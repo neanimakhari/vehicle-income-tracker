@@ -13,7 +13,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy via SSH (Docker Compose)
+      - name: Deploy via SSH (Docker Compose pull)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DROPLET_HOST }}
@@ -39,12 +39,10 @@ jobs:
             test -f .env
             test -d secrets
 
-            # Clear Docker build cache (safe; does NOT remove volumes)
-            docker builder prune -af || true
-
-            # Build fresh and redeploy
-            docker compose -f docker-compose.yml build --no-cache
-            docker compose -f docker-compose.yml up -d --remove-orphans
+            # Disk is tight on small droplets: do not build on the droplet.
+            # Pull prebuilt images from GHCR and start containers.
+            docker compose -f docker-compose.ghcr.yml pull
+            docker compose -f docker-compose.ghcr.yml up -d --remove-orphans
 
             # Clear unused images/containers (safe; does NOT remove volumes)
             docker container prune -f || true
