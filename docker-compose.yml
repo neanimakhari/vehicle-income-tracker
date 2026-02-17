@@ -1,0 +1,77 @@
+# Run from project root: docker compose up --build
+# API: http://localhost:3000  Tenant admin: http://localhost:3002  System admin: http://localhost:3001
+# Mobile app: use API base URL http://10.0.2.2:3000 (Android emulator) or your PC IP (physical device).
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vit_platform
+      POSTGRES_USER: vit_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vit_secret_change_me}
+    ports:
+      - "5432:5432"
+    volumes:
+      - vit_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vit_admin -d vit_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./api/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: vit_admin
+      DB_DATABASE: vit_platform
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-vit_secret_change_me}
+      JWT_SECRET: ${JWT_SECRET:-change-me-jwt-secret-min-32-chars}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-refresh-secret-min-32}
+      BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-}
+      CORS_ORIGINS: "http://localhost:3001,http://localhost:3002,http://127.0.0.1:3001,http://127.0.0.1:3002"
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  system-admin:
+    build:
+      context: ./system-admin
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      API_URL: http://api:3000
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+    ports:
+      - "3001:3001"
+    depends_on:
+      - api
+
+  tenant-admin:
+    build:
+      context: ./tenant-admin
+      dockerfile: Dockerfile
+      args:
+        API_URL: http://api:3000
+    restart: unless-stopped
+    environment:
+      API_URL: http://api:3000
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+    ports:
+      - "3002:3002"
+    depends_on:
+      - api
+
+volumes:
+  vit_pgdata:

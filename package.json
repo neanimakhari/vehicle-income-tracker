@@ -1,0 +1,22 @@
+{
+  "name": "vehicle-income-tracker-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "workspaces": [
+    "system-admin",
+    "tenant-admin",
+    "api",
+    "app"
+  ],
+  "scripts": {
+    "dev": "npm run -ws dev",
+    "build": "npm run -ws build",
+    "lint": "npm run -ws lint",
+    "test": "npm run -ws test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
+

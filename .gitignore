@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment and secrets (never commit)
+.env
+.env.*
+!.env.example
+deploy/secrets/
+!deploy/secrets.example/
+
+# Runtime and uploads
+api/uploads/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Windows reserved names (can break git on Windows)
+nul
+con
+prn
+aux
+
+# IDE and OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
+
+# Testing and coverage
+coverage/
+.nyc_output/
+
+# Flutter/Dart
+app/.dart_tool/
+app/build/
+*.iml
+
+# Optional: uncomment if you use these
+# .cursor/
+# *.local
+

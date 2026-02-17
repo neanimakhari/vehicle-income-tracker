@@ -1,0 +1,117 @@
+name: ci
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  api-smoke:
+    runs-on: ubuntu-latest
+    needs: api
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: vit_admin
+          POSTGRES_PASSWORD: vit_admin_password
+          POSTGRES_DB: vit_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vit_admin -d vit_platform"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: api
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USERNAME: vit_admin
+      DB_PASSWORD: vit_admin_password
+      DB_DATABASE: vit_platform
+      DB_DEFAULT_SCHEMA: platform
+      JWT_SECRET: ci-super-secret-key-123456
+      JWT_REFRESH_SECRET: ci-super-refresh-secret-123456
+      BOOTSTRAP_TOKEN: ci-bootstrap
+      CORS_ORIGINS: http://localhost:3001,http://localhost:3002
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm run migration:run
+      - run: |
+          npm run start:prod &
+          sleep 5
+          curl -f http://localhost:3000/health
+
+  system-admin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: system-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: system-admin/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  tenant-admin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tenant-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: tenant-admin/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.22.0"
+          channel: "stable"
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+
+

@@ -1,0 +1,15 @@
+# Bind app ports to localhost only (so only Nginx on the droplet can reach them).
+# Copy to docker-compose.override.yml when deploying on a single server (e.g. DigitalOcean droplet):
+#   cp docker-compose.override.vehinc.example.yml docker-compose.override.yml
+# Then: docker compose -f docker-compose.yml up -d
+
+services:
+  api:
+    ports:
+      - "127.0.0.1:3020:3000"
+  system-admin:
+    ports:
+      - "127.0.0.1:3021:3001"
+  tenant-admin:
+    ports:
+      - "127.0.0.1:3022:3002"
