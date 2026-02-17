@@ -37,7 +37,7 @@ services:
       JWT_REFRESH_SECRET_FILE: /run/secrets/jwt_refresh_secret
       BOOTSTRAP_TOKEN_FILE: /run/secrets/bootstrap_token
     ports:
-      - "3020:3000"
+      - "127.0.0.1:3020:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -66,7 +66,7 @@ services:
       API_URL: http://api:3000
       COOKIE_SECURE: "${COOKIE_SECURE:-false}"
     ports:
-      - "3011:3001"
+      - "127.0.0.1:3011:3001"
     depends_on:
       - api
 
@@ -83,7 +83,7 @@ services:
       API_URL: http://api:3000
       COOKIE_SECURE: "${COOKIE_SECURE:-false}"
     ports:
-      - "3012:3002"
+      - "127.0.0.1:3012:3002"
     depends_on:
       - api
 
