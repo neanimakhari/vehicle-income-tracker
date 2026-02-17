@@ -21,6 +21,8 @@ jobs:
           key: ${{ secrets.DROPLET_SSH_PRIVATE_KEY }}
           # port defaults to 22 if omitted
           script: |
+            # Use bash so we can rely on pipefail
+            bash -lc '
             set -euo pipefail
 
             APP_DIR="${DROPLET_APP_DIR:-/opt/vehicle_income_tracker}"
@@ -47,3 +49,4 @@ jobs:
             # Clear unused images/containers (safe; does NOT remove volumes)
             docker container prune -f || true
             docker image prune -af || true
+            '
