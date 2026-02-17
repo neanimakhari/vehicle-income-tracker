@@ -1,4 +1,4 @@
-/// <reference types="vitest" />
+import { vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 // Mock next/image to avoid Next context (return a no-op component that doesn't pull in React here)
