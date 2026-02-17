@@ -1,0 +1,49 @@
+name: Deploy to DigitalOcean Droplet
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH (Docker Compose)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USERNAME }}
+          key: ${{ secrets.DROPLET_SSH_PRIVATE_KEY }}
+          # port defaults to 22 if omitted
+          script: |
+            set -euo pipefail
+
+            APP_DIR="${DROPLET_APP_DIR:-/opt/vehicle_income_tracker}"
+
+            echo "Deploying in ${APP_DIR}"
+            cd "${APP_DIR}"
+
+            git fetch --all --prune
+            git reset --hard origin/main
+
+            cd deploy
+
+            # Safety checks (keep secrets on droplet, not in GitHub)
+            test -f .env
+            test -d secrets
+
+            # Clear Docker build cache (safe; does NOT remove volumes)
+            docker builder prune -af || true
+
+            # Build fresh and redeploy
+            docker compose -f docker-compose.yml build --no-cache
+            docker compose -f docker-compose.yml up -d --remove-orphans
+
+            # Clear unused images/containers (safe; does NOT remove volumes)
+            docker container prune -f || true
+            docker image prune -af || true
