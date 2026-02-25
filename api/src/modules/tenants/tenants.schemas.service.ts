@@ -81,6 +81,9 @@ export class TenantSchemasService {
         "petrol_slip" text NULL DEFAULT NULL,
         "driver_id" uuid NULL DEFAULT NULL,
         "logged_on" timestamptz NOT NULL,
+        "approval_status" varchar(20) NOT NULL DEFAULT 'auto',
+        "approved_at" timestamptz NULL DEFAULT NULL,
+        "approved_by" uuid NULL DEFAULT NULL,
         "created_at" timestamptz NOT NULL DEFAULT now(),
         "updated_at" timestamptz NOT NULL DEFAULT now()
       )`,
