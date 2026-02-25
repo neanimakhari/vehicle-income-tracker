@@ -144,3 +144,4 @@ export function SessionsClient({ devices, revokeDevice, revokeAllSessions }: Ses
     </div>
   );
 }
+

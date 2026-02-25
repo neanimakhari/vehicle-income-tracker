@@ -286,3 +286,4 @@ Create the first platform admin using the bootstrap token (see main README or AP
 | **Nginx**       | Proxies each subdomain to localhost and serves HTTPS via Let’s Encrypt |
 
 The domains stay with your provider; only the A records point to the droplet.
+

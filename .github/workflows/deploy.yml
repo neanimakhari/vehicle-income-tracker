@@ -50,3 +50,4 @@ jobs:
             docker container prune -f || true
             docker image prune -af || true
             '
+

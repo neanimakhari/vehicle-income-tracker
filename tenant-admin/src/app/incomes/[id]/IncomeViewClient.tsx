@@ -116,3 +116,4 @@ export function IncomeViewClient({ income }: { income: Income }) {
   );
 }
 
+

@@ -30,3 +30,4 @@ export class AddExpenseReceiptImage1700000000019 implements MigrationInterface {
   }
 }
 
+

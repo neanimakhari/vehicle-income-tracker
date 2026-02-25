@@ -58,3 +58,4 @@ export default async function IncomeViewPage({ params }: { params: Promise<{ id:
   );
 }
 
+
