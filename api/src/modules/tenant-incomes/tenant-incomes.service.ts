@@ -133,7 +133,8 @@ export class TenantIncomesService {
       this.tenantScope,
       TenantUser,
     );
-    return tenantRepo.withSchema(async repo => {
+    try {
+      return await tenantRepo.withSchema(async repo => {
       let driverName = payload.driverName;
       let driverId = payload.driverId ?? null;
       
@@ -168,7 +169,13 @@ export class TenantIncomesService {
       const approvalStatus: 'auto' | 'pending' = isToday ? 'auto' : 'pending';
 
       if (payload.vehicle && payload.endKm != null) {
-        const { lastEndKm } = await this.getLastOdometer(payload.vehicle);
+        const last = await repo
+          .createQueryBuilder('income')
+          .select(['income.endKm', 'income.loggedOn'])
+          .where('income.vehicle = :vehicle', { vehicle: payload.vehicle })
+          .orderBy('income.logged_on', 'DESC')
+          .getOne();
+        const lastEndKm = last?.endKm != null ? Number(last.endKm) : null;
         if (lastEndKm != null && Number(payload.endKm) < lastEndKm) {
           throw new BadRequestException(
             `End KM cannot be less than the last recorded end KM for this vehicle (${lastEndKm}).`,
@@ -183,8 +190,8 @@ export class TenantIncomesService {
         vehicle: payload.vehicle,
         driverName,
         income: payload.income,
-        startingKm: payload.startingKm ?? null,
-        endKm: payload.endKm ?? null,
+        startingKm: payload.startingKm != null ? Math.round(Number(payload.startingKm)) : null,
+        endKm: payload.endKm != null ? Math.round(Number(payload.endKm)) : null,
         petrolPoured: payload.petrolPoured ?? null,
         petrolLitres: payload.petrolLitres ?? null,
         expenseDetail: payload.expenseDetail ?? null,
@@ -219,6 +226,10 @@ export class TenantIncomesService {
       });
       return saved;
     });
+    } catch (err) {
+      console.error('[TenantIncomesService.create]', err);
+      throw err;
+    }
   }
 
   async update(

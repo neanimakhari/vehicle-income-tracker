@@ -1,10 +1,10 @@
 /// API base URL for the mobile app (include /v1 if your API uses versioned routes).
-/// Default: 192.168.0.118:3000 (this machine's Wi‑Fi IP; API verified reachable).
-/// Override: flutter run --dart-define=API_BASE_URL=http://OTHER_IP:3000
+/// Default: production API (HTTPS). For local dev use:
+///   flutter run --dart-define=API_BASE_URL=http://YOUR_IP:3000
 class AppConfig {
   static const String _rawBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.0.118:3000',
+    defaultValue: 'https://vit-api.vehinc.co.za',
   );
 
   /// Base URL with /v1 suffix so all tenant routes work (e.g. /v1/tenant/auth/login).

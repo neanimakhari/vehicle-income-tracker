@@ -11,14 +11,13 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
-# Warn if production URL not set (so frontends don't get localhost)
+# Require NEXT_PUBLIC_API_URL to be set and non-empty (frontends need it)
+if ! grep -qE '^NEXT_PUBLIC_API_URL=.+' .env 2>/dev/null; then
+  echo "Error: set NEXT_PUBLIC_API_URL in deploy/.env (e.g. https://vit-api.vehinc.co.za or http://YOUR_IP:4000)."
+  exit 1
+fi
 if ! grep -q '^NEXT_PUBLIC_API_URL=https://' .env 2>/dev/null; then
-  echo "Warning: NEXT_PUBLIC_API_URL in deploy/.env should be your production API URL (e.g. https://vit-api.vehinc.co.za) so the frontends call the right API."
-  read -r -p "Continue anyway? [y/N] " reply
-  case "$reply" in
-    [yY][eE][sS]|[yY]) ;;
-    *) exit 1 ;;
-  esac
+  echo "Note: NEXT_PUBLIC_API_URL is not https. Use https in production behind Nginx."
 fi
 
 echo "Building from deploy/ (so .env is used)..."
