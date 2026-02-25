@@ -30,3 +30,4 @@ export class ProfilePictureText1700000000018 implements MigrationInterface {
   }
 }
 
+

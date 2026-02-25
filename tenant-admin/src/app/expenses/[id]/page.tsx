@@ -43,3 +43,4 @@ export default async function ExpenseViewPage({ params }: { params: Promise<{ id
   );
 }
 
+

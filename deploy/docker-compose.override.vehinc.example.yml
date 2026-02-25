@@ -13,3 +13,4 @@ services:
   tenant-admin:
     ports:
       - "127.0.0.1:3022:3002"
+

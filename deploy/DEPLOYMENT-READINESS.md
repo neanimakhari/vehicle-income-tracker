@@ -94,3 +94,4 @@ cp -r secrets.example secrets   # then edit secrets/* with real values
 docker compose -f docker-compose.yml up -d
 # API: http://localhost:3010  System admin: http://localhost:3011  Tenant admin: http://localhost:3012
 ```
+
