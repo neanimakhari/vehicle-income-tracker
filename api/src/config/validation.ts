@@ -13,20 +13,18 @@ export const validationSchema = Joi.object({
   DB_SSL: Joi.boolean().truthy('true').falsy('false').default(false),
   DB_DEFAULT_SCHEMA: Joi.string().default('platform'),
   JWT_SECRET: Joi.string()
-    .min(16)
     .when('JWT_SECRET_FILE', {
       is: Joi.string().min(1),
-      then: Joi.optional(),
-      otherwise: Joi.required(),
+      then: Joi.string().allow('').optional(),
+      otherwise: Joi.string().min(16).required(),
     }),
   JWT_SECRET_FILE: Joi.string().allow('').optional(),
   JWT_EXPIRES_IN: Joi.string().default('1h'),
   JWT_REFRESH_SECRET: Joi.string()
-    .min(16)
     .when('JWT_REFRESH_SECRET_FILE', {
       is: Joi.string().min(1),
-      then: Joi.optional(),
-      otherwise: Joi.required(),
+      then: Joi.string().allow('').optional(),
+      otherwise: Joi.string().min(16).required(),
     }),
   JWT_REFRESH_SECRET_FILE: Joi.string().allow('').optional(),
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
