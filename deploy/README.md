@@ -2,6 +2,8 @@
 
 This folder contains deployment helpers for local and production-like setups.
 
+**Recommended:** Use the **[build-and-up script](#local-stack-api--postgres--admin-uis)** (`build-and-up.sh` or `build-and-up.bat`) so the stack is always built from `deploy/` with the correct `.env`. That way the frontends get `NEXT_PUBLIC_API_URL` baked in and the API gets `CORS_ORIGINS`, avoiding "wrong API" and CORS errors in production.
+
 **Before going to production**, use the **[Deployment readiness checklist](./DEPLOYMENT-READINESS.md)**.
 
 **DigitalOcean Droplet + domains at your provider:** see **[DIGITALOCEAN-DROPLET.md](./DIGITALOCEAN-DROPLET.md)** for DNS at your registrar, droplet setup, Nginx + Let’s Encrypt, and binding app ports to localhost.
@@ -10,18 +12,34 @@ This folder contains deployment helpers for local and production-like setups.
 
 1. Copy `env.example.txt` to `.env` in this folder.
 2. Copy `secrets.example/` to `secrets/` and fill in real values.
-3. Update secrets in `.env` (or rely on the `*_FILE` entries).
-3. Run:
+3. For **production**, set in `.env`: `NEXT_PUBLIC_API_URL`, `CORS_ORIGINS`, and optionally `API_PORT`, `SYSTEM_ADMIN_PORT`, `TENANT_ADMIN_PORT`.
+4. Build and start **from this folder** so `.env` is used (required for frontends to get the right API URL):
 
+**Recommended — use the script (from repo root):**
+
+```bash
+./deploy/build-and-up.sh
 ```
-docker compose -f deploy/docker-compose.yml up -d
+
+On Windows (from repo root):
+
+```cmd
+deploy\build-and-up.bat
 ```
 
-By default the deploy compose uses **host ports 3010, 3011, 3012** (to avoid clashes with other services). Override with `API_PORT`, `SYSTEM_ADMIN_PORT`, `TENANT_ADMIN_PORT` in `.env` if needed.
+**Or manually:**
 
-- API: `http://localhost:3010` (or `API_PORT`)
-- System Admin: `http://localhost:3011` (or `SYSTEM_ADMIN_PORT`)
-- Tenant Admin: `http://localhost:3012` (or `TENANT_ADMIN_PORT`)
+```bash
+cd deploy
+docker compose -f docker-compose.yml build --no-cache
+docker compose -f docker-compose.yml up -d
+```
+
+Ports come from `.env`: `API_PORT` (default 4000), `SYSTEM_ADMIN_PORT` (4001), `TENANT_ADMIN_PORT` (4002). If you set e.g. `API_PORT=3020` in `.env`, the API is on port 3020.
+
+- API: `http://localhost:${API_PORT:-4000}`
+- System Admin: `http://localhost:${SYSTEM_ADMIN_PORT:-4001}`
+- Tenant Admin: `http://localhost:${TENANT_ADMIN_PORT:-4002}`
 
 ## Environment variables
 
@@ -34,8 +52,8 @@ API uses the same env vars as `api/config/env.example.txt`, including:
 - `FORCE_MFA_FOR_ADMINS`
 - `*_FILE` secrets (e.g. `DB_PASSWORD_FILE`)
 - **Email (Mailgun):** `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `EMAIL_FROM` (or SMTP fallback: `EMAIL_USER`, `EMAIL_PASSWORD`, etc.)
-- **Production builds:** `NEXT_PUBLIC_API_URL` (e.g. `https://api.yourdomain.com`) so the frontends call the correct API from the browser. Set in `deploy/.env` before `docker compose build`.
-- **CORS:** `CORS_ORIGINS` must list your production frontend URLs (e.g. `https://admin.yourdomain.com,https://app.yourdomain.com`).
+- **Production builds:** `NEXT_PUBLIC_API_URL` (e.g. `https://api.yourdomain.com`) so the frontends call the correct API from the browser. Set in `deploy/.env` **before** building. Use `deploy/build-and-up.sh` or run `docker compose` from **inside `deploy/`** so this variable is in the environment when the frontend images are built.
+- **CORS:** `CORS_ORIGINS` must list your production frontend origins, comma-separated (e.g. `https://admin.yourdomain.com,https://app.yourdomain.com`). Trailing slashes are normalized by the API.
 
 Tenant-level MFA enforcement is managed in System Admin → Tenants (Admin MFA / Driver MFA).
 
@@ -59,13 +77,13 @@ If `MAILGUN_API_KEY` is not set, the app falls back to SMTP. Set `EMAIL_USER`, `
 **Test email:**
 
 ```bash
-curl -X POST http://localhost:3010/email/test \
+curl -X POST http://localhost:4000/email/test \
   -H "Content-Type: application/json" \
   -H "X-Email-Test-Secret: vit-test-email-secret" \
   -d '{"to":"neanimakhari7@gmail.com"}'
 ```
 
-Use a recipient you added as authorized. If `EMAIL_TEST_SECRET` is set, use that value instead of `vit-test-email-secret`.
+Use a recipient you added as authorized. If `EMAIL_TEST_SECRET` is set, use that value instead of `vit-test-email-secret`. (Use your `API_PORT` if set, e.g. 3020.)
 
 ## Secrets flow
 
@@ -83,7 +101,7 @@ Use `deploy/env.production.example.txt` as a base for production deployments (fi
 
 ## Production notes
 
-- **Before building:** Set `NEXT_PUBLIC_API_URL` and `CORS_ORIGINS` in `deploy/.env` to your production domain. Frontends are built with that API URL baked in.
+- **Before building:** Set `NEXT_PUBLIC_API_URL` and `CORS_ORIGINS` in `deploy/.env` to your production domain. Use `deploy/build-and-up.sh` (or `build-and-up.bat` on Windows) so the build runs from `deploy/` and frontends get the correct API URL baked in.
 - Use a managed Postgres service and store secrets in your platform secret manager.
 - Enable TLS at the ingress/load-balancer layer (e.g. Nginx + Let's Encrypt).
 - Run migrations on deploy: the API container runs them on startup via `docker-entrypoint.sh`.

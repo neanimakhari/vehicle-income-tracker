@@ -26,17 +26,29 @@ Use this list before deploying to production (or a production-like environment).
 
 ## 2. Build and run with Docker Compose
 
-- [ ] **Build with production API URL**  
-  If deploying for production, set in `deploy/.env` **before** building:
-  ```bash
-  NEXT_PUBLIC_API_URL=https://api.yourdomain.com
-  ```
-  Then build and start:
+- [ ] **Build from `deploy/` so `.env` is used**  
+  Docker Compose reads `.env` from the **current directory**. If you build from the repo root, `NEXT_PUBLIC_API_URL` may be empty and the frontends are built with `http://localhost:3000` — so the browser calls the wrong API and you get errors or CORS. Always run:
   ```bash
   cd deploy
   docker compose -f docker-compose.yml build --no-cache
   docker compose -f docker-compose.yml up -d
   ```
+
+- [ ] **Build with production API URL**  
+  If deploying for production, set in `deploy/.env` **before** building:
+  ```bash
+  NEXT_PUBLIC_API_URL=https://api.yourdomain.com
+  ```
+  Then build and start (from `deploy/` as above):
+  ```bash
+  cd deploy
+  docker compose -f docker-compose.yml build --no-cache
+  docker compose -f docker-compose.yml up -d
+  ```
+  **If you already deployed** and see API/network errors: rebuild the frontend images with the correct `NEXT_PUBLIC_API_URL` in `deploy/.env`, then `docker compose build --no-cache system-admin tenant-admin` and `up -d` again.
+
+- [ ] **Verify frontend API URL (optional)**  
+  In the browser: open your deployed site (e.g. https://vit-admin.vehinc.co.za), open DevTools → Network, trigger a request (e.g. log in or load dashboard). Check the **request URL** of the API call: it should be your production API (e.g. `https://vit-api.vehinc.co.za/v1/...`). If you see `http://localhost:3000/v1/...`, the frontends were built without `NEXT_PUBLIC_API_URL` — rebuild from `deploy/` with correct `.env`.
 
 - [ ] **Migrations**  
   The API container runs migrations on startup (see `api/docker-entrypoint.sh`). No separate migration step needed.

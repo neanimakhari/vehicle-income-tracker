@@ -35,8 +35,24 @@ async function bootstrap() {
   );
 
   const corsOrigins = configService.get<string[]>('app.corsOrigins') ?? [];
+  const normalizeOrigin = (o: string) => (o.endsWith('/') ? o.slice(0, -1) : o);
+  const allowedSet = new Set(corsOrigins.map(normalizeOrigin));
+
   app.enableCors({
-    origin: corsOrigins.length > 0 ? corsOrigins : false,
+    origin: (origin, callback) => {
+      // No origin: same-origin request, or non-browser client (e.g. Postman)
+      if (!origin) {
+        return callback(null, true);
+      }
+      const normalized = normalizeOrigin(origin);
+      if (allowedSet.has(normalized)) {
+        return callback(null, true);
+      }
+      if (corsOrigins.length === 0) {
+        return callback(null, false);
+      }
+      callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
   });
 
