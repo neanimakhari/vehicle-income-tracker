@@ -7,6 +7,7 @@ import 'dashboard_screen.dart';
 import 'income_log_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    Session.onCleared = _handleSessionCleared;
     _driverDisplayName = Session.email;
     _loadDriverDisplayName();
     _loadExpiryStatus();
@@ -36,6 +38,15 @@ class _HomeScreenState extends State<HomeScreen> {
       HistoryScreen(onBack: _handleBackToHome, openDrawer: () => _scaffoldKey.currentState?.openDrawer()),
       ProfileScreen(onBack: _handleBackToHome, openDrawer: () => _scaffoldKey.currentState?.openDrawer()),
     ];
+  }
+
+  @override
+  void dispose() {
+    // Only clear the callback if we are the current owner
+    if (Session.onCleared == _handleSessionCleared) {
+      Session.onCleared = null;
+    }
+    super.dispose();
   }
 
   Future<void> _loadDriverDisplayName() async {
@@ -59,6 +70,14 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _driverDisplayName = Session.email);
       }
     }
+  }
+
+  void _handleSessionCleared() {
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (_) => false,
+    );
   }
 
   Future<void> _loadExpiryStatus() async {
@@ -88,84 +107,93 @@ class _HomeScreenState extends State<HomeScreen> {
         emailVerified: _emailVerified,
         showExpiryBadge: _showExpiryBadge,
       ),
-      body: Stack(
-        children: [
-          // Add bottom padding to prevent content from being hidden
-          Padding(
-            padding: EdgeInsets.only(bottom: _navbarVisible ? 88 : 16),
-            child: _pages[_index],
-          ),
-          // Collapsible Navigation Bar
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            left: 16,
-            right: 16,
-            bottom: _navbarVisible ? 16 : -80,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Toggle Button
-                GestureDetector(
-                  onTap: () => setState(() => _navbarVisible = !_navbarVisible),
-                  child: Container(
-                    width: 48,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: barColor,
-                      border: Border(
-                        left: BorderSide(color: borderColor),
-                        right: BorderSide(color: borderColor),
-                        top: BorderSide(color: borderColor),
-                      ),
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(AppTheme.radius),
-                        topRight: Radius.circular(AppTheme.radius),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+          return Stack(
+            children: [
+              // Add bottom padding to prevent content from being hidden
+              Padding(
+                padding: EdgeInsets.only(bottom: _navbarVisible ? 88 : 16),
+                child: _pages[_index],
+              ),
+              // Collapsible Navigation Bar with always-visible toggle handle
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: bottomInset + 8,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Toggle Button (always visible)
+                    GestureDetector(
+                      onTap: () => setState(() => _navbarVisible = !_navbarVisible),
+                      child: Container(
+                        width: 48,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: barColor,
+                          border: Border(
+                            left: BorderSide(color: borderColor),
+                            right: BorderSide(color: borderColor),
+                            top: BorderSide(color: borderColor),
+                          ),
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(AppTheme.radius),
+                            topRight: Radius.circular(AppTheme.radius),
+                          ),
+                        ),
+                        child: Icon(
+                          _navbarVisible ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
-                    child: Icon(
-                      _navbarVisible ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
-                      color: Colors.white,
-                      size: 20,
+                    // Navigation Bar (expands/collapses, but handle stays)
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeInOut,
+                      height: _navbarVisible ? 64 : 0,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.only(
+                          bottomLeft: Radius.circular(AppTheme.radius),
+                          bottomRight: Radius.circular(AppTheme.radius),
+                        ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: barColor,
+                            border: Border(
+                              left: BorderSide(color: borderColor),
+                              right: BorderSide(color: borderColor),
+                              bottom: BorderSide(color: borderColor),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(isDarkMode ? 0.4 : 0.2),
+                                blurRadius: 10,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _navItem(Icons.dashboard, 'Home', 0, isDarkMode),
+                              _navItem(Icons.attach_money, 'Income', 1, isDarkMode),
+                              _navItem(Icons.history, 'History', 2, isDarkMode),
+                              _navItem(Icons.person, 'Profile', 3, isDarkMode),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-                // Navigation Bar
-                Container(
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: barColor,
-                    border: Border(
-                      left: BorderSide(color: borderColor),
-                      right: BorderSide(color: borderColor),
-                      bottom: BorderSide(color: borderColor),
-                    ),
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(AppTheme.radius),
-                      bottomRight: Radius.circular(AppTheme.radius),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(isDarkMode ? 0.4 : 0.2),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _navItem(Icons.dashboard, 'Home', 0, isDarkMode),
-                      _navItem(Icons.attach_money, 'Income', 1, isDarkMode),
-                      _navItem(Icons.history, 'History', 2, isDarkMode),
-                      _navItem(Icons.person, 'Profile', 3, isDarkMode),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }

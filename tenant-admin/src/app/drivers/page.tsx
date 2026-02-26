@@ -130,8 +130,11 @@ export default async function DriversPage() {
     if (!firstName || !lastName || !email || !password) {
       return { error: "First name, last name, email and password are required." };
     }
-    if (password.length < 12) {
-      return { error: "Password must be at least 12 characters." };
+    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/;
+    if (!passwordPattern.test(password)) {
+      return {
+        error: "Password must be at least 8 characters and include uppercase, lowercase and a symbol.",
+      };
     }
     try {
       const res = await fetch(`${getApiUrl()}/tenant/users`, {

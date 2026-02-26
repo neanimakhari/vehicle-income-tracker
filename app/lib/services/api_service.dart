@@ -77,7 +77,7 @@ class ApiService {
     final response = await http.get(uri, headers: _authHeaders());
     if (response.statusCode == 401) {
       await Session.clear();
-      throw Exception('Unauthorized');
+      throw Exception('Session expired. Please sign in again.');
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('Failed to fetch incomes (${response.statusCode})');
@@ -105,7 +105,7 @@ class ApiService {
     final response = await http.get(uri, headers: _authHeaders());
     if (response.statusCode == 401) {
       await Session.clear();
-      throw Exception('Unauthorized');
+      throw Exception('Session expired. Please sign in again.');
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       return {'lastEndKm': null, 'lastLoggedOn': null};
@@ -298,7 +298,7 @@ class ApiService {
       return data;
     }
     await Session.clear();
-    throw Exception('Failed to refresh session');
+    throw Exception('Session expired. Please sign in again.');
   }
 
   Future<Map<String, dynamic>> fetchDriverProfile() async {
@@ -465,7 +465,7 @@ class ApiService {
   }) async {
     if (response.statusCode == 401) {
       await Session.clear();
-      throw Exception('Unauthorized');
+      throw Exception('Session expired. Please sign in again.');
     }
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonDecode(response.body) as List<dynamic>;
@@ -497,7 +497,10 @@ class ApiService {
     print('_decodeObject: status=${response.statusCode}, body=${response.body}');
     if (response.statusCode == 401) {
       await Session.clear();
-      final message = _parseErrorMessage(response, 'Unauthorized');
+      final message = _parseErrorMessage(
+        response,
+        'Session expired. Please sign in again.',
+      );
       throw Exception(message);
     }
     if (response.statusCode >= 200 && response.statusCode < 300) {

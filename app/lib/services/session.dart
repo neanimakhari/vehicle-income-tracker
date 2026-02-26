@@ -28,6 +28,11 @@ class Session {
   static int? sessionTimeoutMinutes;
   static bool rememberMe = true;
 
+  /// Optional callback that is invoked when the session is fully cleared
+  /// due to expiry or an unauthorized response from the API.
+  /// UI layers (e.g. HomeScreen) can set this to react globally (navigate to login).
+  static void Function()? onCleared;
+
   static Future<void> load() async {
     accessToken = await _storage.read(key: _tokenKey);
     refreshToken = await _storage.read(key: _refreshTokenKey);
@@ -142,6 +147,10 @@ class Session {
     requireBiometrics = null;
     sessionTimeoutMinutes = null;
     rememberMe = true;
+    final callback = onCleared;
+    if (callback != null) {
+      callback();
+    }
   }
 
   /// Logout: clear access token and all user-specific state so a new login sees a clean slate.

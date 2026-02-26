@@ -79,8 +79,9 @@ export function CreateDriverModal({ createDriver }: Props) {
       setError("First name, last name, email and password are required.");
       return;
     }
-    if (password.length < 12) {
-      setError("Password must be at least 12 characters.");
+    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/;
+    if (!passwordPattern.test(password)) {
+      setError("Password must be at least 8 characters and include uppercase, lowercase and a symbol.");
       return;
     }
     startTransition(async () => {
@@ -188,11 +189,11 @@ export function CreateDriverModal({ createDriver }: Props) {
                 <div className="relative">
                   <input
                     className="input px-3 py-2 pr-10 text-sm w-full"
-                    placeholder="Min 12 characters"
+                    placeholder="Min 8 chars, upper/lowercase & symbol"
                     type={showPassword ? "text" : "password"}
                     name="password"
                     required
-                    minLength={12}
+                    minLength={8}
                     disabled={isPending}
                   />
                   <button
@@ -206,7 +207,9 @@ export function CreateDriverModal({ createDriver }: Props) {
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
-                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">At least 12 characters</p>
+                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  At least 8 characters, including uppercase, lowercase and a symbol
+                </p>
               </div>
               <div className="flex gap-3 pt-2">
                 <button

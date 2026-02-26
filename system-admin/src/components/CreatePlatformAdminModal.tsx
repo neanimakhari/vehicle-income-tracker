@@ -61,8 +61,9 @@ export function CreatePlatformAdminModal({
   async function handleSubmit(formData: FormData) {
     setError(null);
     const password = String(formData.get("password") ?? "");
-    if (password.length < 12) {
-      setError("Password must be at least 12 characters");
+    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/;
+    if (!passwordPattern.test(password)) {
+      setError("Password must be at least 8 characters and include uppercase, lowercase and a symbol.");
       return;
     }
     const result = await createPlatformAdmin(formData);
@@ -103,13 +104,15 @@ export function CreatePlatformAdminModal({
             <input name="email" type="email" required className="input w-full px-3 py-2 text-sm" placeholder="admin@platform.com" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Password (min 12 characters)</label>
+            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Password (min 8 chars, upper/lowercase & symbol)
+            </label>
             <div className="relative">
               <input
                 name="password"
                 type={showPassword ? "text" : "password"}
                 required
-                minLength={12}
+                minLength={8}
                 className="input w-full px-3 py-2 pr-10 text-sm"
                 placeholder="••••••••••••"
               />

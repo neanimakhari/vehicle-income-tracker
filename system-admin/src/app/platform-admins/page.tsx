@@ -19,8 +19,12 @@ export default async function PlatformAdminsPage() {
     if (!email || !password) {
       return { success: false, error: "Email and password are required" };
     }
-    if (password.length < 12) {
-      return { success: false, error: "Password must be at least 12 characters" };
+    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/;
+    if (!passwordPattern.test(password)) {
+      return {
+        success: false,
+        error: "Password must be at least 8 characters and include uppercase, lowercase and a symbol.",
+      };
     }
     try {
       const res = await fetch(`${getApiUrl()}/platform/admins`, {

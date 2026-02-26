@@ -102,6 +102,39 @@ export class TenantReportsController {
     @Body() dto: CustomReportDto,
     @Req() req: { user?: { sub?: string; role?: string } },
   ) {
+    // #region agent log
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const g: any = global as any;
+      const f = g.fetch as
+        | ((input: string, init?: Record<string, unknown>) => Promise<unknown>)
+        | undefined;
+      if (typeof f === 'function') {
+        f('http://127.0.0.1:7725/ingest/8dc24a86-a8d0-42ab-aa70-b4fe2823d695', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Debug-Session-Id': '7d8684',
+          },
+          body: JSON.stringify({
+            sessionId: '7d8684',
+            runId: 'pre-fix',
+            hypothesisId: 'H1',
+            location: 'tenant-reports.controller.ts:customReport',
+            message: 'customReport called',
+            data: {
+              hasBody: !!dto,
+              metricsCount: Array.isArray(dto?.metrics) ? dto.metrics.length : 0,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+      }
+    } catch {
+      // ignore debug logging errors
+    }
+    // #endregion agent log
+
     const filters: any = {};
     
     if (dto.singleDate) {

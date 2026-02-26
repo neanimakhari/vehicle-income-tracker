@@ -142,7 +142,11 @@ class _ResetPasswordLinkScreenState extends State<ResetPasswordLinkScreen> {
                           ),
                         ),
                         validator: (v) {
-                          if (v == null || v.length < 8) return 'Use at least 8 characters';
+                          if (v == null) return 'Use at least 8 characters with uppercase, lowercase and a symbol';
+                          final regex = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$');
+                          if (!regex.hasMatch(v)) {
+                            return 'Use at least 8 characters with uppercase, lowercase and a symbol';
+                          }
                           return null;
                         },
                       ),

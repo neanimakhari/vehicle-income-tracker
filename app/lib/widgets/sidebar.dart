@@ -183,7 +183,6 @@ class AppSidebar extends StatelessWidget {
               label: 'Sign Out',
               onTap: () async {
                 await _performLogout(context);
-                if (context.mounted) Navigator.pop(context);
               },
             ),
             if (Session.role == 'TENANT_ADMIN') ...[

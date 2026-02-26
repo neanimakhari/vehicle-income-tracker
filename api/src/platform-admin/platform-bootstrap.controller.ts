@@ -1,5 +1,5 @@
 import { Body, Controller, Headers, Post } from '@nestjs/common';
-import { IsEmail, MinLength } from 'class-validator';
+import { IsEmail, Matches, MinLength } from 'class-validator';
 import { PlatformBootstrapService } from './platform-bootstrap.service';
 import { ApiTags } from '@nestjs/swagger';
 
@@ -7,7 +7,11 @@ class BootstrapDto {
   @IsEmail()
   email: string;
 
-  @MinLength(12)
+  @MinLength(8)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/, {
+    message:
+      'Password must be at least 8 characters and include uppercase, lowercase and a symbol',
+  })
   password: string;
 }
 

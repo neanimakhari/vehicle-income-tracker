@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import '../services/session.dart';
 import '../theme.dart';
 import '../utils/app_toast.dart';
 import '../widgets/confirmation_dialog.dart';
@@ -136,8 +135,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     if (value == null || value.isEmpty) {
                       return 'Please enter a new password';
                     }
-                    if (value.length < 8) {
-                      return 'Password must be at least 8 characters';
+                    final regex = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$');
+                    if (!regex.hasMatch(value)) {
+                      return 'Use at least 8 characters with uppercase, lowercase and a symbol';
                     }
                     if (value == _currentPasswordController.text) {
                       return 'New password must be different from current password';

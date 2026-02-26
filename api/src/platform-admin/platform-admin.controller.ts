@@ -3,7 +3,7 @@ import { PlatformAdminService } from './platform-admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, Matches, MinLength } from 'class-validator';
 import { ApiTags } from '@nestjs/swagger';
 
 class CreatePlatformAdminDto {
@@ -11,7 +11,11 @@ class CreatePlatformAdminDto {
   email: string;
 
   @IsString()
-  @MinLength(12)
+  @MinLength(8)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/, {
+    message:
+      'Password must be at least 8 characters and include uppercase, lowercase and a symbol',
+  })
   password: string;
 
   @IsString()

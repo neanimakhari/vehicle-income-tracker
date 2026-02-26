@@ -32,8 +32,12 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    if (password.length < 8) {
-      setMessage({ type: "error", text: "Password must be at least 8 characters long." });
+    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/;
+    if (!passwordPattern.test(password)) {
+      setMessage({
+        type: "error",
+        text: "Password must be at least 8 characters and include uppercase, lowercase and a symbol.",
+      });
       return;
     }
 
@@ -129,7 +133,7 @@ export default function ResetPasswordPage() {
                 </button>
               </div>
               <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                Must be at least 8 characters long
+                At least 8 characters, including uppercase, lowercase and a symbol
               </p>
             </div>
 

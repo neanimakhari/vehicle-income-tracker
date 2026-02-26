@@ -103,13 +103,15 @@ export function CreateTenantAdminModal({
             <input name="email" type="email" required className="input w-full px-3 py-2 text-sm" placeholder="admin@example.com" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Password (min 12 chars)</label>
+            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Password (min 8 chars, upper/lowercase & symbol)
+            </label>
             <div className="relative">
               <input
                 name="password"
                 type={showPassword ? "text" : "password"}
                 required
-                minLength={12}
+                minLength={8}
                 className="input w-full px-3 py-2 pr-10 text-sm"
                 placeholder="••••••••••••"
               />

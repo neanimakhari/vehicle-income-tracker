@@ -47,8 +47,12 @@ export default async function TenantAdminsPage() {
     if (!email || !password || !tenantSlug) {
       return { success: false, error: "Email, password and tenant are required" };
     }
-    if (password.length < 12) {
-      return { success: false, error: "Password must be at least 12 characters" };
+    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/;
+    if (!passwordPattern.test(password)) {
+      return {
+        success: false,
+        error: "Password must be at least 8 characters and include uppercase, lowercase and a symbol.",
+      };
     }
     try {
       const res = await fetch(`${getApiUrl()}/tenant/admins`, {
