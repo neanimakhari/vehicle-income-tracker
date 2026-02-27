@@ -210,6 +210,104 @@ nginx -t && systemctl reload nginx
 
 ---
 
+## 6. Database subdomain (vit-database.vehinc.co.za) – DB droplet
+
+Use this on the **database droplet** (64.226.97.116). Nginx serves a simple HTTPS page; **PostgreSQL is not proxied** – pgAdmin and the app connect directly to `vit-database.vehinc.co.za:5432` (or `64.226.97.116:5432`).
+
+### DNS
+
+At your DNS provider, add an **A record**: Name `vit-database`, Value `64.226.97.116`, TTL 300.
+
+### Nginx + HTTPS on the DB droplet
+
+SSH into the DB droplet: `ssh root@64.226.97.116`
+
+```bash
+sudo apt update && sudo apt install -y nginx certbot python3-certbot-nginx
+sudo mkdir -p /var/www/vit-database
+echo '<!DOCTYPE html><html><head><title>VIT Database</title></head><body><h1>VIT Database server</h1><p>PostgreSQL is on port 5432. Use vit-database.vehinc.co.za in pgAdmin.</p></body></html>' | sudo tee /var/www/vit-database/index.html
+```
+
+```bash
+sudo tee /etc/nginx/sites-available/vit-database << 'EOF'
+server {
+    listen 80;
+    server_name vit-database.vehinc.co.za;
+    root /var/www/vit-database;
+    index index.html;
+    location / { try_files $uri $uri/ =404; }
+}
+EOF
+```
+
+```bash
+sudo ln -sf /etc/nginx/sites-available/vit-database /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+sudo ufw allow 80 && sudo ufw allow 443
+```
+
+After DNS has propagated:
+
+```bash
+sudo certbot --nginx -d vit-database.vehinc.co.za
+```
+
+**pgAdmin:** Host `vit-database.vehinc.co.za`, Port `5432`, Database `vit_platform`, User `vit_admin`, Password (e.g. Vit2024#).
+
+---
+
+## 7. Migrate database from app droplet to DB droplet
+
+Use this after the remote Postgres (64.226.97.116) is set up and you want the app to use it instead of the Docker Postgres container.
+
+### A. Dump on app droplet (104.248.42.192)
+
+```bash
+cd /opt/vehicle_income_tracker/deploy
+docker exec -t vit_postgres pg_dump -U vit_admin -d vit_platform -F c -f /tmp/vit_platform.dump
+docker cp vit_postgres:/tmp/vit_platform.dump ./vit_platform.dump
+```
+
+### B. Copy dump to DB droplet
+
+From the app droplet:
+
+```bash
+scp /opt/vehicle_income_tracker/deploy/vit_platform.dump root@64.226.97.116:/root/
+```
+
+### C. Restore on DB droplet (64.226.97.116)
+
+```bash
+sudo -u postgres pg_restore -d vit_platform -U vit_admin --no-owner --no-acl /root/vit_platform.dump
+```
+
+Ignore errors about “already exists” for extensions or the public schema. Then:
+
+```bash
+sudo -u postgres psql -d vit_platform -c "GRANT ALL ON SCHEMA public TO vit_admin; GRANT ALL ON ALL TABLES IN SCHEMA public TO vit_admin; GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO vit_admin;"
+```
+
+### D. Point app at remote DB
+
+On the **app droplet**, in `deploy/`:
+
+- **.env:** set `DB_HOST=64.226.97.116` (or `vit-database.vehinc.co.za` once DNS works).
+- **docker-compose:** remove the `postgres` service, set the API’s `DB_HOST` to that host, and remove `depends_on: postgres` from the API.
+
+Then:
+
+```bash
+cd /opt/vehicle_income_tracker/deploy
+docker compose down
+docker compose up -d
+```
+
+The API will connect to the DB droplet. You can remove the old Docker volume later with `docker volume rm deploy_vit_pgdata` if you no longer need it.
+
+---
+
 ## Summary
 
 | What | Action |
