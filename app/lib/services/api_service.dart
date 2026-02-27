@@ -228,6 +228,15 @@ class ApiService {
     return _decodeObject(response, errorPrefix: 'Failed to fetch tenant policy');
   }
 
+  /// Public list of active tenants (slug + name) for tenant picker.
+  Future<List<Map<String, dynamic>>> fetchPublicTenants() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/public/tenants'),
+    );
+    final data = await _decodeList(response, errorPrefix: 'Failed to fetch tenants');
+    return data.cast<Map<String, dynamic>>();
+  }
+
   Future<Map<String, dynamic>> fetchTenantPolicyPublic(String tenantId) async {
     final response = await http.get(
       Uri.parse('$baseUrl/tenant/policy/public'),

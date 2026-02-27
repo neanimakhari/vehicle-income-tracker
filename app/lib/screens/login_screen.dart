@@ -24,6 +24,9 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _policyLoading = false;
   bool _showPassword = false;
   Map<String, dynamic>? _tenantPolicy;
+  List<Map<String, dynamic>> _tenants = [];
+  bool _tenantsLoading = false;
+  String? _selectedTenantSlug;
 
   @override
   void initState() {
@@ -31,6 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (Session.tenantId != null) {
       _tenantController.text = Session.tenantId!;
     }
+    _loadTenants();
   }
 
   @override
@@ -40,6 +44,33 @@ class _LoginScreenState extends State<LoginScreen> {
     _tenantController.dispose();
     _mfaController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadTenants() async {
+    setState(() => _tenantsLoading = true);
+    try {
+      final tenants = await _api.fetchPublicTenants();
+      if (!mounted) return;
+      setState(() {
+        _tenants = tenants;
+        // Keep previously selected tenant if still valid, otherwise pick first.
+        final current = _tenantController.text.trim();
+        if (current.isNotEmpty && tenants.any((t) => t['slug'] == current)) {
+          _selectedTenantSlug = current;
+        } else if (_selectedTenantSlug == null && tenants.isNotEmpty) {
+          _selectedTenantSlug = tenants.first['slug']?.toString();
+        }
+        if (_selectedTenantSlug != null) {
+          _tenantController.text = _selectedTenantSlug!;
+        }
+      });
+    } catch (_) {
+      // Ignore failures; user can still type manually.
+    } finally {
+      if (mounted) {
+        setState(() => _tenantsLoading = false);
+      }
+    }
   }
 
   Future<void> _login() async {
@@ -240,37 +271,80 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                TextFormField(
-                                  controller: _tenantController,
-                                  cursorColor: AppTheme.primary,
-                                  decoration: InputDecoration(
-                                    filled: true,
-                                    fillColor: (isDarkMode ? Colors.black : Colors.white).withOpacity(0.35),
-                                    labelText: 'Tenant',
-                                    labelStyle: TextStyle(
-                                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                    ),
-                                    floatingLabelStyle: const TextStyle(color: AppTheme.primary),
-                                    hintText: 'e.g. demo',
-                                    hintStyle: TextStyle(
-                                      color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
-                                    ),
-                                    prefixIcon: Icon(
-                                      Icons.business_outlined,
-                                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                    ),
-                                  ),
-                                  style: TextStyle(
-                                    color: isDarkMode ? Colors.white : Colors.black87,
-                                  ),
-                                  textCapitalization: TextCapitalization.none,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Tenant is required';
-                                    }
-                                    return null;
-                                  },
-                                ),
+                                _tenants.isNotEmpty
+                                    ? DropdownButtonFormField<String>(
+                                        value: _selectedTenantSlug,
+                                        items: _tenants
+                                            .map(
+                                              (t) => DropdownMenuItem<String>(
+                                                value: t['slug']?.toString(),
+                                                child: Text(
+                                                  (t['name']?.toString().trim().isNotEmpty == true
+                                                          ? t['name']?.toString()
+                                                          : t['slug']?.toString()) ??
+                                                      '',
+                                                ),
+                                              ),
+                                            )
+                                            .toList(),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            _selectedTenantSlug = value;
+                                            _tenantController.text = value ?? '';
+                                            _tenantPolicy = null;
+                                          });
+                                        },
+                                        decoration: InputDecoration(
+                                          filled: true,
+                                          fillColor: (isDarkMode ? Colors.black : Colors.white).withOpacity(0.35),
+                                          labelText: 'Tenant',
+                                          labelStyle: TextStyle(
+                                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                          ),
+                                          floatingLabelStyle: const TextStyle(color: AppTheme.primary),
+                                          prefixIcon: Icon(
+                                            Icons.business_outlined,
+                                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                          ),
+                                        ),
+                                        validator: (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return 'Tenant is required';
+                                          }
+                                          return null;
+                                        },
+                                      )
+                                    : TextFormField(
+                                        controller: _tenantController,
+                                        cursorColor: AppTheme.primary,
+                                        decoration: InputDecoration(
+                                          filled: true,
+                                          fillColor: (isDarkMode ? Colors.black : Colors.white).withOpacity(0.35),
+                                          labelText: 'Tenant',
+                                          labelStyle: TextStyle(
+                                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                          ),
+                                          floatingLabelStyle: const TextStyle(color: AppTheme.primary),
+                                          hintText: 'e.g. demo',
+                                          hintStyle: TextStyle(
+                                            color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
+                                          ),
+                                          prefixIcon: Icon(
+                                            Icons.business_outlined,
+                                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                          ),
+                                        ),
+                                        style: TextStyle(
+                                          color: isDarkMode ? Colors.white : Colors.black87,
+                                        ),
+                                        textCapitalization: TextCapitalization.none,
+                                        validator: (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return 'Tenant is required';
+                                          }
+                                          return null;
+                                        },
+                                      ),
                                 const SizedBox(height: 12),
                                 Row(
                                   children: [

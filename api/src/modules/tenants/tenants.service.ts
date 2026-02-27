@@ -25,6 +25,18 @@ export class TenantsService {
     });
   }
 
+  /**
+   * Lightweight list of active tenants for public consumers (e.g. mobile app tenant picker).
+   */
+  async findAllPublic(): Promise<Array<{ slug: string; name: string }>> {
+    const tenants = await this.tenantRepository.find({
+      where: { isActive: true },
+      select: ['slug', 'name'],
+      order: { name: 'ASC' },
+    });
+    return tenants.map((t) => ({ slug: t.slug, name: t.name }));
+  }
+
   /** Per-tenant usage for billing and reporting. Includes id/name for easy invoicing. */
   async getUsageForAll(): Promise<
     Array<{

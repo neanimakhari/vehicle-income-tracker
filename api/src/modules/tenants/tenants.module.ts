@@ -8,10 +8,11 @@ import { TenantSchemasService } from './tenants.schemas.service';
 import { AuditModule } from '../audit/audit.module';
 import { EmailModule } from '../email/email.module';
 import { TenancyModule } from '../../tenancy/tenancy.module';
+import { PublicTenantsController } from './public-tenants.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Tenant]), AuditModule, EmailModule, forwardRef(() => TenancyModule)],
-  controllers: [TenantsController, TenantPolicyController],
+  controllers: [TenantsController, TenantPolicyController, PublicTenantsController],
   providers: [TenantsService, TenantSchemasService],
   exports: [TenantsService, TenantSchemasService],
 })
