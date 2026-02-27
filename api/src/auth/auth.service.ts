@@ -90,6 +90,21 @@ export class AuthService {
     },
   ) {
     const user = await this.validateUser(email, password);
+    // Enforce app separation: tenant admin credentials cannot log into platform and vice versa.
+    const isTenantAdminLogin = context?.tenantSlug != null && context.tenantSlug !== '';
+    if (isTenantAdminLogin) {
+      if (user.role !== 'TENANT_ADMIN') {
+        throw new UnauthorizedException(
+          'This account is for platform admin. Sign in at the system admin app.',
+        );
+      }
+    } else {
+      if (user.role !== 'PLATFORM_ADMIN') {
+        throw new UnauthorizedException(
+          'This account is for tenant admin. Sign in at the tenant admin app with your tenant.',
+        );
+      }
+    }
     if (user.role === 'TENANT_ADMIN' && user.tenantId && context?.tenantSlug) {
       if (user.tenantId !== context.tenantSlug) {
         throw new UnauthorizedException('This account is not for the specified tenant.');

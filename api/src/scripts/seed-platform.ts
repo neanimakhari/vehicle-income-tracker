@@ -70,6 +70,28 @@ async function seed() {
     console.log(`Platform admin ${config.platformAdminEmail} already exists`);
   }
 
+  // Optional extra platform admin (e.g. SEED_EXTRA_PLATFORM_ADMIN_EMAIL + SEED_EXTRA_PLATFORM_ADMIN_PASSWORD)
+  const extraEmail = process.env.SEED_EXTRA_PLATFORM_ADMIN_EMAIL?.trim();
+  const extraPassword = process.env.SEED_EXTRA_PLATFORM_ADMIN_PASSWORD;
+  if (extraEmail && extraPassword) {
+    const existing = await authRepo.findOne({ where: { email: extraEmail } });
+    if (!existing) {
+      const passwordHash = await bcrypt.hash(extraPassword, 12);
+      await authRepo.save(
+        authRepo.create({
+          email: extraEmail,
+          passwordHash,
+          role: 'PLATFORM_ADMIN',
+          tenantId: null,
+          isActive: true,
+        }),
+      );
+      console.log(`Created extra platform admin ${extraEmail}`);
+    } else {
+      console.log(`Extra platform admin ${extraEmail} already exists`);
+    }
+  }
+
   const tenantAdmin = await authRepo.findOne({
     where: { email: config.tenantAdminEmail },
   });

@@ -85,6 +85,12 @@ After the stack is up, seed to create the demo tenant and users:
 docker compose run --rm api npm run seed:platform:prod
 ```
 
+To create an **additional** platform admin, pass env vars (from the `deploy` directory):
+
+```bash
+docker compose run --rm -e SEED_EXTRA_PLATFORM_ADMIN_EMAIL=your@email.com -e "SEED_EXTRA_PLATFORM_ADMIN_PASSWORD=YourPassword#" api npm run seed:platform:prod
+```
+
 If you see "Missing script", rebuild the API image: `docker compose build api`
 
 ---
