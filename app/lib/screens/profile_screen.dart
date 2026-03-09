@@ -12,6 +12,7 @@ import '../widgets/app_section.dart';
 import '../widgets/confirmation_dialog.dart';
 import 'login_screen.dart';
 import 'mfa_setup_screen.dart';
+import 'change_password_screen.dart';
 import 'driver_profile_screen.dart';
 import 'help_screen.dart';
 import 'privacy_policy_screen.dart';
@@ -509,6 +510,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 16),
                 _securityCard(isDarkMode),
                 const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+                      );
+                    },
+                    icon: const Icon(Icons.lock_outline),
+                    label: const Text('Change Password'),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   height: 48,

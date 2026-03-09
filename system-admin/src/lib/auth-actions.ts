@@ -8,6 +8,7 @@ export async function loginAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const mfaToken = String(formData.get("mfaToken") ?? "").trim();
+  const tenantSlug = String(formData.get("tenantSlug") ?? "").trim();
   const rememberMe = formData.get("rememberMe") === "on" || formData.get("rememberMe") === "true";
 
   if (!email || !password) {
@@ -18,7 +19,12 @@ export async function loginAction(formData: FormData) {
     const res = await fetch(`${getApiUrl()}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, mfaToken: mfaToken || undefined }),
+      body: JSON.stringify({
+        email,
+        password,
+        mfaToken: mfaToken || undefined,
+        tenantSlug: tenantSlug || undefined,
+      }),
     });
 
     if (!res.ok) {
@@ -33,6 +39,12 @@ export async function loginAction(formData: FormData) {
         }
         if (message.includes("MFA setup required")) {
           reason = "mfa-setup";
+        }
+        if (message.includes("Invalid credentials")) {
+          reason = "invalid-credentials";
+        }
+        if (message.includes("not for the specified tenant")) {
+          reason = "wrong-tenant";
         }
       } catch {
         // ignore parse errors

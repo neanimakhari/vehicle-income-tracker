@@ -35,7 +35,7 @@ class VITApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'VIT Mobile',
+      title: 'VIT',
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       home: const InitialRoute(),

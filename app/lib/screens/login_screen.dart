@@ -26,7 +26,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _showPassword = false;
   Map<String, dynamic>? _tenantPolicy;
   List<Map<String, dynamic>> _tenants = [];
-  bool _tenantsLoading = false;
   String? _selectedTenantSlug;
 
   @override
@@ -48,7 +47,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _loadTenants() async {
-    setState(() => _tenantsLoading = true);
     try {
       final tenants = await _api.fetchPublicTenants();
       if (!mounted) return;
@@ -67,10 +65,6 @@ class _LoginScreenState extends State<LoginScreen> {
       });
     } catch (_) {
       // Ignore failures; user can still type manually.
-    } finally {
-      if (mounted) {
-        setState(() => _tenantsLoading = false);
-      }
     }
   }
 
@@ -161,7 +155,27 @@ class _LoginScreenState extends State<LoginScreen> {
       if (errorText != null) {
         AppToast.error(context, errorText);
       } else {
-        AppToast.error(context, 'Login failed', e);
+        String? friendly;
+        if (message.contains('Invalid credentials') || message.contains('incorrect password')) {
+          friendly = 'Incorrect email or password.';
+        } else if (message.contains('Tenant not found') || message.contains('Tenant context missing')) {
+          friendly = 'Tenant not found. Please check the tenant selection.';
+        } else if (message.contains('Invalid MFA token')) {
+          friendly = 'Invalid MFA code. Please try again.';
+        } else if (message.contains('Account locked')) {
+          friendly = 'Account locked. Please try again later.';
+        } else if (message.contains('Sign in at the tenant admin app')) {
+          friendly = 'This account is for tenant admins. Please sign in in the tenant admin app.';
+        } else if (message.contains('Sign in at the system admin app')) {
+          friendly = 'This account is for platform admins. Please sign in in the system admin app.';
+        } else if (message.contains('not for the specified tenant')) {
+          friendly = 'This account is not for the selected tenant.';
+        }
+        if (friendly != null) {
+          AppToast.error(context, friendly);
+        } else {
+          AppToast.error(context, 'Login failed', e);
+        }
       }
     } finally {
       if (mounted) {
@@ -381,99 +395,108 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ],
                                 ),
                                 const SizedBox(height: 20),
-                                TextFormField(
-                                  controller: _emailController,
-                                  cursorColor: AppTheme.primary,
-                                  decoration: InputDecoration(
-                                    filled: true,
-                                    fillColor: (isDarkMode ? Colors.black : Colors.white).withOpacity(0.35),
-                                    labelText: 'Email',
-                                    labelStyle: TextStyle(
-                                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                    ),
-                                    floatingLabelStyle: const TextStyle(color: AppTheme.primary),
-                                    hintText: 'Enter your email',
-                                    hintStyle: TextStyle(
-                                      color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
-                                    ),
-                                    prefixIcon: Icon(
-                                      Icons.email_outlined,
-                                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                    ),
-                                  ),
-                                  style: TextStyle(
-                                    color: isDarkMode ? Colors.white : Colors.black87,
-                                  ),
-                                  keyboardType: TextInputType.emailAddress,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Please enter your email';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 20),
-                                TextFormField(
-                                  controller: _passwordController,
-                                  cursorColor: AppTheme.primary,
-                                  obscureText: !_showPassword,
-                                  decoration: InputDecoration(
-                                    filled: true,
-                                    fillColor: (isDarkMode ? Colors.black : Colors.white).withOpacity(0.35),
-                                    labelText: 'Password',
-                                    labelStyle: TextStyle(
-                                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                    ),
-                                    floatingLabelStyle: const TextStyle(color: AppTheme.primary),
-                                    hintText: 'Enter your password...',
-                                    hintStyle: TextStyle(
-                                      color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
-                                    ),
-                                    prefixIcon: Icon(
-                                      Icons.lock_outline,
-                                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                    ),
-                                    suffixIcon: IconButton(
-                                      icon: Icon(
-                                        _showPassword ? Icons.visibility_off : Icons.visibility,
-                                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                AutofillGroup(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      TextFormField(
+                                        controller: _emailController,
+                                        cursorColor: AppTheme.primary,
+                                        autofillHints: const [AutofillHints.username, AutofillHints.email],
+                                        decoration: InputDecoration(
+                                          filled: true,
+                                          fillColor: (isDarkMode ? Colors.black : Colors.white).withOpacity(0.35),
+                                          labelText: 'Email',
+                                          labelStyle: TextStyle(
+                                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                          ),
+                                          floatingLabelStyle: const TextStyle(color: AppTheme.primary),
+                                          hintText: 'Enter your email',
+                                          hintStyle: TextStyle(
+                                            color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
+                                          ),
+                                          prefixIcon: Icon(
+                                            Icons.email_outlined,
+                                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                          ),
+                                        ),
+                                        style: TextStyle(
+                                          color: isDarkMode ? Colors.white : Colors.black87,
+                                        ),
+                                        keyboardType: TextInputType.emailAddress,
+                                        validator: (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return 'Please enter your email';
+                                          }
+                                          return null;
+                                        },
                                       ),
-                                      onPressed: () => setState(() => _showPassword = !_showPassword),
-                                    ),
-                                  ),
-                                  style: TextStyle(
-                                    color: isDarkMode ? Colors.white : Colors.black87,
-                                  ),
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Please enter your password';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 16),
-                                TextFormField(
-                                  controller: _mfaController,
-                                  cursorColor: AppTheme.primary,
-                                  decoration: InputDecoration(
-                                    filled: true,
-                                    fillColor: (isDarkMode ? Colors.black : Colors.white).withOpacity(0.35),
-                                    labelText: 'MFA Code (if enabled)',
-                                    labelStyle: TextStyle(
-                                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                    ),
-                                    floatingLabelStyle: const TextStyle(color: AppTheme.primary),
-                                    hintText: '123456',
-                                    hintStyle: TextStyle(
-                                      color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
-                                    ),
-                                    prefixIcon: Icon(
-                                      Icons.shield_outlined,
-                                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                    ),
-                                  ),
-                                  style: TextStyle(
-                                    color: isDarkMode ? Colors.white : Colors.black87,
+                                      const SizedBox(height: 20),
+                                      TextFormField(
+                                        controller: _passwordController,
+                                        cursorColor: AppTheme.primary,
+                                        obscureText: !_showPassword,
+                                        autofillHints: const [AutofillHints.password],
+                                        decoration: InputDecoration(
+                                          filled: true,
+                                          fillColor: (isDarkMode ? Colors.black : Colors.white).withOpacity(0.35),
+                                          labelText: 'Password',
+                                          labelStyle: TextStyle(
+                                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                          ),
+                                          floatingLabelStyle: const TextStyle(color: AppTheme.primary),
+                                          hintText: 'Enter your password...',
+                                          hintStyle: TextStyle(
+                                            color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
+                                          ),
+                                          prefixIcon: Icon(
+                                            Icons.lock_outline,
+                                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                          ),
+                                          suffixIcon: IconButton(
+                                            icon: Icon(
+                                              _showPassword ? Icons.visibility_off : Icons.visibility,
+                                              color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                            ),
+                                            onPressed: () => setState(() => _showPassword = !_showPassword),
+                                          ),
+                                        ),
+                                        style: TextStyle(
+                                          color: isDarkMode ? Colors.white : Colors.black87,
+                                        ),
+                                        validator: (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return 'Please enter your password';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: 16),
+                                      TextFormField(
+                                        controller: _mfaController,
+                                        cursorColor: AppTheme.primary,
+                                        decoration: InputDecoration(
+                                          filled: true,
+                                          fillColor: (isDarkMode ? Colors.black : Colors.white).withOpacity(0.35),
+                                          labelText: 'MFA Code (if enabled)',
+                                          labelStyle: TextStyle(
+                                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                          ),
+                                          floatingLabelStyle: const TextStyle(color: AppTheme.primary),
+                                          hintText: '123456',
+                                          hintStyle: TextStyle(
+                                            color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
+                                          ),
+                                          prefixIcon: Icon(
+                                            Icons.shield_outlined,
+                                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                          ),
+                                        ),
+                                        style: TextStyle(
+                                          color: isDarkMode ? Colors.white : Colors.black87,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                                 const SizedBox(height: 28),
