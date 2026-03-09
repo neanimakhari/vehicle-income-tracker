@@ -16,6 +16,7 @@ import 'screens/security_blocked_screen.dart';
 import 'screens/reset_password_link_screen.dart';
 import 'screens/verify_email_link_screen.dart';
 import 'screens/splash_screen.dart';
+import 'screens/change_password_screen.dart';
 import 'theme.dart';
 
 Future<void> main() async {
@@ -182,24 +183,12 @@ class _HomeGateState extends State<HomeGate> with WidgetsBindingObserver {
       return;
     }
     try {
-      final api = ApiService();
-      final policy = await api.fetchTenantPolicy();
-      final requireMfaUsers = policy['requireMfaUsers'] == true;
-      Session.requireBiometrics = policy['requireBiometrics'] == true;
-      Session.sessionTimeoutMinutes = policy['sessionTimeoutMinutes'] is int
-          ? policy['sessionTimeoutMinutes'] as int
-          : int.tryParse(policy['sessionTimeoutMinutes']?.toString() ?? '');
-      await Session.save();
-      final requiresBiometrics =
-          (Session.requireBiometrics == true) || SecuritySettings.biometricsEnabled;
-      setState(() {
-        _requiresMfa = requireMfaUsers && Session.mfaEnabled != true;
-        if (requiresBiometrics) {
-          _locked = true;
-        }
-      });
-      await OfflineQueue.syncPending(api);
-      _evaluateLock();
+      await Future.any([
+        _resolveGateWithApi(),
+        Future.delayed(const Duration(seconds: 25), () {
+          throw Exception('Startup timed out');
+        }),
+      ]);
     } catch (_) {
       setState(() {
         _requiresMfa = false;
@@ -209,6 +198,32 @@ class _HomeGateState extends State<HomeGate> with WidgetsBindingObserver {
         setState(() => _loading = false);
       }
     }
+  }
+
+  Future<void> _resolveGateWithApi() async {
+    final api = ApiService();
+    final policy = await api.fetchTenantPolicy();
+    final requireMfaUsers = policy['requireMfaUsers'] == true;
+    Session.requireBiometrics = policy['requireBiometrics'] == true;
+    Session.sessionTimeoutMinutes = policy['sessionTimeoutMinutes'] is int
+        ? policy['sessionTimeoutMinutes'] as int
+        : int.tryParse(policy['sessionTimeoutMinutes']?.toString() ?? '');
+    await Session.save();
+    final requiresBiometrics =
+        (Session.requireBiometrics == true) || SecuritySettings.biometricsEnabled;
+    if (mounted) {
+      setState(() {
+        _requiresMfa = requireMfaUsers && Session.mfaEnabled != true;
+        if (requiresBiometrics) {
+          _locked = true;
+        }
+      });
+    }
+    await OfflineQueue.syncPending(api).timeout(
+      const Duration(seconds: 15),
+      onTimeout: () => Future.value(0),
+    );
+    _evaluateLock();
   }
 
   void _evaluateLock() {
@@ -247,6 +262,9 @@ class _HomeGateState extends State<HomeGate> with WidgetsBindingObserver {
           setState(() => _locked = false);
         },
       );
+    }
+    if (Session.mustChangePassword == true) {
+      return const ChangePasswordScreen(forcedFirstLogin: true);
     }
     return HomeScreen(key: ValueKey('${Session.userId ?? Session.email ?? ""}'));
   }

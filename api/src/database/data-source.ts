@@ -26,6 +26,7 @@ import { AddExpenseReceiptImage1700000000019 } from './migrations/1700000000019-
 import { AddIncomeApprovalStatus1700000000020 } from './migrations/1700000000020-add-income-approval-status';
 import { AddDriverExpiryUpdateRequests1700000000021 } from './migrations/1700000000021-add-driver-expiry-update-requests';
 import { EnsureIncomeApprovalColumns1700000000022 } from './migrations/1700000000022-ensure-income-approval-columns';
+import { AddMustChangePassword1700000000023 } from './migrations/1700000000023-add-must-change-password';
 
 export default new DataSource({
   type: 'postgres',
@@ -60,6 +61,7 @@ export default new DataSource({
     AddIncomeApprovalStatus1700000000020,
     AddDriverExpiryUpdateRequests1700000000021,
     EnsureIncomeApprovalColumns1700000000022,
+    AddMustChangePassword1700000000023,
   ],
 });
 

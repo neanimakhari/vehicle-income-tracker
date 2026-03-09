@@ -108,6 +108,9 @@ export class TenantUser {
   @Column({ name: 'email_verification_expires', type: 'timestamptz', nullable: true })
   emailVerificationExpires: Date | null;
 
+  @Column({ name: 'must_change_password', type: 'boolean', default: true })
+  mustChangePassword: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

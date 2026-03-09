@@ -5,6 +5,7 @@ import '../theme.dart';
 import '../utils/app_toast.dart';
 import 'home_screen.dart';
 import 'mfa_setup_screen.dart';
+import 'change_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -99,14 +100,24 @@ class _LoginScreenState extends State<LoginScreen> {
               : result['user']?['tenantId'] as String?;
       Session.tenantName = result['tenantName'] as String? ?? result['user']?['tenantName'] as String?;
       Session.rememberMe = true;
+      Session.mustChangePassword = result['user']?['mustChangePassword'] as bool? ?? false;
       await Session.save();
       if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => HomeScreen(key: ValueKey('${Session.userId ?? Session.email ?? ""}')),
-        ),
-      );
+      if (Session.mustChangePassword == true) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const ChangePasswordScreen(forcedFirstLogin: true),
+          ),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => HomeScreen(key: ValueKey('${Session.userId ?? Session.email ?? ""}')),
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       final message = e.toString();

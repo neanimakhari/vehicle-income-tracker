@@ -13,6 +13,7 @@ class Session {
   static const _requireBiometricsKey = 'requireBiometrics';
   static const _sessionTimeoutKey = 'sessionTimeoutMinutes';
   static const _rememberMeKey = 'rememberMe';
+  static const _mustChangePasswordKey = 'mustChangePassword';
   static final _storage = FlutterSecureStorage();
 
   static String? accessToken;
@@ -27,6 +28,7 @@ class Session {
   static bool? requireBiometrics;
   static int? sessionTimeoutMinutes;
   static bool rememberMe = true;
+  static bool? mustChangePassword;
 
   /// Optional callback that is invoked when the session is fully cleared
   /// due to expiry or an unauthorized response from the API.
@@ -50,6 +52,8 @@ class Session {
     sessionTimeoutMinutes = timeoutValue == null ? null : int.tryParse(timeoutValue);
     final rememberValue = await _storage.read(key: _rememberMeKey);
     rememberMe = rememberValue != 'false';
+    final mustChangeValue = await _storage.read(key: _mustChangePasswordKey);
+    mustChangePassword = mustChangeValue == null ? null : mustChangeValue == 'true';
   }
 
   static Future<void> save() async {
@@ -115,6 +119,14 @@ class Session {
       await _storage.delete(key: _sessionTimeoutKey);
     }
     await _storage.write(key: _rememberMeKey, value: rememberMe.toString());
+    if (mustChangePassword != null) {
+      await _storage.write(
+        key: _mustChangePasswordKey,
+        value: mustChangePassword.toString(),
+      );
+    } else {
+      await _storage.delete(key: _mustChangePasswordKey);
+    }
     if (!rememberMe) {
       await _storage.delete(key: _emailKey);
       await _storage.delete(key: _tenantKey);
@@ -135,6 +147,7 @@ class Session {
     await _storage.delete(key: _requireBiometricsKey);
     await _storage.delete(key: _sessionTimeoutKey);
     await _storage.delete(key: _rememberMeKey);
+    await _storage.delete(key: _mustChangePasswordKey);
     accessToken = null;
     refreshToken = null;
     tenantId = null;
@@ -147,21 +160,20 @@ class Session {
     requireBiometrics = null;
     sessionTimeoutMinutes = null;
     rememberMe = true;
+    mustChangePassword = null;
     final callback = onCleared;
     if (callback != null) {
       callback();
     }
   }
 
-  /// Logout: clear access token and all user-specific state so a new login sees a clean slate.
-  /// Clears in-memory user fields so no UI shows the previous user; keeps refreshToken, tenantId, email
-  /// in storage so "Login with Biometrics" can refresh for the same user.
   static Future<void> clearForLogout() async {
     await _storage.delete(key: _tokenKey);
     await _storage.delete(key: _userIdKey);
     await _storage.delete(key: _roleKey);
     await _storage.delete(key: _mfaEnabledKey);
     await _storage.delete(key: _tenantNameKey);
+    await _storage.delete(key: _mustChangePasswordKey);
     accessToken = null;
     userId = null;
     role = null;
@@ -169,6 +181,7 @@ class Session {
     tenantName = null;
     email = null;
     tenantId = null;
+    mustChangePassword = null;
   }
 }
 

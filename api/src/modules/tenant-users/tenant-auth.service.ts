@@ -233,6 +233,7 @@ export class TenantAuthService {
           mfaEnabled: user.mfaEnabled,
           firstName: user.firstName,
           lastName: user.lastName,
+          mustChangePassword: user.mustChangePassword ?? false,
         },
       };
     } catch (error) {
@@ -625,6 +626,7 @@ export class TenantAuthService {
       user.passwordHash = passwordHash;
       user.failedLoginAttempts = 0;
       user.lockedUntil = null;
+      user.mustChangePassword = false;
       await repo.save(user);
 
       // Log password change

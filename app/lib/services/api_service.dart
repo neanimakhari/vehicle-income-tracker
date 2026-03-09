@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import '../config.dart';
 import 'session.dart';
 
@@ -224,6 +225,9 @@ class ApiService {
     final response = await http.get(
       Uri.parse('$baseUrl/tenant/policy'),
       headers: _authHeaders(),
+    ).timeout(
+      const Duration(seconds: 20),
+      onTimeout: () => throw Exception('Request timed out'),
     );
     return _decodeObject(response, errorPrefix: 'Failed to fetch tenant policy');
   }
@@ -415,11 +419,27 @@ class ApiService {
     List<int> fileBytes,
     String fileName,
   ) async {
-    // Ensure filename has an image extension (server may validate by extension if mimetype is missing)
-    String name = fileName;
-    if (!RegExp(r'\.(jpe?g|png|gif|webp)$', caseSensitive: false).hasMatch(name)) {
-      name = name.isEmpty ? 'image.jpg' : '$name.jpg';
+    // Normalize filename so server always gets a valid extension (Android may return path or name without extension).
+    final extRegex = RegExp(r'\.(jpe?g|png|gif|webp)$', caseSensitive: false);
+    String name = fileName.trim().isEmpty ? 'image' : fileName;
+    // Strip path to basename for logging and to get extension from path if name has none
+    final baseName = name.contains('/') ? name.split('/').last : name;
+    final hasExt = extRegex.hasMatch(baseName);
+    if (!hasExt) {
+      // Try extension from path (e.g. /path/to/IMG_123.jpg -> .jpg)
+      final pathExt = baseName.contains('.') ? '.${baseName.split('.').last}' : null;
+      final validExt = pathExt != null && ['.jpg', '.jpeg', '.png', '.gif', '.webp'].contains(pathExt.toLowerCase()) ? pathExt : '.jpg';
+      name = baseName.contains('.') ? baseName : '$baseName$validExt';
+    } else {
+      name = baseName;
     }
+    final ext = name.toLowerCase().contains('.')
+        ? name.toLowerCase().split('.').last
+        : 'jpg';
+    final String mimeSubtype = ext == 'jpg' || ext == 'jpeg'
+        ? 'jpeg'
+        : (ext == 'png' || ext == 'gif' || ext == 'webp' ? ext : 'jpeg');
+    final contentType = MediaType('image', mimeSubtype);
     final request = http.MultipartRequest(
       'POST',
       Uri.parse('$baseUrl/tenant/drivers/profile/picture'),
@@ -430,6 +450,7 @@ class ApiService {
         'file',
         fileBytes,
         filename: name,
+        contentType: contentType,
       ),
     );
     final streamedResponse = await request.send();
@@ -546,7 +567,7 @@ class ApiService {
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/tenant/auth/change-password'),
-      headers: _authHeaders(),
+      headers: _authHeaders(contentType: true),
       body: jsonEncode({
         'currentPassword': currentPassword,
         'newPassword': newPassword,

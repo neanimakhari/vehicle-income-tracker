@@ -45,6 +45,7 @@ export class TenantSchemasService {
                "email_verified" boolean NOT NULL DEFAULT false,
                "email_verification_token" varchar NULL,
                "email_verification_expires" timestamptz NULL,
+               "must_change_password" boolean NOT NULL DEFAULT true,
                "created_at" timestamptz NOT NULL DEFAULT now(),
                "updated_at" timestamptz NOT NULL DEFAULT now()
              )`,

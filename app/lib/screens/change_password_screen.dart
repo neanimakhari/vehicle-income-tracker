@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/session.dart';
 import '../theme.dart';
 import '../utils/app_toast.dart';
 import '../widgets/confirmation_dialog.dart';
+import 'home_screen.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
-  const ChangePasswordScreen({super.key});
+  const ChangePasswordScreen({super.key, this.forcedFirstLogin = false});
+
+  final bool forcedFirstLogin;
 
   @override
   State<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
@@ -35,15 +39,16 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       return;
     }
 
-    final confirmed = await ConfirmationDialog.show(
-      context: context,
-      title: 'Change Password',
-      message: 'Are you sure you want to change your password?',
-      confirmText: 'Change Password',
-      cancelText: 'Cancel',
-    );
-
-    if (confirmed != true) return;
+    if (!widget.forcedFirstLogin) {
+      final confirmed = await ConfirmationDialog.show(
+        context: context,
+        title: 'Change Password',
+        message: 'Are you sure you want to change your password?',
+        confirmText: 'Change Password',
+        cancelText: 'Cancel',
+      );
+      if (confirmed != true) return;
+    }
 
     setState(() => _isLoading = true);
     try {
@@ -54,7 +59,18 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
       if (!mounted) return;
       AppToast.success(context, 'Password changed successfully');
-      Navigator.pop(context);
+      if (widget.forcedFirstLogin) {
+        Session.mustChangePassword = false;
+        await Session.save();
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => HomeScreen(key: ValueKey('${Session.userId ?? Session.email ?? ""}')),
+          ),
+        );
+      } else {
+        Navigator.pop(context);
+      }
     } catch (e) {
       if (!mounted) return;
       AppToast.error(context, 'Failed to change password', e);
@@ -75,10 +91,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         centerTitle: true,
         backgroundColor: isDarkMode ? AppTheme.darkBackground : AppTheme.primary,
         foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.maybePop(context),
-        ),
+        leading: widget.forcedFirstLogin
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.maybePop(context),
+              ),
+        automaticallyImplyLeading: !widget.forcedFirstLogin,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -88,6 +107,32 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (widget.forcedFirstLogin) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 24),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(AppTheme.radius),
+                      border: Border.all(color: AppTheme.primary.withOpacity(0.5)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: AppTheme.primary, size: 28),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'You must change your password before you can continue.',
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white : Colors.black87,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 // Current Password
                 TextFormField(

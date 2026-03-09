@@ -90,6 +90,7 @@ export class TenantUsersService {
         emailVerified: false,
         emailVerificationToken: verificationToken,
         emailVerificationExpires: verificationExpires,
+        mustChangePassword: true,
       });
       const saved = await repo.save(user);
 
