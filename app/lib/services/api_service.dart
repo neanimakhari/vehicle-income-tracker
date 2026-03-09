@@ -475,12 +475,10 @@ class ApiService {
 
   /// Fetches the current driver's profile picture with auth. Returns null if none or error.
   Future<List<int>?> getProfilePictureBytes() async {
-    final token = Session.accessToken;
-    if (token == null || token.isEmpty) return null;
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/tenant/drivers/profile/picture'),
-        headers: {'Authorization': 'Bearer $token'},
+        headers: _authHeaders(),
       );
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return response.bodyBytes;
