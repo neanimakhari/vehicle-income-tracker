@@ -290,38 +290,67 @@ export class EmailService {
       <!DOCTYPE html>
       <html>
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
-          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-          .button { display: inline-block; padding: 12px 24px; background: #14b8a6; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 12px; }
-          .warning { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin: 20px 0; border-radius: 4px; }
+          body { margin:0; padding:0; background:#0f172a; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height:1.6; color:#111827; }
+          .wrapper { width:100%; background:#0f172a; padding:24px 12px; }
+          .container { max-width:600px; margin:0 auto; background:#f9fafb; border-radius:16px; overflow:hidden; box-shadow:0 20px 40px rgba(15,23,42,0.35); }
+          .header { background: radial-gradient(circle at top left,#22c55e,#14b8a6 40%,#0f172a 100%); color:#f9fafb; padding:28px 24px 20px; text-align:left; }
+          .brand-row { display:flex; align-items:center; gap:12px; }
+          .brand-title { font-size:22px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; }
+          .brand-subtitle { font-size:13px; opacity:0.9; }
+          .pill { display:inline-block; margin-top:8px; padding:4px 10px; border-radius:999px; background:rgba(15,23,42,0.55); font-size:11px; text-transform:uppercase; letter-spacing:0.08em; }
+          .content { padding:28px 24px 24px; background:#f9fafb; }
+          .title { font-size:20px; font-weight:600; margin-bottom:4px; color:#020617; }
+          .lead { font-size:14px; color:#4b5563; margin-bottom:18px; }
+          .button { display:inline-block; padding:12px 24px; background:#0d9488; color:#ecfeff; text-decoration:none; border-radius:999px; font-weight:600; font-size:14px; box-shadow:0 10px 25px rgba(13,148,136,0.35); }
+          .button:hover { background:#0f766e; }
+          .link-block { margin-top:18px; font-size:12px; color:#6b7280; word-break:break-all; }
+          .warning { background:#fef3c7; border-radius:10px; padding:12px 14px; margin:18px 0; border:1px solid #facc15; font-size:13px; color:#92400e; }
+          .footer { padding:18px 24px 24px; text-align:center; color:#9ca3af; font-size:11px; background:#f3f4f6; }
+          .logo-circle { width:40px; height:40px; border-radius:50%; background:rgba(15,23,42,0.18); display:flex; align-items:center; justify-content:center; }
+          .logo-text { font-size:18px; font-weight:800; letter-spacing:0.06em; }
         </style>
       </head>
       <body>
-        <div class="container">
-          <div class="header">
-            <h1>Password Reset Request</h1>
-            <p>${tenantName}</p>
-          </div>
-          <div class="content">
-            <p>Hello ${userName},</p>
-            <p>We received a request to reset your password for your VIT account.</p>
-            <p>Click the button below to reset your password:</p>
-            <div style="text-align: center;">
-              <a href="${resetUrl}" class="button">Reset Password</a>
+        <div class="wrapper">
+          <div class="container">
+            <div class="header">
+              <div class="brand-row">
+                <div class="logo-circle">
+                  <span class="logo-text">V</span>
+                </div>
+                <div>
+                  <div class="brand-title">Vehicle Income Tracker</div>
+                  <div class="brand-subtitle">${tenantName}</div>
+                </div>
+              </div>
+              <div class="pill">Security notification</div>
             </div>
-            <p>Or copy and paste this link into your browser:</p>
-            <p style="word-break: break-all; color: #14b8a6;">${resetUrl}</p>
-            <div class="warning">
-              <strong>⚠️ Security Notice:</strong> This link will expire in 1 hour. If you didn't request this reset, please ignore this email or contact support if you have concerns.
+            <div class="content">
+              <h1 class="title">Password reset requested</h1>
+              <p class="lead">
+                Hi ${userName}, we received a request to reset the password for your VIT account.
+                If this was you, use the secure button below to choose a new password.
+              </p>
+              <p style="text-align:center; margin:22px 0;">
+                <a href="${resetUrl}" class="button">Reset password</a>
+              </p>
+              <div class="link-block">
+                If the button doesn’t work, copy and paste this link into your browser:<br />
+                <span style="color:#0f766e;">${resetUrl}</span>
+              </div>
+              <div class="warning">
+                <strong>Security notice:</strong> This link is valid for 1 hour. If you didn’t request a password
+                reset, you can safely ignore this email or contact your administrator.
+              </div>
+              <p style="font-size:13px; color:#6b7280; margin-top:12px;">
+                For your safety, never share this link or your password with anyone.
+              </p>
             </div>
-            <p>If you didn't request a password reset, you can safely ignore this email.</p>
             <div class="footer">
-              <p>This is an automated email from VIT (Vehicle Income Tracker)</p>
-              <p>Generated on ${new Date().toLocaleDateString('en-ZA')}</p>
+              <div>VIT – Vehicle Income Tracker</div>
+              <div>Generated on ${new Date().toLocaleDateString('en-ZA')}</div>
             </div>
           </div>
         </div>
@@ -346,36 +375,64 @@ export class EmailService {
       <!DOCTYPE html>
       <html>
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
-          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-          .button { display: inline-block; padding: 12px 24px; background: #14b8a6; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 12px; }
-          .info { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px; margin: 20px 0; border-radius: 4px; }
+          body { margin:0; padding:0; background:#0f172a; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height:1.6; color:#111827; }
+          .wrapper { width:100%; background:#0f172a; padding:24px 12px; }
+          .container { max-width:600px; margin:0 auto; background:#f9fafb; border-radius:16px; overflow:hidden; box-shadow:0 20px 40px rgba(15,23,42,0.35); }
+          .header { background: radial-gradient(circle at top left,#22c55e,#14b8a6 40%,#0f172a 100%); color:#f9fafb; padding:28px 24px 20px; text-align:left; }
+          .brand-row { display:flex; align-items:center; gap:12px; }
+          .brand-title { font-size:22px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; }
+          .brand-subtitle { font-size:13px; opacity:0.9; }
+          .pill { display:inline-block; margin-top:8px; padding:4px 10px; border-radius:999px; background:rgba(15,23,42,0.55); font-size:11px; text-transform:uppercase; letter-spacing:0.08em; }
+          .content { padding:28px 24px 24px; background:#f9fafb; }
+          .title { font-size:20px; font-weight:600; margin-bottom:4px; color:#020617; }
+          .lead { font-size:14px; color:#4b5563; margin-bottom:18px; }
+          .button { display:inline-block; padding:12px 24px; background:#0d9488; color:#ecfeff; text-decoration:none; border-radius:999px; font-weight:600; font-size:14px; box-shadow:0 10px 25px rgba(13,148,136,0.35); }
+          .button:hover { background:#0f766e; }
+          .link-block { margin-top:18px; font-size:12px; color:#6b7280; word-break:break-all; }
+          .info { background:#eff6ff; border-radius:10px; padding:12px 14px; margin:18px 0; border:1px solid #3b82f6; font-size:13px; color:#1d4ed8; }
+          .footer { padding:18px 24px 24px; text-align:center; color:#9ca3af; font-size:11px; background:#f3f4f6; }
+          .logo-circle { width:40px; height:40px; border-radius:50%; background:rgba(15,23,42,0.18); display:flex; align-items:center; justify-content:center; }
+          .logo-text { font-size:18px; font-weight:800; letter-spacing:0.06em; }
         </style>
       </head>
       <body>
-        <div class="container">
-          <div class="header">
-            <h1>Verify Your Email Address</h1>
-            <p>${tenantName}</p>
-          </div>
-          <div class="content">
-            <p>Hello ${userName},</p>
-            <p>Thank you for signing up! Please verify your email address to complete your account setup.</p>
-            <div style="text-align: center;">
-              <a href="${verificationUrl}" class="button">Verify Email Address</a>
+        <div class="wrapper">
+          <div class="container">
+            <div class="header">
+              <div class="brand-row">
+                <div class="logo-circle">
+                  <span class="logo-text">V</span>
+                </div>
+                <div>
+                  <div class="brand-title">Vehicle Income Tracker</div>
+                  <div class="brand-subtitle">${tenantName}</div>
+                </div>
+              </div>
+              <div class="pill">Email verification</div>
             </div>
-            <p>Or copy and paste this link into your browser:</p>
-            <p style="word-break: break-all; color: #14b8a6;">${verificationUrl}</p>
-            <div class="info">
-              <strong>ℹ️ Note:</strong> This verification link will expire in 24 hours. If you didn't create an account, you can safely ignore this email.
+            <div class="content">
+              <h1 class="title">Verify your email address</h1>
+              <p class="lead">
+                Hello ${userName}, thank you for signing up. Please confirm your email to activate your VIT account
+                and start tracking your vehicles and income.
+              </p>
+              <p style="text-align:center; margin:22px 0;">
+                <a href="${verificationUrl}" class="button">Verify email</a>
+              </p>
+              <div class="link-block">
+                If the button doesn’t work, copy and paste this link into your browser:<br />
+                <span style="color:#0f766e;">${verificationUrl}</span>
+              </div>
+              <div class="info">
+                <strong>Important:</strong> This verification link will expire in 24 hours. If you didn’t create an
+                account, you can safely ignore this email.
+              </div>
             </div>
             <div class="footer">
-              <p>This is an automated email from VIT (Vehicle Income Tracker)</p>
-              <p>Generated on ${new Date().toLocaleDateString('en-ZA')}</p>
+              <div>This is an automated email from VIT (Vehicle Income Tracker)</div>
+              <div>Generated on ${new Date().toLocaleDateString('en-ZA')}</div>
             </div>
           </div>
         </div>
@@ -400,37 +457,64 @@ export class EmailService {
       <!DOCTYPE html>
       <html>
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
-          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-          .button { display: inline-block; padding: 12px 24px; background: #14b8a6; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 12px; }
-          .warning { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin: 20px 0; border-radius: 4px; }
+          body { margin:0; padding:0; background:#0f172a; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height:1.6; color:#111827; }
+          .wrapper { width:100%; background:#0f172a; padding:24px 12px; }
+          .container { max-width:600px; margin:0 auto; background:#f9fafb; border-radius:16px; overflow:hidden; box-shadow:0 20px 40px rgba(15,23,42,0.35); }
+          .header { background: radial-gradient(circle at top left,#22c55e,#14b8a6 40%,#0f172a 100%); color:#f9fafb; padding:28px 24px 20px; text-align:left; }
+          .brand-row { display:flex; align-items:center; gap:12px; }
+          .brand-title { font-size:22px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; }
+          .brand-subtitle { font-size:13px; opacity:0.9; }
+          .pill { display:inline-block; margin-top:8px; padding:4px 10px; border-radius:999px; background:rgba(15,23,42,0.55); font-size:11px; text-transform:uppercase; letter-spacing:0.08em; }
+          .content { padding:28px 24px 24px; background:#f9fafb; }
+          .title { font-size:20px; font-weight:600; margin-bottom:4px; color:#020617; }
+          .lead { font-size:14px; color:#4b5563; margin-bottom:18px; }
+          .button { display:inline-block; padding:12px 24px; background:#0d9488; color:#ecfeff; text-decoration:none; border-radius:999px; font-weight:600; font-size:14px; box-shadow:0 10px 25px rgba(13,148,136,0.35); }
+          .button:hover { background:#0f766e; }
+          .link-block { margin-top:18px; font-size:12px; color:#6b7280; word-break:break-all; }
+          .warning { background:#fef3c7; border-radius:10px; padding:12px 14px; margin:18px 0; border:1px solid #facc15; font-size:13px; color:#92400e; }
+          .footer { padding:18px 24px 24px; text-align:center; color:#9ca3af; font-size:11px; background:#f3f4f6; }
+          .logo-circle { width:40px; height:40px; border-radius:50%; background:rgba(15,23,42,0.18); display:flex; align-items:center; justify-content:center; }
+          .logo-text { font-size:18px; font-weight:800; letter-spacing:0.06em; }
         </style>
       </head>
       <body>
-        <div class="container">
-          <div class="header">
-            <h1>Password Reset Request</h1>
-            <p>${appName}</p>
-          </div>
-          <div class="content">
-            <p>Hello ${userName},</p>
-            <p>We received a request to reset your password for your admin account.</p>
-            <p>Click the button below to reset your password:</p>
-            <div style="text-align: center;">
-              <a href="${resetUrl}" class="button">Reset Password</a>
+        <div class="wrapper">
+          <div class="container">
+            <div class="header">
+              <div class="brand-row">
+                <div class="logo-circle">
+                  <span class="logo-text">V</span>
+                </div>
+                <div>
+                  <div class="brand-title">Vehicle Income Tracker</div>
+                  <div class="brand-subtitle">${appName}</div>
+                </div>
+              </div>
+              <div class="pill">Admin security</div>
             </div>
-            <p>Or copy and paste this link into your browser:</p>
-            <p style="word-break: break-all; color: #14b8a6;">${resetUrl}</p>
-            <div class="warning">
-              <strong>Security notice:</strong> This link will expire in 1 hour. If you didn't request this reset, please ignore this email or contact support.
+            <div class="content">
+              <h1 class="title">Reset your admin password</h1>
+              <p class="lead">
+                Hello ${userName}, a password reset was requested for your admin account. Use the secure button
+                below if you initiated this request.
+              </p>
+              <p style="text-align:center; margin:22px 0;">
+                <a href="${resetUrl}" class="button">Reset admin password</a>
+              </p>
+              <div class="link-block">
+                If the button doesn’t work, copy and paste this link into your browser:<br />
+                <span style="color:#0f766e;">${resetUrl}</span>
+              </div>
+              <div class="warning">
+                <strong>Security notice:</strong> This link will expire in 1 hour. If you didn’t request this reset,
+                please ignore this email and, if concerned, notify your platform administrator.
+              </div>
             </div>
             <div class="footer">
-              <p>This is an automated email from VIT (Vehicle Income Tracker)</p>
-              <p>Generated on ${new Date().toLocaleDateString('en-ZA')}</p>
+              <div>This is an automated email from VIT (Vehicle Income Tracker)</div>
+              <div>Generated on ${new Date().toLocaleDateString('en-ZA')}</div>
             </div>
           </div>
         </div>
@@ -555,32 +639,56 @@ export class EmailService {
       <!DOCTYPE html>
       <html>
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
-          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-          .code { font-size: 28px; font-weight: bold; letter-spacing: 8px; color: #14b8a6; padding: 16px; background: white; border-radius: 8px; text-align: center; margin: 20px 0; }
-          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 12px; }
-          .warning { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin: 20px 0; border-radius: 4px; }
+          body { margin:0; padding:0; background:#0f172a; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height:1.6; color:#111827; }
+          .wrapper { width:100%; background:#0f172a; padding:24px 12px; }
+          .container { max-width:600px; margin:0 auto; background:#f9fafb; border-radius:16px; overflow:hidden; box-shadow:0 20px 40px rgba(15,23,42,0.35); }
+          .header { background: radial-gradient(circle at top left,#22c55e,#14b8a6 40%,#0f172a 100%); color:#f9fafb; padding:28px 24px 20px; text-align:left; }
+          .brand-row { display:flex; align-items:center; gap:12px; }
+          .brand-title { font-size:22px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; }
+          .brand-subtitle { font-size:13px; opacity:0.9; }
+          .pill { display:inline-block; margin-top:8px; padding:4px 10px; border-radius:999px; background:rgba(15,23,42,0.55); font-size:11px; text-transform:uppercase; letter-spacing:0.08em; }
+          .content { padding:28px 24px 24px; background:#f9fafb; }
+          .title { font-size:20px; font-weight:600; margin-bottom:4px; color:#020617; }
+          .lead { font-size:14px; color:#4b5563; margin-bottom:18px; }
+          .code { font-size:28px; font-weight:700; letter-spacing:0.35em; color:#0f766e; padding:16px 12px; background:#ecfeff; border-radius:14px; text-align:center; margin:20px 0; border:1px solid #99f6e4; }
+          .footer { padding:18px 24px 24px; text-align:center; color:#9ca3af; font-size:11px; background:#f3f4f6; }
+          .warning { background:#fef3c7; border-radius:10px; padding:12px 14px; margin:18px 0; border:1px solid #facc15; font-size:13px; color:#92400e; }
+          .logo-circle { width:40px; height:40px; border-radius:50%; background:rgba(15,23,42,0.18); display:flex; align-items:center; justify-content:center; }
+          .logo-text { font-size:18px; font-weight:800; letter-spacing:0.06em; }
         </style>
       </head>
       <body>
-        <div class="container">
-          <div class="header">
-            <h1>Email verification code</h1>
-            <p>${tenantName}</p>
-          </div>
-          <div class="content">
-            <p>Your one-time verification code is:</p>
-            <div class="code">${code}</div>
-            <p>Enter this code in the app to verify your email. The code expires in 10 minutes.</p>
-            <div class="warning">
-              <strong>Security:</strong> Never share this code. If you didn't request it, ignore this email.
+        <div class="wrapper">
+          <div class="container">
+            <div class="header">
+              <div class="brand-row">
+                <div class="logo-circle">
+                  <span class="logo-text">V</span>
+                </div>
+                <div>
+                  <div class="brand-title">Vehicle Income Tracker</div>
+                  <div class="brand-subtitle">${tenantName}</div>
+                </div>
+              </div>
+              <div class="pill">Email verification code</div>
+            </div>
+            <div class="content">
+              <h1 class="title">Your one-time verification code</h1>
+              <p class="lead">
+                Use the code below in the app to verify your email address. For your security, this code is valid
+                for 10 minutes only.
+              </p>
+              <div class="code">${code}</div>
+              <div class="warning">
+                <strong>Security:</strong> Never share this code with anyone. If you didn’t request it, you can ignore
+                this email and your account will remain unchanged.
+              </div>
             </div>
             <div class="footer">
-              <p>This is an automated email from VIT (Vehicle Income Tracker)</p>
-              <p>Generated on ${new Date().toLocaleDateString('en-ZA')}</p>
+              <div>This is an automated email from VIT (Vehicle Income Tracker)</div>
+              <div>Generated on ${new Date().toLocaleDateString('en-ZA')}</div>
             </div>
           </div>
         </div>

@@ -171,3 +171,127 @@ For production (e.g. DigitalOcean droplet):
 4. Default host ports are 3010 (API), 3011 (system admin), 3012 (tenant admin). Put Nginx (or similar) in front with SSL.
 
 See **`deploy/README.md`** for full details.
+
+---
+
+## Database indexing, performance, and scalability
+
+This section captures how to keep Postgres fast as data grows, and how to scale out / add failover safely.
+
+### Indexing strategy (Postgres)
+
+- **General rules**
+  - **Always index:**
+    - Primary keys (`id` on all entities – already covered by TypeORM).
+    - All `FOREIGN KEY` columns (e.g. `tenant_id`, `vehicle_id`, `driver_id`, `income_id`, `created_by_id`).
+    - Columns used in **joins** or frequent `WHERE` filters / `ORDER BY`.
+  - **Avoid over-indexing:** every extra index slows down writes. Only add indexes you actually use in queries.
+
+- **Recommended indexes by module**
+  - **Tenant and users**
+    - `platform.tenants.slug` (unique index – already present).
+    - `tenant_*.users.email` (unique index – already present).
+    - Add (if not already in migrations):
+      - `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_email_verified ON tenant_*.users(email_verified);`
+      - `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_tenant_created_at ON tenant_*.users(created_at);`
+  - **Incomes / trips**
+    - Typical queries: by tenant, by vehicle, by driver, recent first, by date range.
+    - For each tenant schema (`tenant_xxx`), ensure:
+      - `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_incomes_vehicle_date ON incomes(vehicle_label, date);`
+      - `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_incomes_driver_date ON incomes(driver_id, date);`
+      - `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_incomes_created_at ON incomes(created_at DESC);`
+  - **Maintenance / alerts**
+    - `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_maintenance_vehicle_due_date ON maintenance_tasks(vehicle_id, due_date);`
+    - `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_alerts_tenant_created_at ON alerts(created_at DESC);`
+  - **Audit logs**
+    - Used for tenant / platform history views and debugging.
+    - `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_audit_tenant_created_at ON audit_logs(tenant_id, created_at DESC);`
+    - `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_audit_actor ON audit_logs(actor_user_id, actor_role);`
+
+- **How to add indexes safely in production**
+  - Use **concurrent** indexes so you don’t lock tables for writes:
+    - `CREATE INDEX CONCURRENTLY ...` (you can run via a migration or manual SQL).
+  - For long-running or large-table changes, prefer:
+    - New migration using TypeORM’s `queryRunner.query('CREATE INDEX CONCURRENTLY ...')`.
+    - Run during low-traffic windows if you expect multi-million-row tables.
+
+### Partitioning and large-tenant strategy
+
+If any single tenant (fleet) becomes very large (millions of incomes):
+
+- **Time-based partitioning**
+  - Partition `incomes` and `maintenance_tasks` by **month** or **year** on `date`.
+  - Benefits: faster queries for recent data, easier archival of old data.
+  - Approach:
+    - Introduce parent table `incomes` + child tables `incomes_2026_01`, etc. in each `tenant_*` schema.
+    - Use Postgres declarative partitioning (`PARTITION BY RANGE (date)`).
+  - Start with **monthly partitions** once a single table exceeds ~5–10 million rows.
+
+- **Archiving**
+  - For very old data (e.g. > 3 years), consider:
+    - Moving partitions to cheaper storage or a separate reporting DB.
+    - Expose an “Export to CSV” or “Archive” function in system-admin to offload old periods.
+
+### Scaling reads and writes (replicas, failover)
+
+- **Single primary with read replica**
+  - Use **managed Postgres** (e.g. DigitalOcean Managed DB, AWS RDS, etc.) with:
+    - 1 primary (read/write).
+    - 1+ read replicas for heavy reporting / analytics.
+  - App changes:
+    - Keep **all writes** and OLTP queries on the primary (current behavior).
+    - For heavy, read-only endpoints (e.g. monthly reports, long audit log queries), you can:
+      - Configure a second TypeORM `DataSource` pointing to the replica, or
+      - Use a reporting worker / cron job that connects to the replica for reports.
+
+- **Failover**
+  - If you use a managed DB:
+    - Enable **automatic failover**; the connection string stays the same and VIT only sees a short outage.
+  - If self-managed Postgres:
+    - Recommended: use a tool like **Patroni** or a managed service instead of hand-rolling replication.
+    - Ensure the **connection string in `deploy/.env`** points at a virtual IP / HA proxy (e.g. HAProxy, pgBouncer) that can fail over to a new primary.
+
+### Application-level scalability
+
+- **API (NestJS)**
+  - Stateless; can scale horizontally:
+    - Run multiple `api` containers behind Nginx.
+    - Keep **sessions authless** (JWT) and avoid sticky sessions.
+  - For heavy workloads:
+    - Enable **Node.js clustering** or scale Docker replicas: `docker compose up -d --scale api=3` (adjust nginx upstreams).
+
+- **Next.js apps (system-admin, tenant-admin)**
+  - Mostly server-rendered/edge-friendly:
+    - Can scale with more `system-admin` / `tenant-admin` containers behind Nginx.
+  - Ensure:
+    - Static assets are cached at the CDN / Nginx level.
+    - `NEXT_PUBLIC_API_URL` always points at the load-balanced API endpoint.
+
+- **Background jobs and reports**
+  - For expensive monthly or per-tenant reports:
+    - Use a **job queue** (e.g. BullMQ + Redis).
+    - Store report snapshots per tenant instead of recalculating on every request.
+
+### Monitoring and capacity planning
+
+- **What to watch**
+  - Postgres:
+    - CPU, RAM, disk I/O, connections.
+    - Slow queries (`pg_stat_statements`) – use this to decide which indexes to add.
+  - App:
+    - API latency (P95/P99) per endpoint.
+    - Error rates (500s, DB timeouts).
+  - Disk:
+    - Docker images + volumes growth (run `docker system df` regularly, prune unused images).
+
+- **Simple process**
+  - Start with:
+    - A single Postgres instance (managed if possible).
+    - One API container, one system-admin, one tenant-admin.
+  - As load grows:
+    1. Add **indexes** based on slow queries.
+    2. Scale **API and web containers** horizontally.
+    3. Move to **managed Postgres with read replica**.
+    4. Introduce **partitioning / archiving** for the biggest tables.
+
+This README section should give you a clear path from “small single-database deployment” to “multi-tenant system with replicas, failover, and large datasets” without re-architecting the whole app.
