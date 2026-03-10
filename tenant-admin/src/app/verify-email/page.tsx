@@ -33,7 +33,10 @@ export default function VerifyEmailPage() {
 
       const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(tenantId ? { "X-Tenant-Id": tenantId } : {}),
+        },
         body: JSON.stringify({ token: verificationToken }),
       });
 
@@ -70,7 +73,10 @@ export default function VerifyEmailPage() {
 
       const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(tenantId ? { "X-Tenant-Id": tenantId } : {}),
+        },
         body: JSON.stringify({ email }),
       });
 
