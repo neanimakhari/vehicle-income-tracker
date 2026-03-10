@@ -99,16 +99,16 @@ export function TenantAdminsClient({
       </div>
 
       <div className="mt-8 flow-root">
-        <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+        <div className="-mx-3 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
           <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
             <div className="overflow-hidden shadow ring-1 ring-black/5 sm:rounded-lg">
-              <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
+              <table className="min-w-full divide-y divide-zinc-200 text-xs sm:text-sm dark:divide-zinc-800">
                 <thead className="bg-zinc-50 dark:bg-zinc-900">
                   <tr>
-                    <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50">Email</th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50">Tenant</th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50">Status</th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50">Created</th>
+                    <th scope="col" className="py-3 pl-4 pr-3 text-left font-semibold text-zinc-900 dark:text-zinc-50">Email</th>
+                    <th scope="col" className="px-3 py-3 text-left font-semibold text-zinc-900 dark:text-zinc-50">Tenant</th>
+                    <th scope="col" className="hidden sm:table-cell px-3 py-3 text-left font-semibold text-zinc-900 dark:text-zinc-50">Status</th>
+                    <th scope="col" className="hidden md:table-cell px-3 py-3 text-left font-semibold text-zinc-900 dark:text-zinc-50">Created</th>
                     <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
                       <span className="sr-only">Actions</span>
                     </th>
@@ -126,13 +126,13 @@ export function TenantAdminsClient({
                   )}
                   {pageAdmins.map((admin) => (
                     <tr key={admin.id}>
-                      <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                      <td className="whitespace-nowrap py-3 pl-4 pr-3 font-medium text-zinc-900 dark:text-zinc-50">
                         {admin.email}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">
+                      <td className="whitespace-nowrap px-3 py-3 text-zinc-500 dark:text-zinc-400">
                         {admin.tenantName ? `${admin.tenantName} (${admin.tenantId})` : admin.tenantId}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm">
+                      <td className="hidden sm:table-cell whitespace-nowrap px-3 py-3">
                         <span
                           className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
                             admin.isActive
@@ -143,7 +143,7 @@ export function TenantAdminsClient({
                           {admin.isActive ? "Active" : "Inactive"}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">
+                      <td className="hidden md:table-cell whitespace-nowrap px-3 py-3 text-zinc-500 dark:text-zinc-400">
                         {admin.createdAt ? new Date(admin.createdAt).toLocaleDateString() : "—"}
                       </td>
                       <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">

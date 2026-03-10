@@ -64,7 +64,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (confirmed == true) {
       await Session.clearForLogout();
-      await SecuritySettings.clear();
       await OfflineQueue.clearQueue();
       if (!context.mounted) return;
       Navigator.pushAndRemoveUntil(

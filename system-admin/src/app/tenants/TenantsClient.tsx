@@ -206,34 +206,34 @@ export function TenantsClient({
       )}
 
       <div className="mt-8 flow-root">
-        <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+        <div className="-mx-3 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
           <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
             <div className="overflow-hidden shadow ring-1 ring-black/5 sm:rounded-lg">
-              <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
+              <table className="min-w-full divide-y divide-zinc-200 text-xs sm:text-sm dark:divide-zinc-800">
                 <thead className="bg-zinc-50 dark:bg-zinc-900">
                   <tr>
-                    <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                    <th scope="col" className="py-3 pl-4 pr-3 text-left font-semibold text-zinc-900 dark:text-zinc-50">
                       Name
                     </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                    <th scope="col" className="px-3 py-3 text-left font-semibold text-zinc-900 dark:text-zinc-50">
                       Slug
                     </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                    <th scope="col" className="hidden md:table-cell px-3 py-3 text-left font-semibold text-zinc-900 dark:text-zinc-50">
                       Contact
                     </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                    <th scope="col" className="hidden sm:table-cell px-3 py-3 text-left font-semibold text-zinc-900 dark:text-zinc-50">
                       Has admin
                     </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                    <th scope="col" className="px-3 py-3 text-left font-semibold text-zinc-900 dark:text-zinc-50">
                       Status
                     </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                    <th scope="col" className="hidden lg:table-cell px-3 py-3 text-left font-semibold text-zinc-900 dark:text-zinc-50">
                       Admin MFA
                     </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                    <th scope="col" className="hidden lg:table-cell px-3 py-3 text-left font-semibold text-zinc-900 dark:text-zinc-50">
                       Driver MFA
                     </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                    <th scope="col" className="hidden md:table-cell px-3 py-3 text-left font-semibold text-zinc-900 dark:text-zinc-50">
                       Usage
                     </th>
                     <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
@@ -263,10 +263,10 @@ export function TenantsClient({
                       <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">
                         {tenant.slug}
                       </td>
-                      <td className="max-w-[180px] truncate px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">
+                      <td className="hidden md:table-cell max-w-[180px] truncate px-3 py-3 text-zinc-500 dark:text-zinc-400">
                         {tenant.contactEmail || tenant.contactPhone || tenant.contactName || "—"}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm">
+                      <td className="hidden sm:table-cell whitespace-nowrap px-3 py-3">
                         {tenantSlugsWithAdmin.has(tenant.slug) ? (
                           <span className="inline-flex rounded-full bg-emerald-100 px-2 text-xs font-semibold leading-5 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                             Yes
@@ -277,7 +277,7 @@ export function TenantsClient({
                           </span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm">
+                      <td className="whitespace-nowrap px-3 py-3">
                         <span
                           className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
                             tenant.isActive
@@ -288,7 +288,7 @@ export function TenantsClient({
                           {tenant.isActive ? "Active" : "Inactive"}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm">
+                      <td className="hidden lg:table-cell whitespace-nowrap px-3 py-3">
                         <span
                           className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
                             tenant.requireMfa
@@ -299,7 +299,7 @@ export function TenantsClient({
                           {tenant.requireMfa ? "Required" : "Optional"}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm">
+                      <td className="hidden lg:table-cell whitespace-nowrap px-3 py-3">
                         <span
                           className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
                             tenant.requireMfaUsers
@@ -310,7 +310,7 @@ export function TenantsClient({
                           {tenant.requireMfaUsers ? "Required" : "Optional"}
                         </span>
                       </td>
-                      <td className="px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">
+                      <td className="hidden md:table-cell px-3 py-3 text-zinc-500 dark:text-zinc-400">
                         {u ? (
                           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span title={`Vehicles: ${u.vehicles}. Total income (logged): ${u.totalIncome}`}>

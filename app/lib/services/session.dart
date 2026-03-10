@@ -168,6 +168,9 @@ class Session {
   }
 
   static Future<void> clearForLogout() async {
+    // Lightweight logout:
+    // - Clear tokens and user-specific flags
+    // - Keep tenant/email + refresh token so biometric / "remember me" flows work
     await _storage.delete(key: _tokenKey);
     await _storage.delete(key: _userIdKey);
     await _storage.delete(key: _roleKey);
@@ -179,8 +182,6 @@ class Session {
     role = null;
     mfaEnabled = null;
     tenantName = null;
-    email = null;
-    tenantId = null;
     mustChangePassword = null;
   }
 }

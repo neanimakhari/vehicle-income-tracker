@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:local_auth/local_auth.dart';
 import '../services/api_service.dart';
 import '../services/session.dart';
+import '../services/security_settings.dart';
 import '../theme.dart';
 import '../utils/app_toast.dart';
 import 'home_screen.dart';
@@ -24,9 +26,11 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _policyLoading = false;
   bool _showPassword = false;
+  bool _biometricAvailable = false;
   Map<String, dynamic>? _tenantPolicy;
   List<Map<String, dynamic>> _tenants = [];
   String? _selectedTenantSlug;
+  final LocalAuthentication _auth = LocalAuthentication();
 
   @override
   void initState() {
@@ -35,6 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _tenantController.text = Session.tenantId!;
     }
     _loadTenants();
+     _checkBiometricLogin();
   }
 
   @override
@@ -65,6 +70,22 @@ class _LoginScreenState extends State<LoginScreen> {
       });
     } catch (_) {
       // Ignore failures; user can still type manually.
+    }
+  }
+
+  Future<void> _checkBiometricLogin() async {
+    try {
+      final hasRefresh = Session.refreshToken != null && Session.refreshToken!.isNotEmpty;
+      if (!SecuritySettings.biometricsEnabled || !hasRefresh) {
+        return;
+      }
+      final canCheck = await _auth.canCheckBiometrics;
+      if (!mounted) return;
+      if (canCheck) {
+        setState(() => _biometricAvailable = true);
+      }
+    } catch (_) {
+      // If anything fails, just hide the biometric option
     }
   }
 
@@ -176,6 +197,46 @@ class _LoginScreenState extends State<LoginScreen> {
         } else {
           AppToast.error(context, 'Login failed', e);
         }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _loginWithBiometrics() async {
+    if (_isLoading || !_biometricAvailable) return;
+    setState(() => _isLoading = true);
+    try {
+      final didAuthenticate = await _auth.authenticate(
+        localizedReason: 'Sign in with biometrics',
+        options: const AuthenticationOptions(
+          stickyAuth: true,
+          biometricOnly: true,
+        ),
+      );
+      if (!didAuthenticate) {
+        if (mounted) {
+          AppToast.info(context, 'Biometric authentication cancelled.');
+        }
+        return;
+      }
+      final api = ApiService();
+      final data = await api.refreshSession();
+      Session.accessToken = data['accessToken'] as String?;
+      Session.refreshToken = data['refreshToken'] as String?;
+      await Session.save();
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => HomeScreen(key: ValueKey('${Session.userId ?? Session.email ?? ""}')),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        AppToast.error(context, 'Biometric sign-in failed', e);
       }
     } finally {
       if (mounted) {
@@ -531,6 +592,17 @@ class _LoginScreenState extends State<LoginScreen> {
                                           ),
                                   ),
                                 ),
+                                if (_biometricAvailable) ...[
+                                  const SizedBox(height: 12),
+                                  TextButton.icon(
+                                    onPressed: _isLoading ? null : _loginWithBiometrics,
+                                    icon: const Icon(Icons.fingerprint),
+                                    label: const Text('Sign in with biometrics'),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: AppTheme.primary,
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
