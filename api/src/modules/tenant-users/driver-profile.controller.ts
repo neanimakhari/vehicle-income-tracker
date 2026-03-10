@@ -34,6 +34,10 @@ import * as fs from 'fs';
 class UpdateDriverProfileDto {
   @IsString()
   @IsOptional()
+  phoneNumber?: string;
+
+  @IsString()
+  @IsOptional()
   idNumber?: string;
 
   @IsString()
@@ -148,6 +152,28 @@ export class DriverProfileController {
     if (dto.prdpExpiry) data.prdpExpiry = new Date(dto.prdpExpiry);
     if (dto.medicalCertificateExpiry) data.medicalCertificateExpiry = new Date(dto.medicalCertificateExpiry);
     if (dto.salary) data.salary = parseFloat(dto.salary as any);
+
+    // #region agent log
+    if (typeof fetch !== 'undefined') {
+      void fetch('http://127.0.0.1:7725/ingest/8dc24a86-a8d0-42ab-aa70-b4fe2823d695', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Debug-Session-Id': 'd09f8e',
+        },
+        body: JSON.stringify({
+          sessionId: 'd09f8e',
+          runId: 'pre-fix',
+          hypothesisId: 'H2',
+          location: 'driver-profile.controller.ts:updateMyProfile',
+          message: 'updateMyProfile received payload',
+          data: { userId: req.user.sub, dto, data },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    }
+    // #endregion
+
     return this.driverProfileService.updateProfile(req.user.sub, data, req.user.sub, false);
   }
 
@@ -206,6 +232,28 @@ export class DriverProfileController {
     if (dto.prdpExpiry) data.prdpExpiry = new Date(dto.prdpExpiry);
     if (dto.medicalCertificateExpiry) data.medicalCertificateExpiry = new Date(dto.medicalCertificateExpiry);
     if (dto.salary) data.salary = parseFloat(dto.salary as any);
+
+    // #region agent log
+    if (typeof fetch !== 'undefined') {
+      void fetch('http://127.0.0.1:7725/ingest/8dc24a86-a8d0-42ab-aa70-b4fe2823d695', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Debug-Session-Id': 'd09f8e',
+        },
+        body: JSON.stringify({
+          sessionId: 'd09f8e',
+          runId: 'pre-fix',
+          hypothesisId: 'H2',
+          location: 'driver-profile.controller.ts:updateDriverProfile',
+          message: 'updateDriverProfile received payload',
+          data: { driverId: id, dto, data },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    }
+    // #endregion
+
     return this.driverProfileService.updateProfile(id, data, req.user.sub, true);
   }
 

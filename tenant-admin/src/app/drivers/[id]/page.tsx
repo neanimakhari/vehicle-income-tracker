@@ -73,10 +73,23 @@ export default async function DriverProfilePage({
     "use server";
     const data: Record<string, any> = {};
     const fields = [
-      "idNumber", "passportNumber", "dateOfBirth", "licenseNumber", "licenseExpiry",
-      "prdpNumber", "prdpExpiry", "medicalCertificateExpiry", "bankName",
-      "bankAccountNumber", "bankBranchCode", "accountHolderName", "salary",
-      "address", "emergencyContactName", "emergencyContactPhone"
+      "phoneNumber",
+      "idNumber",
+      "passportNumber",
+      "dateOfBirth",
+      "licenseNumber",
+      "licenseExpiry",
+      "prdpNumber",
+      "prdpExpiry",
+      "medicalCertificateExpiry",
+      "bankName",
+      "bankAccountNumber",
+      "bankBranchCode",
+      "accountHolderName",
+      "salary",
+      "address",
+      "emergencyContactName",
+      "emergencyContactPhone",
     ];
     for (const field of fields) {
       const value = formData.get(field);
@@ -88,15 +101,49 @@ export default async function DriverProfilePage({
       data.salary = parseFloat(data.salary);
     }
     const { id } = await params;
-    await fetch(`${getApiUrl()}/tenant/drivers/${id}/profile`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        ...(await getAuthHeaders()),
-      },
-      body: JSON.stringify(data),
-    });
-    revalidatePath(`/drivers/${id}`);
+
+    // #region agent log
+    if (typeof fetch !== "undefined") {
+      void fetch("http://127.0.0.1:7725/ingest/8dc24a86-a8d0-42ab-aa70-b4fe2823d695", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "d09f8e",
+        },
+        body: JSON.stringify({
+          sessionId: "d09f8e",
+          runId: "pre-fix",
+          hypothesisId: "H2",
+          location: "tenant-admin/drivers/[id]/page.tsx:updateProfile",
+          message: "Updating driver profile from tenant admin",
+          data: { id, payload: data },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    }
+    // #endregion
+
+    try {
+      const res = await fetch(`${getApiUrl()}/tenant/drivers/${id}/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(await getAuthHeaders()),
+        },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string | string[] };
+        const msg = Array.isArray(body.message) ? body.message.join(" ") : (body.message ?? "Failed to update driver profile");
+        revalidatePath(`/drivers/${id}`);
+        redirect(`/drivers/${id}?error=${encodeURIComponent(msg)}`);
+      }
+      revalidatePath(`/drivers/${id}`);
+      redirect(`/drivers/${id}?success=${encodeURIComponent("Driver profile updated")}`);
+    } catch {
+      revalidatePath(`/drivers/${id}`);
+      redirect(`/drivers/${id}?error=${encodeURIComponent("Could not update driver profile. Try again.")}`);
+    }
   }
 
   async function deleteDocument(formData: FormData) {
@@ -321,9 +368,9 @@ export default async function DriverProfilePage({
               </label>
               <input
                 type="text"
-                value={profile.phoneNumber ?? ""}
-                disabled
-                className="mt-1 w-full rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50"
+                name="phoneNumber"
+                defaultValue={profile.phoneNumber ?? ""}
+                className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
               />
             </div>
             <div>

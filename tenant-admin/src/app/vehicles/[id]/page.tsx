@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth";
 import { fetchJson, getApiUrl, getAuthHeaders } from "../../../lib/api";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save, Car, FileText, Shield, User, Calendar } from "lucide-react";
 
@@ -145,16 +145,30 @@ export default async function VehicleDetailPage({
     const notes = formData.get("notes");
     if (notes) payload.notes = notes;
 
-    await fetch(`${getApiUrl()}/tenant/vehicles/${id}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        ...(await getAuthHeaders()),
-      },
-      body: JSON.stringify(payload),
-    });
-    revalidatePath(`/vehicles/${id}`);
-    revalidatePath("/vehicles");
+    try {
+      const res = await fetch(`${getApiUrl()}/tenant/vehicles/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(await getAuthHeaders()),
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string | string[] };
+        const msg = Array.isArray(body.message) ? body.message.join(" ") : (body.message ?? "Failed to update vehicle");
+        revalidatePath(`/vehicles/${id}`);
+        revalidatePath("/vehicles");
+        redirect(`/vehicles/${id}?error=${encodeURIComponent(msg)}`);
+      }
+      revalidatePath(`/vehicles/${id}`);
+      revalidatePath("/vehicles");
+      redirect(`/vehicles/${id}?success=${encodeURIComponent("Vehicle details updated")}`);
+    } catch {
+      revalidatePath(`/vehicles/${id}`);
+      revalidatePath("/vehicles");
+      redirect(`/vehicles/${id}?error=${encodeURIComponent("Could not update vehicle. Try again.")}`);
+    }
   }
 
   return (
@@ -319,7 +333,7 @@ export default async function VehicleDetailPage({
                 type="date"
                 name="licenseDiskExpiry"
                 defaultValue={formatDateForInput(vehicle.licenseDiskExpiry)}
-                className="input w-full"
+                className="input w-full bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-50"
               />
             </div>
           </div>
@@ -375,7 +389,7 @@ export default async function VehicleDetailPage({
                 type="date"
                 name="insuranceExpiry"
                 defaultValue={formatDateForInput(vehicle.insuranceExpiry)}
-                className="input w-full"
+                className="input w-full bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-50"
               />
             </div>
           </div>
@@ -450,7 +464,7 @@ export default async function VehicleDetailPage({
                 type="date"
                 name="roadworthyExpiry"
                 defaultValue={formatDateForInput(vehicle.roadworthyExpiry)}
-                className="input w-full"
+                className="input w-full bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-50"
               />
             </div>
             <div>
@@ -472,7 +486,7 @@ export default async function VehicleDetailPage({
                 type="date"
                 name="permitExpiry"
                 defaultValue={formatDateForInput(vehicle.permitExpiry)}
-                className="input w-full"
+                className="input w-full bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-50"
               />
             </div>
           </div>

@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, EyeOff, Lock, Mail, Shield, ArrowRight, BookmarkCheck } from "lucide-react";
 import { loginAction } from "@/lib/auth-actions";
 import Link from "next/link";
 import Image from "next/image";
+import { getApiUrl } from "@/lib/api-client";
+
+type TenantOption = { slug: string; name?: string };
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -12,6 +15,26 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<{ error: string; message?: string } | null>(null);
+  const [tenants, setTenants] = useState<TenantOption[]>([]);
+  const [tenantSlug, setTenantSlug] = useState<string>("");
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadTenants() {
+      try {
+        const res = await fetch(`${getApiUrl()}/public/tenants`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as TenantOption[];
+        if (!cancelled && Array.isArray(data)) setTenants(data);
+      } catch {
+        // ignore - tenant dropdown remains manual fallback
+      }
+    }
+    loadTenants();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -68,15 +91,23 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-2">Tenant</label>
-              <input
-                type="text"
+              <select
                 name="tenantSlug"
                 required
-                autoComplete="organization"
-                className="block w-full pl-3 pr-3 py-3 border border-zinc-600 rounded-lg bg-zinc-800/80 text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                placeholder="e.g. demo or acme"
-              />
-              <p className="mt-1 text-xs text-zinc-400">Your tenant identifier (slug).</p>
+                value={tenantSlug}
+                onChange={(e) => setTenantSlug(e.target.value)}
+                className="block w-full px-3 py-3 border border-zinc-600 rounded-lg bg-zinc-800/80 text-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              >
+                <option value="">Select your tenant</option>
+                {tenants.map((t) => (
+                  <option key={t.slug} value={t.slug}>
+                    {t.name ? `${t.name} (${t.slug})` : t.slug}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-zinc-400">
+                Choose the tenant you belong to. If you don&apos;t see it, contact support.
+              </p>
             </div>
 
             <div>

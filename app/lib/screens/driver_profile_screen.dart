@@ -917,7 +917,11 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               hintText: 'Tap to pick date',
               labelStyle: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[600]),
               prefixIcon: Icon(icon, color: AppTheme.primary, size: 20),
-              suffixIcon: const Icon(Icons.calendar_today, size: 20),
+              suffixIcon: Icon(
+                Icons.calendar_today,
+                size: 20,
+                color: isDarkMode ? Colors.white : AppTheme.primary,
+              ),
               filled: true,
               fillColor: isDarkMode ? AppTheme.darkBackground : Colors.grey.shade50,
               border: OutlineInputBorder(

@@ -66,7 +66,34 @@ export class DriverProfileService {
       if (!user) {
         throw new NotFoundException('Driver not found');
       }
+
       Object.assign(user, payload);
+
+      // #region agent log
+      if (typeof fetch !== 'undefined') {
+        void fetch('http://127.0.0.1:7725/ingest/8dc24a86-a8d0-42ab-aa70-b4fe2823d695', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Debug-Session-Id': 'd09f8e',
+          },
+          body: JSON.stringify({
+            sessionId: 'd09f8e',
+            runId: allowExpiryUpdate ? 'pre-fix-admin' : 'pre-fix-driver',
+            hypothesisId: 'H2',
+            location: 'driver-profile.service.ts:updateProfile',
+            message: 'Persisting driver profile update',
+            data: {
+              userId,
+              allowExpiryUpdate,
+              payload,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+      }
+      // #endregion
+
       return repo.save(user);
     });
   }
@@ -89,44 +116,150 @@ export class DriverProfileService {
       DriverDocument,
     );
 
-    // Verify user exists
-    await userRepo.withSchema(async repo => {
-      const user = await repo.findOne({ where: { id: userId } });
-      if (!user) {
-        throw new NotFoundException('Driver not found');
+    try {
+      // #region agent log
+      if (typeof fetch !== 'undefined') {
+        void fetch('http://127.0.0.1:7725/ingest/8dc24a86-a8d0-42ab-aa70-b4fe2823d695', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Debug-Session-Id': 'd09f8e',
+          },
+          body: JSON.stringify({
+            sessionId: 'd09f8e',
+            runId: 'pre-fix-upload',
+            hypothesisId: 'H-upload',
+            location: 'driver-profile.service.ts:uploadDocument',
+            message: 'Starting driver document upload',
+            data: {
+              userId,
+              documentType,
+              fileName: file.originalname,
+              fileSize: file.size,
+              mimeType: file.mimetype,
+              tenantSchema: this.tenantScope.getTenantSchema?.(),
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
       }
-    });
+      // #endregion
 
-    // Generate unique filename
-    const timestamp = Date.now();
-    const ext = path.extname(file.originalname);
-    const fileName = `${userId}_${documentType}_${timestamp}${ext}`;
-
-    // Ensure tenant-specific directory exists
-    const tenantSchema = this.tenantScope.getTenantSchema();
-    const tenantDir = path.join(this.uploadsDir, tenantSchema);
-    if (!fs.existsSync(tenantDir)) {
-      await mkdir(tenantDir, { recursive: true });
-    }
-    const tenantFilePath = path.join(tenantDir, fileName);
-
-    // Save file
-    await writeFile(tenantFilePath, file.buffer);
-
-    // Save document record
-    return docRepo.withSchema(async repo => {
-      const document = repo.create({
-        userId,
-        documentType,
-        fileName: file.originalname,
-        filePath: tenantFilePath,
-        fileSize: file.size,
-        mimeType: file.mimetype,
-        uploadedBy: uploadedBy ?? null,
-        notes: notes ?? null,
+      // Verify user exists
+      await userRepo.withSchema(async repo => {
+        const user = await repo.findOne({ where: { id: userId } });
+        if (!user) {
+          throw new NotFoundException('Driver not found');
+        }
       });
-      return repo.save(document);
-    });
+
+      // Generate unique filename
+      const timestamp = Date.now();
+      const ext = path.extname(file.originalname);
+      const fileName = `${userId}_${documentType}_${timestamp}${ext}`;
+
+      // Ensure tenant-specific directory exists
+      const tenantSchema = this.tenantScope.getTenantSchema();
+      const tenantDir = path.join(this.uploadsDir, tenantSchema);
+      if (!fs.existsSync(tenantDir)) {
+        await mkdir(tenantDir, { recursive: true });
+      }
+      const tenantFilePath = path.join(tenantDir, fileName);
+
+      // #region agent log
+      if (typeof fetch !== 'undefined') {
+        void fetch('http://127.0.0.1:7725/ingest/8dc24a86-a8d0-42ab-aa70-b4fe2823d695', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Debug-Session-Id': 'd09f8e',
+          },
+          body: JSON.stringify({
+            sessionId: 'd09f8e',
+            runId: 'pre-fix-upload',
+            hypothesisId: 'H-upload',
+            location: 'driver-profile.service.ts:uploadDocument',
+            message: 'About to write driver document file',
+            data: {
+              tenantDir,
+              tenantFilePath,
+              uploadsDir: this.uploadsDir,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+      }
+      // #endregion
+
+      // Save file
+      await writeFile(tenantFilePath, file.buffer);
+
+      // Save document record
+      const saved = await docRepo.withSchema(async repo => {
+        const document = repo.create({
+          userId,
+          documentType,
+          fileName: file.originalname,
+          filePath: tenantFilePath,
+          fileSize: file.size,
+          mimeType: file.mimetype,
+          uploadedBy: uploadedBy ?? null,
+          notes: notes ?? null,
+        });
+        return repo.save(document);
+      });
+
+      // #region agent log
+      if (typeof fetch !== 'undefined') {
+        void fetch('http://127.0.0.1:7725/ingest/8dc24a86-a8d0-42ab-aa70-b4fe2823d695', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Debug-Session-Id': 'd09f8e',
+          },
+          body: JSON.stringify({
+            sessionId: 'd09f8e',
+            runId: 'pre-fix-upload',
+            hypothesisId: 'H-upload',
+            location: 'driver-profile.service.ts:uploadDocument',
+            message: 'Driver document upload completed',
+            data: {
+              userId,
+              documentId: saved.id,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+      }
+      // #endregion
+
+      return saved;
+    } catch (error: any) {
+      // #region agent log
+      if (typeof fetch !== 'undefined') {
+        void fetch('http://127.0.0.1:7725/ingest/8dc24a86-a8d0-42ab-aa70-b4fe2823d695', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Debug-Session-Id': 'd09f8e',
+          },
+          body: JSON.stringify({
+            sessionId: 'd09f8e',
+            runId: 'pre-fix-upload',
+            hypothesisId: 'H-upload',
+            location: 'driver-profile.service.ts:uploadDocument',
+            message: 'Driver document upload failed',
+            data: {
+              userId,
+              errorMessage: error?.message ?? String(error),
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+      }
+      // #endregion
+      throw error;
+    }
   }
 
   async getDocuments(userId: string): Promise<DriverDocument[]> {
