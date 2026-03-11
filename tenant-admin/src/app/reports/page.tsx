@@ -9,7 +9,7 @@ async function fetchSummary() {
     netIncome: number;
     incomeCount: number;
     expenseCount: number;
-  }>("/tenant/reports/summary");
+  }>("/tenant/reports/summary", { tolerate401: true });
   return summary ?? null;
 }
 
@@ -23,7 +23,7 @@ async function fetchTopVehicles() {
     totalPetrolLitres: number;
     totalDistance: number;
     costPerKm: number;
-  }>>("/tenant/reports/top-vehicles?limit=10");
+  }>>("/tenant/reports/top-vehicles?limit=10", { tolerate401: true });
   return vehicles ?? [];
 }
 
@@ -37,7 +37,7 @@ async function fetchDriverStats() {
     totalPetrolCost: number;
     avgIncomePerTrip: number;
     netIncome: number;
-  }>>("/tenant/reports/driver-stats");
+  }>>("/tenant/reports/driver-stats", { tolerate401: true });
   return drivers ?? [];
 }
 
@@ -50,7 +50,7 @@ async function fetchFuelEfficiencyVehicles() {
     kmPerLitre: number;
     costPerKm: number;
     costPerLitre: number;
-  }>>("/tenant/reports/fuel-efficiency/vehicles");
+  }>>("/tenant/reports/fuel-efficiency/vehicles", { tolerate401: true });
   return efficiency ?? [];
 }
 
@@ -64,7 +64,7 @@ async function fetchFuelEfficiencyDrivers() {
     trips: number;
     kmPerLitre: number;
     costPerKm: number;
-  }>>("/tenant/reports/fuel-efficiency/drivers");
+  }>>("/tenant/reports/fuel-efficiency/drivers", { tolerate401: true });
   return efficiency ?? [];
 }
 

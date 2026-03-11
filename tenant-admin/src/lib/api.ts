@@ -19,7 +19,7 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
-export async function fetchJson<T>(path: string) {
+export async function fetchJson<T>(path: string, options?: { tolerate401?: boolean }) {
   try {
     const res = await fetch(`${getApiUrl()}${path}`, {
       cache: "no-store",
@@ -29,8 +29,12 @@ export async function fetchJson<T>(path: string) {
     });
 
     if (!res.ok) {
-      // Auto-logout on 401 (Unauthorized) - token expired
+      // Auto-logout on 401 (Unauthorized) - token expired, unless explicitly tolerated
       if (res.status === 401) {
+        if (options?.tolerate401) {
+          console.warn(`fetchJson 401 tolerated for path ${path}`);
+          return null;
+        }
         const { clearAuthSession } = await import("./auth");
         await clearAuthSession();
         const { redirect } = await import("next/navigation");
