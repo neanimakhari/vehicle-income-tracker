@@ -82,6 +82,7 @@ export function AdvancedReportBuilder() {
             body: JSON.stringify({
               metrics: ['income'],
             }),
+            tolerate401: true,
           }
         );
         if (data && data.filters) {
@@ -150,6 +151,7 @@ export function AdvancedReportBuilder() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(payload),
+          tolerate401: true,
         }
       );
 

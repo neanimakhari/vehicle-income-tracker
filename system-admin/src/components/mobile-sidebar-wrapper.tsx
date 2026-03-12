@@ -73,7 +73,7 @@ export function MobileSidebarWrapper() {
       {/* Menu Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="lg:hidden fixed top-3 left-3 z-50 inline-flex items-center gap-2 px-3 py-2 rounded-full bg-teal-600 text-white text-xs font-medium shadow-lg shadow-teal-700/40 active:scale-95 transition-transform"
+        className="lg:hidden fixed top-3 left-3 z-[60] inline-flex items-center gap-2 px-3 py-2 rounded-full bg-teal-600 text-white text-xs font-medium shadow-lg shadow-teal-700/40 active:scale-95 transition-transform"
         aria-label="Open menu"
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -1,4 +1,3 @@
-import { requireAuth } from "@/lib/auth";
 import { fetchJson } from "../../lib/api";
 import { ReportsClient } from "./reports-client";
 
@@ -69,8 +68,6 @@ async function fetchFuelEfficiencyDrivers() {
 }
 
 export default async function ReportsPage() {
-  await requireAuth();
-  
   const [summary, topVehicles, driverStats, fuelEfficiencyVehicles, fuelEfficiencyDrivers] = await Promise.all([
     fetchSummary(),
     fetchTopVehicles(),

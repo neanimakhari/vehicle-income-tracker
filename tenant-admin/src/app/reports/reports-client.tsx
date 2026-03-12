@@ -95,7 +95,8 @@ export function ReportsClient({
 
     try {
       const report = await fetchJsonClient<any>(
-        `/tenant/reports/monthly-report?startDate=${dateRange.start}&endDate=${dateRange.end}`
+        `/tenant/reports/monthly-report?startDate=${dateRange.start}&endDate=${dateRange.end}`,
+        { tolerate401: true },
       );
       
       // Download as JSON

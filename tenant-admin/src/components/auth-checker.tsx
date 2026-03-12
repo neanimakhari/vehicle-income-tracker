@@ -2,9 +2,11 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 export function AuthChecker() {
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     // Check for token expiration on client side
@@ -16,7 +18,9 @@ export function AuthChecker() {
         });
         
         if (response.status === 401) {
-          router.push("/login?error=expired");
+          if (!pathname.startsWith("/reports")) {
+            router.push("/login?error=expired");
+          }
         }
       } catch (error) {
         // Silently fail - server-side checks will handle it
@@ -33,7 +37,7 @@ export function AuthChecker() {
       clearInterval(interval);
       window.removeEventListener("focus", checkAuth);
     };
-  }, [router]);
+  }, [router, pathname]);
 
   return null;
 }

@@ -6,7 +6,6 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { getAuthToken } from "@/lib/auth";
 import { fetchJson } from "@/lib/api";
-import { unstable_rethrow } from "next/navigation";
 import { logoutAction } from "@/lib/auth-actions";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -42,15 +41,14 @@ export default async function RootLayout({
   if (isAuthenticated) {
     try {
       const [policy, drivers] = await Promise.all([
-        fetchJson<{ requireMfaUsers?: boolean; tenantName?: string }>("/tenant/policy"),
-        fetchJson<Array<{ mfaEnabled?: boolean }>>("/tenant/users"),
+        fetchJson<{ requireMfaUsers?: boolean; tenantName?: string }>("/tenant/policy", { tolerate401: true }),
+        fetchJson<Array<{ mfaEnabled?: boolean }>>("/tenant/users", { tolerate401: true }),
       ]);
       if (policy?.requireMfaUsers) {
         pendingMfaUsers = (drivers ?? []).filter(driver => !driver.mfaEnabled).length;
       }
       tenantName = policy?.tenantName ?? null;
     } catch (err) {
-      unstable_rethrow(err); // allow redirect() from api 401 to propagate
       pendingMfaUsers = null;
       tenantName = null;
     }

@@ -15,7 +15,10 @@ export function getApiUrl(): string {
   return base.endsWith("/v1") ? base : `${base.replace(/\/$/, "")}/v1`;
 }
 
-export async function fetchJsonClient<T>(path: string, options?: RequestInit): Promise<T | null> {
+export async function fetchJsonClient<T>(
+  path: string,
+  options?: (RequestInit & { tolerate401?: boolean }),
+): Promise<T | null> {
   try {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -24,6 +27,9 @@ export async function fetchJsonClient<T>(path: string, options?: RequestInit): P
     const res = await fetch(`${getApiUrl()}${path}`, { cache: "no-store", ...options, headers });
     if (!res.ok) {
       if (res.status === 401) {
+        if (options?.tolerate401) {
+          return null;
+        }
         window.location.href = "/login";
         return null;
       }
