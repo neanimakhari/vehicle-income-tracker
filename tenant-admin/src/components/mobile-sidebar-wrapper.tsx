@@ -70,10 +70,10 @@ export function MobileSidebarWrapper({ tenantName }: { tenantName: string | null
           </div>
         </div>
       </aside>
-      {/* Menu Button */}
+      {/* Menu Button - z-50 so it sits above the sticky header (z-30) in mobile view */}
       <button
         onClick={() => setIsOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-30 p-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm shadow-md"
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm shadow-md"
         aria-label="Open menu"
       >
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
