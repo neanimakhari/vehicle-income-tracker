@@ -73,7 +73,7 @@ export function AdvancedReportBuilder() {
       try {
         // Generate a basic report to get available filters
         const data = await fetchJsonClient<CustomReportData>(
-          `/tenant/reports/custom`,
+          `/api/proxy/tenant/reports/custom`,
           {
             method: 'POST',
             headers: {
@@ -82,7 +82,6 @@ export function AdvancedReportBuilder() {
             body: JSON.stringify({
               metrics: ['income'],
             }),
-            tolerate401: true,
           }
         );
         if (data && data.filters) {
@@ -144,14 +143,13 @@ export function AdvancedReportBuilder() {
       }
 
       const data = await fetchJsonClient<CustomReportData>(
-        `/tenant/reports/custom`,
+        `/api/proxy/tenant/reports/custom`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(payload),
-          tolerate401: true,
         }
       );
 
