@@ -164,7 +164,13 @@ export default async function VehicleDetailPage({
       revalidatePath(`/vehicles/${id}`);
       revalidatePath("/vehicles");
       redirect(`/vehicles/${id}?success=${encodeURIComponent("Vehicle details updated")}`);
-    } catch {
+    } catch (error) {
+      const err = error as { digest?: string };
+      // Next.js redirect() throws a special error to stop execution.
+      // Do not convert successful redirects into failure toasts.
+      if (typeof err?.digest === "string" && err.digest.startsWith("NEXT_REDIRECT")) {
+        throw error;
+      }
       revalidatePath(`/vehicles/${id}`);
       revalidatePath("/vehicles");
       redirect(`/vehicles/${id}?error=${encodeURIComponent("Could not update vehicle. Try again.")}`);

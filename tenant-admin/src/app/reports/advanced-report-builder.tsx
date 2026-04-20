@@ -30,7 +30,7 @@ import {
   CheckSquare,
   Square,
 } from "lucide-react";
-import { fetchJsonClient, getApiUrl } from "../../lib/api-client";
+import { fetchJsonClient } from "../../lib/api-client";
 
 const COLORS = ['#14b8a6', '#0d9488', '#0f766e', '#115e59', '#134e4a', '#042f2e', '#0891b2', '#06b6d4'];
 

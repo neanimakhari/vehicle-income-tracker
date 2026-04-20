@@ -20,11 +20,15 @@ export async function fetchJsonClient<T>(
   options?: (RequestInit & { tolerate401?: boolean }),
 ): Promise<T | null> {
   try {
+    const targetUrl =
+      path.startsWith("http://") || path.startsWith("https://") || path.startsWith("/api/")
+        ? path
+        : `${getApiUrl()}${path}`;
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...(options?.headers as Record<string, string> || {}),
     };
-    const res = await fetch(`${getApiUrl()}${path}`, { cache: "no-store", ...options, headers });
+    const res = await fetch(targetUrl, { cache: "no-store", ...options, headers });
     if (!res.ok) {
       if (res.status === 401) {
         if (options?.tolerate401) {

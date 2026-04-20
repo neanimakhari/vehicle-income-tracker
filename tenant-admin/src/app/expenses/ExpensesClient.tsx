@@ -5,9 +5,17 @@ import Link from "next/link";
 import { CreateExpenseModal } from "@/components/create-expense-modal";
 import { TablePagination } from "@/components/table-pagination";
 import { FullscreenImageViewer, toDataUrl } from "@/components/fullscreen-image-viewer";
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Eye } from "lucide-react";
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Eye, Pencil } from "lucide-react";
 
-type Expense = { id: string; description: string; amount: number; receiptImage?: string; loggedOn?: string };
+type Expense = {
+  id: string;
+  sourceType: "manual" | "income";
+  sourceId: string;
+  description: string;
+  amount: number;
+  receiptImage?: string;
+  loggedOn?: string;
+};
 
 type SortKey = "description" | "amount" | "loggedOn";
 type SortDir = "asc" | "desc";
@@ -15,6 +23,7 @@ type SortDir = "asc" | "desc";
 type Props = {
   expenses: Expense[];
   createExpense: (formData: FormData) => Promise<{ success: boolean; error?: string }>;
+  updateExpense: (formData: FormData) => Promise<{ success: boolean; error?: string }>;
   deleteExpense: (formData: FormData) => Promise<unknown>;
 };
 
@@ -23,13 +32,16 @@ function SortIcon({ current, dir }: { current: boolean; dir: SortDir | null }) {
   return dir === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
 }
 
-export function ExpensesClient({ expenses, createExpense, deleteExpense }: Props) {
+export function ExpensesClient({ expenses, createExpense, updateExpense, deleteExpense }: Props) {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("loggedOn");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [pageSize, setPageSize] = useState(10);
   const [pageIndex, setPageIndex] = useState(0);
   const [viewerImage, setViewerImage] = useState<{ dataUrl: string; title: string } | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editReceiptBase64, setEditReceiptBase64] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -169,11 +181,22 @@ export function ExpensesClient({ expenses, createExpense, deleteExpense }: Props
                         <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                           <div className="flex items-center justify-end gap-2">
                             <Link
-                              href={`/expenses/${expense.id}`}
+                              href={`/expenses/${encodeURIComponent(expense.id)}`}
                               className="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300"
                             >
                               <Eye className="h-4 w-4" /> View
                             </Link>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingId(expense.id);
+                                setEditError(null);
+                                setEditReceiptBase64(expense.receiptImage ?? null);
+                              }}
+                              className="inline-flex items-center gap-1 text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                            >
+                              <Pencil className="h-4 w-4" /> Edit
+                            </button>
                             <form action={async (formData) => { await deleteExpense(formData); }} className="inline">
                               <input type="hidden" name="id" value={expense.id} />
                               <button className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" type="submit">
@@ -211,6 +234,133 @@ export function ExpensesClient({ expenses, createExpense, deleteExpense }: Props
           onClose={() => setViewerImage(null)}
         />
       )}
+
+      {editingId && expenses.some((e) => e.id === editingId) && (
+        <EditExpenseModal
+          expense={expenses.find((e) => e.id === editingId) as Expense}
+          error={editError}
+          initialReceiptBase64={editReceiptBase64}
+          onCancel={() => {
+            setEditingId(null);
+            setEditError(null);
+            setEditReceiptBase64(null);
+          }}
+          onSubmit={async (formData) => {
+            const result = await updateExpense(formData);
+            if (result.success) {
+              setEditingId(null);
+              setEditError(null);
+              setEditReceiptBase64(null);
+              return;
+            }
+            setEditError(result.error ?? "Failed to update");
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function toDateInputValue(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function EditExpenseModal({
+  expense,
+  initialReceiptBase64,
+  error,
+  onCancel,
+  onSubmit,
+}: {
+  expense: Expense;
+  initialReceiptBase64: string | null;
+  error: string | null;
+  onCancel: () => void;
+  onSubmit: (formData: FormData) => Promise<void>;
+}) {
+  const [receiptBase64, setReceiptBase64] = useState<string | null>(initialReceiptBase64);
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result ?? "");
+      setReceiptBase64(result.includes(",") ? result.split(",")[1] ?? null : result || null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div className="absolute inset-0 bg-zinc-900/60 dark:bg-zinc-950/70" onClick={onCancel} aria-hidden />
+      <div className="relative w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Edit Expense</h2>
+        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          Source: {expense.sourceType === "income" ? "Income log" : "Manual expense"}
+        </p>
+        <form
+          className="mt-4 space-y-4"
+          action={async (formData) => {
+            await onSubmit(formData);
+          }}
+        >
+          {error && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">
+              {error}
+            </div>
+          )}
+          <input type="hidden" name="id" value={expense.id} />
+          <input type="hidden" name="receiptImage" value={receiptBase64 ?? ""} />
+          <div>
+            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Description</label>
+            <input name="description" required defaultValue={expense.description} className="input w-full px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Amount (R)</label>
+            <input name="amount" type="number" step="0.01" required defaultValue={expense.amount} className="input w-full px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Date</label>
+            <input name="loggedOn" type="date" required defaultValue={toDateInputValue(expense.loggedOn)} className="input w-full px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Receipt image</label>
+            <input type="file" accept="image/*" onChange={handleFile} className="input w-full px-3 py-2 text-sm" />
+            {receiptBase64 ? (
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">Receipt attached</span>
+                <button
+                  type="button"
+                  className="text-xs text-red-600 hover:text-red-700 dark:text-red-400"
+                  onClick={() => setReceiptBase64(null)}
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <span className="mt-2 block text-xs text-zinc-500 dark:text-zinc-400">No receipt image</span>
+            )}
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onCancel} className="btn btn-secondary flex-1">
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary flex-1">
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

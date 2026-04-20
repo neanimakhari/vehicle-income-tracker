@@ -5,6 +5,8 @@ import { ExpenseViewClient } from "./ExpenseViewClient";
 
 type Expense = {
   id: string;
+  sourceType?: "manual" | "income";
+  sourceId?: string;
   description: string;
   amount: number;
   receiptImage?: string | null;
@@ -15,8 +17,10 @@ type Expense = {
 export default async function ExpenseViewPage({ params }: { params: Promise<{ id: string }> }) {
   await requireAuth();
   const { id } = await params;
-  const expense = await fetchJson<Expense>(`/tenant/expenses/${id}`);
-  if (!expense) {
+  const decodedId = decodeURIComponent(id);
+  const expense = await fetchJson<Expense[]>(`/tenant/expenses/unified`);
+  const selected = (expense ?? []).find((e) => e.id === decodedId);
+  if (!selected) {
     return (
       <div className="max-w-2xl mx-auto py-8">
         <p className="text-zinc-600 dark:text-zinc-400">Expense not found.</p>
@@ -27,11 +31,11 @@ export default async function ExpenseViewPage({ params }: { params: Promise<{ id
     );
   }
   const normalized = {
-    id: expense.id,
-    description: expense.description,
-    amount: Number(expense.amount) || 0,
-    receiptImage: expense.receiptImage ?? expense.receipt_image ?? undefined,
-    loggedOn: expense.loggedOn,
+    id: selected.id,
+    description: selected.description,
+    amount: Number(selected.amount) || 0,
+    receiptImage: selected.receiptImage ?? selected.receipt_image ?? undefined,
+    loggedOn: selected.loggedOn,
   };
   return (
     <div className="max-w-2xl mx-auto py-8">

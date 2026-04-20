@@ -148,9 +148,12 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
     }
   }
 
-  Future<void> _pickImage({required bool isExpenseImage}) async {
+  Future<void> _pickImage({
+    required bool isExpenseImage,
+    required ImageSource source,
+  }) async {
     final image = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
+      source: source,
       imageQuality: 60,
       maxWidth: 800,
       maxHeight: 800,
@@ -168,6 +171,46 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
     await _applyOcrHints(image.path, isExpenseImage: isExpenseImage);
   }
 
+  Future<void> _showImageSourcePicker({required bool isExpenseImage}) async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: isDarkMode ? AppTheme.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: AppTheme.primary),
+              title: const Text('Take photo'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(
+                  isExpenseImage: isExpenseImage,
+                  source: ImageSource.camera,
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: AppTheme.primary),
+              title: const Text('Choose from gallery'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(
+                  isExpenseImage: isExpenseImage,
+                  source: ImageSource.gallery,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _removeImage({required bool isExpenseImage}) {
     setState(() {
       if (isExpenseImage) {
@@ -180,6 +223,11 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    final incomeAmount = _parseFlexibleDouble(_incomeController.text.trim());
+    if (incomeAmount == null) {
+      AppToast.error(context, 'Please enter a valid income amount.');
       return;
     }
     final startingKm = _startingKmController.text.trim().isEmpty
@@ -216,15 +264,9 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
 
     setState(() => _submitting = true);
     try {
-      final expensePrice = _expenseAmountController.text.trim().isEmpty
-          ? null
-          : double.parse(_expenseAmountController.text.trim());
-      final petrolPoured = _petrolCostController.text.trim().isEmpty
-          ? null
-          : double.tryParse(_petrolCostController.text.trim());
-      final petrolLitres = _petrolLitresController.text.trim().isEmpty
-          ? null
-          : double.tryParse(_petrolLitresController.text.trim());
+      final expensePrice = _parseFlexibleDouble(_expenseAmountController.text.trim());
+      final petrolPoured = _parseFlexibleDouble(_petrolCostController.text.trim());
+      final petrolLitres = _parseFlexibleDouble(_petrolLitresController.text.trim());
       final result = await _api.createIncome({
         'vehicle': _vehicles
                 .firstWhere(
@@ -234,7 +276,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
                 ?.toString() ??
             '',
         'driverName': _driverController.text.trim(),
-        'income': double.parse(_incomeController.text.trim()),
+        'income': incomeAmount,
         'startingKm': startingKm,
         'endKm': endKm,
         'petrolPoured': petrolPoured,
@@ -282,7 +324,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
                   ?.toString() ??
               '',
           'driverName': _driverController.text.trim(),
-          'income': double.parse(_incomeController.text.trim()),
+          'income': incomeAmount,
           'startingKm': _startingKmController.text.trim().isEmpty
               ? null
               : int.tryParse(_startingKmController.text.trim()),
@@ -291,16 +333,16 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
               : int.tryParse(_endKmController.text.trim()),
           'petrolPoured': _petrolCostController.text.trim().isEmpty
               ? null
-              : double.tryParse(_petrolCostController.text.trim()),
+              : _parseFlexibleDouble(_petrolCostController.text.trim()),
           'petrolLitres': _petrolLitresController.text.trim().isEmpty
               ? null
-              : double.tryParse(_petrolLitresController.text.trim()),
+              : _parseFlexibleDouble(_petrolLitresController.text.trim()),
           'expenseDetail': _expenseDetailController.text.trim().isEmpty
               ? null
               : _expenseDetailController.text.trim(),
           'expensePrice': _expenseAmountController.text.trim().isEmpty
               ? null
-              : double.tryParse(_expenseAmountController.text.trim()),
+              : _parseFlexibleDouble(_expenseAmountController.text.trim()),
           'expenseImage': _expenseImageBase64,
           'petrolSlip': _petrolSlipBase64,
           'loggedOn': loggedOn,
@@ -390,6 +432,32 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
     final lines = text.split('\n').where((line) => line.trim().isNotEmpty).toList();
     if (lines.isEmpty) return null;
     return lines.first.trim();
+  }
+
+  double? _parseFlexibleDouble(String input) {
+    if (input.trim().isEmpty) return null;
+    var cleaned = input.trim().replaceAll(RegExp(r'[^0-9,.\-]'), '');
+    if (cleaned.isEmpty) return null;
+
+    final hasComma = cleaned.contains(',');
+    final hasDot = cleaned.contains('.');
+
+    if (hasComma && hasDot) {
+      final lastComma = cleaned.lastIndexOf(',');
+      final lastDot = cleaned.lastIndexOf('.');
+      if (lastComma > lastDot) {
+        // Example: 1.234,56 -> 1234.56
+        cleaned = cleaned.replaceAll('.', '').replaceAll(',', '.');
+      } else {
+        // Example: 1,234.56 -> 1234.56
+        cleaned = cleaned.replaceAll(',', '');
+      }
+    } else if (hasComma) {
+      // Example: 1234,56 -> 1234.56
+      cleaned = cleaned.replaceAll(',', '.');
+    }
+
+    return double.tryParse(cleaned);
   }
 
   @override
@@ -615,7 +683,14 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
                         label: 'Income Amount (R)',
                         icon: Icons.attach_money,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        validator: (value) => value == null || value.isEmpty ? 'Income required' : null,
+                        validator: (value) {
+                          final raw = value?.trim() ?? '';
+                          if (raw.isEmpty) return 'Income required';
+                          if (_parseFlexibleDouble(raw) == null) {
+                            return 'Enter a valid number';
+                          }
+                          return null;
+                        },
                       ),
                     ],
                   ),
@@ -644,7 +719,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
                         base64: _petrolSlipBase64,
                         label: 'Petrol Slip',
                         icon: Icons.receipt,
-                        onPick: () => _pickImage(isExpenseImage: false),
+                        onPick: () => _showImageSourcePicker(isExpenseImage: false),
                         onRemove: () => _removeImage(isExpenseImage: false),
                         isDarkMode: isDarkMode,
                       ),
@@ -677,14 +752,21 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
                               label: 'Expense Amount (R)',
                               icon: Icons.money_off,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              validator: (_) => null,
+                              validator: (value) {
+                                final raw = value?.trim() ?? '';
+                                if (raw.isEmpty) return null;
+                                if (_parseFlexibleDouble(raw) == null) {
+                                  return 'Enter a valid number';
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: 16),
                             _imagePickerWithPreview(
                               base64: _expenseImageBase64,
                               label: 'Expense Receipt',
                               icon: Icons.receipt_long,
-                              onPick: () => _pickImage(isExpenseImage: true),
+                              onPick: () => _showImageSourcePicker(isExpenseImage: true),
                               onRemove: () => _removeImage(isExpenseImage: true),
                               isDarkMode: isDarkMode,
                             ),
