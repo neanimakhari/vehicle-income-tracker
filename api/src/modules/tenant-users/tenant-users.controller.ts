@@ -16,7 +16,14 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { TenantContextGuard } from '../../tenancy/guards/tenant-context.guard';
 import { TenantAccessGuard } from '../../tenancy/guards/tenant-access.guard';
-import { IsEmail, IsNotEmpty, IsOptional, IsString, Matches, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  MinLength,
+} from 'class-validator';
 import { ApiTags } from '@nestjs/swagger';
 
 class CreateTenantUserDto {
@@ -99,5 +106,11 @@ export class TenantUsersController {
   remindMfa(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.tenantUsersService.sendMfaReminder(id);
   }
-}
 
+  @Post(':id/password/reset')
+  @UseGuards(JwtAuthGuard, RolesGuard, TenantContextGuard, TenantAccessGuard)
+  @Roles('TENANT_ADMIN')
+  resetPassword(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.tenantUsersService.resetPassword(id);
+  }
+}

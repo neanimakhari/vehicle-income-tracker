@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -48,13 +53,15 @@ export class TenantUsersService {
       this.tenantScope,
       TenantUser,
     );
-    return tenantRepo.withSchema(repo => repo.find());
+    return tenantRepo.withSchema((repo) => repo.find());
   }
 
   async create(payload: CreateTenantUserPayload): Promise<TenantUser> {
     const tenantSlug = this.tenantContext.getTenantId();
     if (tenantSlug) {
-      const tenant = await this.tenantRepository.findOne({ where: { slug: tenantSlug } });
+      const tenant = await this.tenantRepository.findOne({
+        where: { slug: tenantSlug },
+      });
       if (tenant?.maxDrivers != null && tenant.maxDrivers >= 1) {
         const usage = await this.tenantSchemasService.getUsage(tenantSlug);
         if (usage.drivers >= tenant.maxDrivers) {
@@ -70,7 +77,7 @@ export class TenantUsersService {
       this.tenantScope,
       TenantUser,
     );
-    return tenantRepo.withSchema(async repo => {
+    return tenantRepo.withSchema(async (repo) => {
       const existing = await repo.findOne({ where: { email: payload.email } });
       if (existing) {
         throw new ConflictException('User already exists');
@@ -97,11 +104,17 @@ export class TenantUsersService {
       // Send verification email (use driver app URL for deep link when set)
       try {
         const tenantId = this.tenantContext.getTenantId();
-        const tenant = tenantId ? await this.tenantRepository.findOne({ where: { slug: tenantId } }) : null;
-        const driverAppUrl = this.configService.get<string>('appUrls.driverApp');
-        const baseUrl = driverAppUrl ?? process.env.FRONTEND_URL ?? 'http://localhost:3002';
+        const tenant = tenantId
+          ? await this.tenantRepository.findOne({ where: { slug: tenantId } })
+          : null;
+        const driverAppUrl =
+          this.configService.get<string>('appUrls.driverApp');
+        const baseUrl =
+          driverAppUrl ?? process.env.FRONTEND_URL ?? 'http://localhost:3002';
         const path = `verify-email?token=${verificationToken}${tenantId ? `&tenant=${encodeURIComponent(tenantId)}` : ''}`;
-        const verificationUrl = baseUrl.endsWith('/') ? `${baseUrl}${path}` : `${baseUrl}/${path}`;
+        const verificationUrl = baseUrl.endsWith('/')
+          ? `${baseUrl}${path}`
+          : `${baseUrl}/${path}`;
         await this.emailService.sendVerificationEmail(
           saved.email,
           `${saved.firstName} ${saved.lastName}`,
@@ -127,13 +140,16 @@ export class TenantUsersService {
     });
   }
 
-  async update(id: string, payload: UpdateTenantUserPayload): Promise<TenantUser> {
+  async update(
+    id: string,
+    payload: UpdateTenantUserPayload,
+  ): Promise<TenantUser> {
     const tenantRepo = new TenantAwareRepository(
       this.dataSource,
       this.tenantScope,
       TenantUser,
     );
-    return tenantRepo.withSchema(async repo => {
+    return tenantRepo.withSchema(async (repo) => {
       const existing = await repo.findOne({ where: { id } });
       if (!existing) {
         throw new NotFoundException('User not found');
@@ -173,7 +189,7 @@ export class TenantUsersService {
       this.tenantScope,
       TenantUser,
     );
-    return tenantRepo.withSchema(async repo => {
+    return tenantRepo.withSchema(async (repo) => {
       const existing = await repo.findOne({ where: { id } });
       if (!existing) {
         throw new NotFoundException('User not found');
@@ -200,7 +216,7 @@ export class TenantUsersService {
       this.tenantScope,
       TenantUser,
     );
-    return tenantRepo.withSchema(async repo => {
+    return tenantRepo.withSchema(async (repo) => {
       const existing = await repo.findOne({ where: { id } });
       if (!existing) {
         throw new NotFoundException('User not found');
@@ -229,7 +245,7 @@ export class TenantUsersService {
       this.tenantScope,
       TenantUser,
     );
-    return tenantRepo.withSchema(async repo => {
+    return tenantRepo.withSchema(async (repo) => {
       const existing = await repo.findOne({ where: { id } });
       if (!existing) {
         throw new NotFoundException('User not found');
@@ -248,5 +264,46 @@ export class TenantUsersService {
       return { sent: true };
     });
   }
-}
 
+  /**
+   * Admin-triggered password reset: sets a temporary password and forces change on next login.
+   */
+  async resetPassword(
+    id: string,
+  ): Promise<{ temporaryPassword: string; email: string }> {
+    const tenantRepo = new TenantAwareRepository(
+      this.dataSource,
+      this.tenantScope,
+      TenantUser,
+    );
+    return tenantRepo.withSchema(async (repo) => {
+      const existing = await repo.findOne({ where: { id } });
+      if (!existing) {
+        throw new NotFoundException('User not found');
+      }
+
+      const temporaryPassword = `Tmp${randomUUID().replace(/-/g, '').slice(0, 8)}!aA`;
+      existing.passwordHash = await bcrypt.hash(temporaryPassword, 12);
+      existing.mustChangePassword = true;
+      existing.passwordResetToken = null;
+      existing.passwordResetExpires = null;
+      existing.failedLoginAttempts = 0;
+      existing.lockedUntil = null;
+      const saved = await repo.save(existing);
+
+      await this.auditService.log({
+        action: 'tenant.user.password.reset',
+        actorUserId: null,
+        actorRole: 'TENANT_ADMIN',
+        targetType: 'tenant_user',
+        targetId: saved.id,
+        metadata: {
+          tenant: this.tenantContext.getTenantId(),
+          email: saved.email,
+        },
+      });
+
+      return { temporaryPassword, email: saved.email };
+    });
+  }
+}

@@ -21,6 +21,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   validate(payload: JwtPayload) {
     return {
+      // Controllers historically read req.user.sub; keep userId for any callers that use it.
+      sub: payload.sub,
       userId: payload.sub,
       email: payload.email,
       role: payload.role,
@@ -28,5 +30,3 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     };
   }
 }
-
-

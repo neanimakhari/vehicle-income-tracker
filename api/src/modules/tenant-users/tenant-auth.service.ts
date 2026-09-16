@@ -23,7 +23,10 @@ const EMAIL_OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 
 @Injectable()
 export class TenantAuthService {
-  private readonly emailOtpStore = new Map<string, { code: string; expiresAt: number }>();
+  private readonly emailOtpStore = new Map<
+    string,
+    { code: string; expiresAt: number }
+  >();
 
   constructor(
     private readonly dataSource: DataSource,
@@ -52,13 +55,14 @@ export class TenantAuthService {
   private getLockoutConfig() {
     return {
       maxAttempts: this.configService.get<number>('auth.maxLoginAttempts') ?? 5,
-      lockoutMinutes: this.configService.get<number>('auth.lockoutMinutes') ?? 15,
+      lockoutMinutes:
+        this.configService.get<number>('auth.lockoutMinutes') ?? 15,
     };
   }
 
   async validateUser(email: string, password: string): Promise<TenantUser> {
     const tenantRepo = this.getTenantRepo();
-    return tenantRepo.withSchema(async repo => {
+    return tenantRepo.withSchema(async (repo) => {
       const user = await repo.findOne({ where: { email } });
       if (!user || !user.isActive) {
         throw new UnauthorizedException('Invalid credentials');
@@ -89,7 +93,12 @@ export class TenantAuthService {
     email: string,
     password: string,
     mfaToken?: string,
-    context?: { ip?: string; deviceId?: string; deviceName?: string; pushToken?: string },
+    context?: {
+      ip?: string;
+      deviceId?: string;
+      deviceName?: string;
+      pushToken?: string;
+    },
   ) {
     const tenantSlug = this.tenantContext.getTenantId();
     if (!tenantSlug) {
@@ -178,13 +187,15 @@ export class TenantAuthService {
         tenantId: tenantSlug,
       };
 
-      const refreshExpiresIn = (this.configService.get<string>('auth.jwtRefreshExpiresIn') ?? '7d') as StringValue;
+      const refreshExpiresIn = (this.configService.get<string>(
+        'auth.jwtRefreshExpiresIn',
+      ) ?? '7d') as StringValue;
 
       const tokens = await this.issueTokens(payload, refreshExpiresIn);
 
       const previousIp = user.lastLoginIp;
       try {
-        await this.getTenantRepo().withSchema(async repo => {
+        await this.getTenantRepo().withSchema(async (repo) => {
           if (ipAddress) {
             user.lastLoginIp = ipAddress;
           }
@@ -244,11 +255,19 @@ export class TenantAuthService {
       }
       // Surface common causes with user-friendly messages
       const msg = error instanceof Error ? error.message : String(error);
-      if (msg.includes('does not exist') || msg.includes('relation') || msg.includes('schema')) {
-        throw new UnauthorizedException('Tenant not found or not set up. Check the tenant slug or contact your administrator.');
+      if (
+        msg.includes('does not exist') ||
+        msg.includes('relation') ||
+        msg.includes('schema')
+      ) {
+        throw new UnauthorizedException(
+          'Tenant not found or not set up. Check the tenant slug or contact your administrator.',
+        );
       }
       if (msg.includes('Tenant not found') || msg.includes('tenant')) {
-        throw new UnauthorizedException('Tenant not found. Please check the tenant slug.');
+        throw new UnauthorizedException(
+          'Tenant not found. Please check the tenant slug.',
+        );
       }
       throw new UnauthorizedException('Login failed. Please try again.');
     }
@@ -259,14 +278,18 @@ export class TenantAuthService {
     return this.setupMfa(user.id);
   }
 
-  async verifyMfaWithCredentials(email: string, password: string, token: string) {
+  async verifyMfaWithCredentials(
+    email: string,
+    password: string,
+    token: string,
+  ) {
     const user = await this.validateUser(email, password);
     return this.verifyMfa(user.id, token);
   }
 
   async setupMfa(userId: string) {
     const tenantRepo = this.getTenantRepo();
-    return tenantRepo.withSchema(async repo => {
+    return tenantRepo.withSchema(async (repo) => {
       const user = await repo.findOne({ where: { id: userId } });
       if (!user) {
         throw new UnauthorizedException('User not found');
@@ -288,7 +311,7 @@ export class TenantAuthService {
 
   async verifyMfa(userId: string, token: string) {
     const tenantRepo = this.getTenantRepo();
-    return tenantRepo.withSchema(async repo => {
+    return tenantRepo.withSchema(async (repo) => {
       const user = await repo.findOne({ where: { id: userId } });
       if (!user || !user.mfaSecret) {
         throw new UnauthorizedException('MFA not initialized');
@@ -335,7 +358,9 @@ export class TenantAuthService {
         tenantId: payload.tenantId,
       };
 
-      const refreshExpiresIn = (this.configService.get<string>('auth.jwtRefreshExpiresIn') ?? '7d') as StringValue;
+      const refreshExpiresIn = (this.configService.get<string>(
+        'auth.jwtRefreshExpiresIn',
+      ) ?? '7d') as StringValue;
       const tokens = await this.issueTokens(accessPayload, refreshExpiresIn);
 
       tokenRecord.isRevoked = true;
@@ -381,9 +406,18 @@ export class TenantAuthService {
     return { accessToken, refreshToken, refreshTokenId };
   }
 
-  private async revokeAllTokens(userId: string, role: string, tenantId: string | null) {
+  private async revokeAllTokens(
+    userId: string,
+    role: string,
+    tenantId: string | null,
+  ) {
     await this.refreshTokenRepository.update(
-      { userId, userRole: role, tenantId: tenantId ?? IsNull(), isRevoked: false },
+      {
+        userId,
+        userRole: role,
+        tenantId: tenantId ?? IsNull(),
+        isRevoked: false,
+      },
       { isRevoked: true },
     );
   }
@@ -483,11 +517,14 @@ export class TenantAuthService {
 
   async forgotPassword(email: string): Promise<{ message: string }> {
     const tenantRepo = this.getTenantRepo();
-    return tenantRepo.withSchema(async repo => {
+    return tenantRepo.withSchema(async (repo) => {
       const user = await repo.findOne({ where: { email } });
       if (!user || !user.isActive) {
         // Don't reveal if user exists for security
-        return { message: 'If an account exists with this email, a password reset link has been sent.' };
+        return {
+          message:
+            'If an account exists with this email, a password reset link has been sent.',
+        };
       }
 
       // Generate reset token
@@ -500,14 +537,22 @@ export class TenantAuthService {
 
       // Get tenant info for email
       const tenantId = this.tenantContext.getTenantId();
-      const tenant = tenantId ? await this.tenantRepository.findOne({ where: { slug: tenantId } }) : null;
+      const tenant = tenantId
+        ? await this.tenantRepository.findOne({ where: { slug: tenantId } })
+        : null;
 
       // Send reset email (use driver app URL for deep link when set; include tenant for in-app flow)
       try {
-        const driverAppUrl = this.configService.get<string>('appUrls.driverApp');
-        const baseUrl = driverAppUrl || this.configService.get<string>('appUrls.frontend') || 'http://localhost:3002';
+        const driverAppUrl =
+          this.configService.get<string>('appUrls.driverApp');
+        const baseUrl =
+          driverAppUrl ||
+          this.configService.get<string>('appUrls.frontend') ||
+          'http://localhost:3002';
         const path = `reset-password?token=${resetToken}${tenantId ? `&tenant=${encodeURIComponent(tenantId)}` : ''}`;
-        const resetUrl = baseUrl.endsWith('/') ? `${baseUrl}${path}` : `${baseUrl}/${path}`;
+        const resetUrl = baseUrl.endsWith('/')
+          ? `${baseUrl}${path}`
+          : `${baseUrl}/${path}`;
         await this.emailService.sendPasswordResetEmail(
           user.email,
           `${user.firstName} ${user.lastName}`,
@@ -519,13 +564,19 @@ export class TenantAuthService {
         // Don't fail the request if email fails
       }
 
-      return { message: 'If an account exists with this email, a password reset link has been sent.' };
+      return {
+        message:
+          'If an account exists with this email, a password reset link has been sent.',
+      };
     });
   }
 
-  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+  async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
     const tenantRepo = this.getTenantRepo();
-    return tenantRepo.withSchema(async repo => {
+    return tenantRepo.withSchema(async (repo) => {
       const user = await repo.findOne({
         where: {
           passwordResetToken: token,
@@ -536,7 +587,10 @@ export class TenantAuthService {
         throw new UnauthorizedException('Invalid or expired reset token');
       }
 
-      if (!user.passwordResetExpires || user.passwordResetExpires.getTime() < Date.now()) {
+      if (
+        !user.passwordResetExpires ||
+        user.passwordResetExpires.getTime() < Date.now()
+      ) {
         user.passwordResetToken = null;
         user.passwordResetExpires = null;
         await repo.save(user);
@@ -550,15 +604,18 @@ export class TenantAuthService {
       user.passwordResetExpires = null;
       user.failedLoginAttempts = 0;
       user.lockedUntil = null;
+      user.mustChangePassword = false;
       await repo.save(user);
 
       return { message: 'Password has been reset successfully' };
     });
   }
 
-  async verifyEmail(token: string): Promise<{ message: string; verified: boolean }> {
+  async verifyEmail(
+    token: string,
+  ): Promise<{ message: string; verified: boolean }> {
     const tenantRepo = this.getTenantRepo();
-    return tenantRepo.withSchema(async repo => {
+    return tenantRepo.withSchema(async (repo) => {
       const user = await repo.findOne({
         where: {
           emailVerificationToken: token,
@@ -569,7 +626,10 @@ export class TenantAuthService {
         throw new UnauthorizedException('Invalid verification token');
       }
 
-      if (!user.emailVerificationExpires || user.emailVerificationExpires.getTime() < Date.now()) {
+      if (
+        !user.emailVerificationExpires ||
+        user.emailVerificationExpires.getTime() < Date.now()
+      ) {
         // Generate new token
         const newToken = randomUUID();
         const newExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -580,11 +640,19 @@ export class TenantAuthService {
         // Resend verification email
         try {
           const tenantId = this.tenantContext.getTenantId();
-          const tenant = tenantId ? await this.tenantRepository.findOne({ where: { slug: tenantId } }) : null;
-          const driverAppUrl = this.configService.get<string>('appUrls.driverApp');
-          const baseUrl = driverAppUrl || this.configService.get<string>('appUrls.frontend') || 'http://localhost:3002';
+          const tenant = tenantId
+            ? await this.tenantRepository.findOne({ where: { slug: tenantId } })
+            : null;
+          const driverAppUrl =
+            this.configService.get<string>('appUrls.driverApp');
+          const baseUrl =
+            driverAppUrl ||
+            this.configService.get<string>('appUrls.frontend') ||
+            'http://localhost:3002';
           const path = `verify-email?token=${newToken}${tenantId ? `&tenant=${encodeURIComponent(tenantId)}` : ''}`;
-          const verificationUrl = baseUrl.endsWith('/') ? `${baseUrl}${path}` : `${baseUrl}/${path}`;
+          const verificationUrl = baseUrl.endsWith('/')
+            ? `${baseUrl}${path}`
+            : `${baseUrl}/${path}`;
           await this.emailService.sendVerificationEmail(
             user.email,
             `${user.firstName} ${user.lastName}`,
@@ -595,7 +663,9 @@ export class TenantAuthService {
           console.error('Error resending verification email:', error);
         }
 
-        throw new UnauthorizedException('Verification token has expired. A new verification email has been sent.');
+        throw new UnauthorizedException(
+          'Verification token has expired. A new verification email has been sent.',
+        );
       }
 
       // Verify email
@@ -608,9 +678,13 @@ export class TenantAuthService {
     });
   }
 
-  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ message: string }> {
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
     const tenantRepo = this.getTenantRepo();
-    return tenantRepo.withSchema(async repo => {
+    return tenantRepo.withSchema(async (repo) => {
       const user = await repo.findOne({ where: { id: userId } });
       if (!user) {
         throw new UnauthorizedException('User not found');
@@ -649,10 +723,13 @@ export class TenantAuthService {
       throw new UnauthorizedException('Tenant context missing');
     }
     const tenantRepo = this.getTenantRepo();
-    return tenantRepo.withSchema(async repo => {
+    return tenantRepo.withSchema(async (repo) => {
       const user = await repo.findOne({ where: { email } });
       if (!user || !user.isActive) {
-        return { message: 'If an account exists with this email and is not verified, a verification code has been sent.' };
+        return {
+          message:
+            'If an account exists with this email and is not verified, a verification code has been sent.',
+        };
       }
       if (user.emailVerified) {
         return { message: 'Email is already verified' };
@@ -663,7 +740,9 @@ export class TenantAuthService {
         code,
         expiresAt: Date.now() + EMAIL_OTP_EXPIRY_MS,
       });
-      const tenant = await this.tenantRepository.findOne({ where: { slug: tenantId } });
+      const tenant = await this.tenantRepository.findOne({
+        where: { slug: tenantId },
+      });
       try {
         await this.emailService.sendEmailOtp(
           user.email,
@@ -675,11 +754,17 @@ export class TenantAuthService {
         this.emailOtpStore.delete(key);
         throw error;
       }
-      return { message: 'If an account exists with this email and is not verified, a verification code has been sent.' };
+      return {
+        message:
+          'If an account exists with this email and is not verified, a verification code has been sent.',
+      };
     });
   }
 
-  async verifyEmailWithOtp(email: string, code: string): Promise<{ message: string; verified: boolean }> {
+  async verifyEmailWithOtp(
+    email: string,
+    code: string,
+  ): Promise<{ message: string; verified: boolean }> {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) {
       throw new UnauthorizedException('Tenant context missing');
@@ -695,7 +780,7 @@ export class TenantAuthService {
     }
     this.emailOtpStore.delete(key);
     const tenantRepo = this.getTenantRepo();
-    return tenantRepo.withSchema(async repo => {
+    return tenantRepo.withSchema(async (repo) => {
       const user = await repo.findOne({ where: { email } });
       if (!user || !user.isActive) {
         throw new UnauthorizedException('Invalid verification code');
@@ -710,11 +795,14 @@ export class TenantAuthService {
 
   async resendVerificationEmail(email: string): Promise<{ message: string }> {
     const tenantRepo = this.getTenantRepo();
-    return tenantRepo.withSchema(async repo => {
+    return tenantRepo.withSchema(async (repo) => {
       const user = await repo.findOne({ where: { email } });
       if (!user || !user.isActive) {
         // Don't reveal if user exists for security
-        return { message: 'If an account exists with this email and is not verified, a verification email has been sent.' };
+        return {
+          message:
+            'If an account exists with this email and is not verified, a verification email has been sent.',
+        };
       }
 
       if (user.emailVerified) {
@@ -732,11 +820,19 @@ export class TenantAuthService {
       // Send verification email (use driver app URL for deep link when set; include tenant for in-app flow)
       try {
         const tenantId = this.tenantContext.getTenantId();
-        const tenant = tenantId ? await this.tenantRepository.findOne({ where: { slug: tenantId } }) : null;
-        const driverAppUrl = this.configService.get<string>('appUrls.driverApp');
-        const baseUrl = driverAppUrl || this.configService.get<string>('appUrls.frontend') || 'http://localhost:3002';
+        const tenant = tenantId
+          ? await this.tenantRepository.findOne({ where: { slug: tenantId } })
+          : null;
+        const driverAppUrl =
+          this.configService.get<string>('appUrls.driverApp');
+        const baseUrl =
+          driverAppUrl ||
+          this.configService.get<string>('appUrls.frontend') ||
+          'http://localhost:3002';
         const path = `verify-email?token=${verificationToken}${tenantId ? `&tenant=${encodeURIComponent(tenantId)}` : ''}`;
-        const verificationUrl = baseUrl.endsWith('/') ? `${baseUrl}${path}` : `${baseUrl}/${path}`;
+        const verificationUrl = baseUrl.endsWith('/')
+          ? `${baseUrl}${path}`
+          : `${baseUrl}/${path}`;
         await this.emailService.sendVerificationEmail(
           user.email,
           `${user.firstName} ${user.lastName}`,
@@ -748,7 +844,10 @@ export class TenantAuthService {
         // Don't fail the request if email fails
       }
 
-      return { message: 'If an account exists with this email and is not verified, a verification email has been sent.' };
+      return {
+        message:
+          'If an account exists with this email and is not verified, a verification email has been sent.',
+      };
     });
   }
 
@@ -771,4 +870,3 @@ export class TenantAuthService {
     }
   }
 }
-

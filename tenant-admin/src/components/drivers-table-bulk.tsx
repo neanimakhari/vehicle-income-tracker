@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { DriverAvatar } from "./driver-avatar";
 import { TablePagination } from "@/components/table-pagination";
+import { ResetDriverPasswordButton } from "@/components/reset-driver-password-button";
 
 type Driver = {
   id: string;
@@ -43,6 +44,11 @@ type Props = {
   onRemindMfa: (formData: FormData) => Promise<void>;
   onBulkToggle: (formData: FormData) => Promise<void>;
   onBulkRemindMfa: (formData: FormData) => Promise<void>;
+  onResetPassword: (id: string) => Promise<{
+    temporaryPassword?: string;
+    email?: string;
+    error?: string;
+  }>;
 };
 
 function SortIcon({ current, dir }: { current: boolean; dir: SortDir | null }) {
@@ -58,6 +64,7 @@ export function DriversTableBulk({
   onRemindMfa,
   onBulkToggle,
   onBulkRemindMfa,
+  onResetPassword,
 }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
@@ -466,6 +473,11 @@ export function DriversTableBulk({
                               <span className="hidden lg:inline ml-1.5">Reset MFA</span>
                             </button>
                           </form>
+                          <ResetDriverPasswordButton
+                            driverId={driver.id}
+                            driverName={`${driver.firstName} ${driver.lastName}`}
+                            onReset={onResetPassword}
+                          />
                           {!driver.mfaEnabled && (
                             <form action={onRemindMfa} className="inline">
                               <input type="hidden" name="id" value={driver.id} />

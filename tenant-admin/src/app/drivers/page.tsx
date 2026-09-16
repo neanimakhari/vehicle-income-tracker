@@ -91,6 +91,44 @@ export default async function DriversPage() {
     revalidatePath("/drivers");
   }
 
+  async function resetDriverPassword(id: string): Promise<{
+    temporaryPassword?: string;
+    email?: string;
+    error?: string;
+  }> {
+    "use server";
+    if (!id) {
+      return { error: "Missing driver id." };
+    }
+    try {
+      const res = await fetch(`${getApiUrl()}/tenant/users/${id}/password/reset`, {
+        method: "POST",
+        headers: {
+          ...(await getAuthHeaders()),
+        },
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        temporaryPassword?: string;
+        email?: string;
+        message?: string | string[];
+      };
+      if (!res.ok) {
+        const msg = Array.isArray(body.message)
+          ? body.message.join(" ")
+          : (body.message ?? "Failed to reset password.");
+        return { error: msg };
+      }
+      revalidatePath("/drivers");
+      return {
+        temporaryPassword: body.temporaryPassword,
+        email: body.email,
+      };
+    } catch (e) {
+      console.error("Reset driver password error:", e);
+      return { error: "Could not reset password. Try again." };
+    }
+  }
+
   async function bulkToggleDrivers(formData: FormData) {
     "use server";
     const idsRaw = String(formData.get("ids") ?? "");
@@ -193,6 +231,7 @@ export default async function DriversPage() {
         onRemindMfa={remindDriverMfa}
         onBulkToggle={bulkToggleDrivers}
         onBulkRemindMfa={bulkRemindMfa}
+        onResetPassword={resetDriverPassword}
       />
     </div>
   );
