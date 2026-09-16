@@ -1,8 +1,22 @@
 @import "tailwindcss";
 
+/* Class-based dark mode (ThemeProvider toggles .dark on <html>) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+  Theme contract (standard Tailwind dark:):
+  - Light = no .dark on <html>
+  - Dark  = .dark on <html>
+  Previous body classes inverted this and broke contrast across pages.
+*/
+
 :root {
-  --background: #f5f5f5;
-  --foreground: #121212;
+  --background: #f4f7f6;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #eef2f1;
+  --border: #d4ddd9;
+  --muted: #64748b;
   --teal-50: #f0fdfa;
   --teal-100: #ccfbf1;
   --teal-200: #99f6e4;
@@ -14,6 +28,17 @@
   --teal-800: #115e59;
   --teal-900: #134e4a;
   --teal-950: #042f2e;
+  color-scheme: light;
+}
+
+.dark {
+  --background: #0b1220;
+  --foreground: #e2e8f0;
+  --surface: #111827;
+  --surface-muted: #1e293b;
+  --border: #334155;
+  --muted: #94a3b8;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -33,19 +58,17 @@
   --color-primary-950: var(--teal-950);
 }
 
-.dark {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-}
-
 body {
-  background: var(--background);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(13, 148, 136, 0.12), transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, rgba(15, 118, 110, 0.08), transparent 50%),
+    var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), sans-serif;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-/* Skip link: visually hidden until focused */
+/* Skip link */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -58,9 +81,35 @@ body {
   border: 0;
 }
 
+.focus\:not-sr-only:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: inherit;
+  margin: inherit;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  a {
+    @apply underline-offset-2;
+  }
+
+  /* Tables: prevent page-level horizontal blowouts */
+  table {
+    @apply max-w-full;
+  }
+}
+
 @layer components {
   .btn {
-    @apply px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-sm;
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-sm whitespace-nowrap;
   }
 
   .btn-primary {
@@ -68,19 +117,23 @@ body {
   }
 
   .btn-secondary {
-    @apply bg-zinc-200 text-zinc-700 hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2;
+    @apply bg-zinc-200 text-zinc-800 hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700 focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 dark:focus:ring-offset-zinc-900;
   }
 
   .input {
-    @apply block w-full rounded-lg border-zinc-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 transition-colors text-zinc-900 placeholder:text-zinc-400 dark:placeholder:text-zinc-500;
+    @apply block w-full max-w-full rounded-lg border border-zinc-300 bg-white shadow-sm focus:border-teal-500 focus:ring-teal-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50 transition-colors text-zinc-900 placeholder:text-zinc-500 dark:placeholder:text-zinc-400;
   }
 
   .card {
-    @apply rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 transition-all duration-200 hover:shadow-md;
+    @apply rounded-xl border border-zinc-200 bg-white text-zinc-900 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 transition-all duration-200;
   }
 
   .sidebar-link {
-    @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200;
+    @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 min-w-0;
+  }
+
+  .sidebar-link span {
+    @apply truncate;
   }
 
   .sidebar-link-active {
@@ -90,18 +143,34 @@ body {
   .sidebar-link-inactive {
     @apply text-zinc-300 hover:bg-zinc-800 hover:text-white;
   }
+
+  /* Readable page chrome */
+  .page-title {
+    @apply text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 break-words;
+  }
+
+  .page-subtitle {
+    @apply mt-1 text-sm text-zinc-600 dark:text-zinc-400 break-words;
+  }
+
+  .muted {
+    @apply text-zinc-600 dark:text-zinc-400;
+  }
 }
 
-/* Full-bleed table scroll that matches main padding (px-4 sm:px-6 lg:px-8) */
 .table-responsive {
   @apply -mx-4 sm:-mx-6 lg:-mx-8 overflow-x-auto;
 }
 
 .table-responsive table {
-  @apply min-w-full divide-y divide-zinc-200 dark:divide-zinc-800;
+  @apply min-w-full divide-y divide-zinc-200 dark:divide-zinc-700;
 }
 
 .table-responsive th,
 .table-responsive td {
-  @apply whitespace-nowrap px-3 py-3 text-sm sm:px-4;
+  @apply whitespace-nowrap px-3 py-3 text-sm sm:px-4 text-zinc-800 dark:text-zinc-200;
+}
+
+.table-responsive th {
+  @apply font-semibold text-zinc-900 dark:text-zinc-50;
 }

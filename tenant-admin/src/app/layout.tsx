@@ -55,8 +55,15 @@ export default async function RootLayout({
   }
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme');var d=window.matchMedia('(prefers-color-scheme: dark)').matches;if(t==='dark'||(t!=='light'&&d)){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body
-        className={`${inter.variable} bg-gradient-to-br from-zinc-950 via-zinc-900 to-teal-950/20 text-zinc-100 antialiased dark:from-zinc-100 dark:via-zinc-50 dark:to-teal-50/40 dark:text-zinc-900`}
+        className={`${inter.variable} min-h-screen bg-[var(--background)] text-[var(--foreground)] antialiased overflow-x-hidden`}
       >
         {process.env.NEXT_PUBLIC_USERWAY_ACCOUNT_ID ? (
           <Script
@@ -117,7 +124,7 @@ export default async function RootLayout({
                   <Suspense fallback={null}>
                     <ToastFromUrl />
                   </Suspense>
-                  <header className="sticky top-0 z-30 flex h-16 lg:h-20 items-center gap-x-4 border-b border-zinc-200/80 bg-white/80 backdrop-blur-lg shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/80">
+                  <header className="sticky top-0 z-30 flex h-16 lg:h-20 items-center gap-x-4 border-b border-zinc-200/80 bg-white/90 backdrop-blur-lg shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/90">
                     <div className="flex flex-1 items-center justify-between pl-14 pr-4 lg:px-8">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="truncate text-sm sm:text-base lg:text-lg font-semibold bg-gradient-to-r from-teal-600 to-teal-700 bg-clip-text text-transparent">
