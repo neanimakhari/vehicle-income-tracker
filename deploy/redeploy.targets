@@ -1,0 +1,16 @@
+# Which VIT services to redeploy.
+# Edit this file (or pass --services on the CLI / workflow_dispatch input).
+#
+# Allowed values (comma-separated):
+#   api              – Nest API (vit-api)
+#   system-admin     – Platform admin (vit-platform)
+#   tenant-admin     – Tenant admin (vit-admin)
+#   all              – api + system-admin + tenant-admin
+#
+# Aliases accepted by redeploy.sh / the workflow:
+#   vit-api, api
+#   platform, platform-admin, vit-platform, system-admin
+#   tenant, vit-admin, tenant-admin
+#   all
+
+SERVICES=tenant-admin

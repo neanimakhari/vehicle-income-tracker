@@ -4,6 +4,8 @@ This folder contains deployment helpers for local and production-like setups.
 
 **Recommended:** Use the **[build-and-up script](#local-stack-api--postgres--admin-uis)** (`build-and-up.sh` or `build-and-up.bat`) so the stack is always built from `deploy/` with the correct `.env`. That way the frontends get `NEXT_PUBLIC_API_URL` baked in and the API gets `CORS_ORIGINS`, avoiding "wrong API" and CORS errors in production.
 
+**Selective prod redeploy (tenant-admin / platform / api) without SSHing:** see **[AGENT-DEPLOY.md](./AGENT-DEPLOY.md)** — edit `redeploy.targets`, then trigger the GitHub Actions workflow.
+
 **Before going to production**, use the **[Deployment readiness checklist](./DEPLOYMENT-READINESS.md)**.
 
 **DigitalOcean Droplet + domains at your provider:** see **[DIGITALOCEAN-DROPLET.md](./DIGITALOCEAN-DROPLET.md)** for DNS at your registrar, droplet setup, Nginx + Let’s Encrypt, and binding app ports to localhost.

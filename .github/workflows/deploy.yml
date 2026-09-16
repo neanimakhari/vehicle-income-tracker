@@ -1,9 +1,36 @@
 name: Deploy to DigitalOcean Droplet
 
+# Trigger:
+#   - Push of platform-v* tags (full stack)
+#   - Manual / agent: workflow_dispatch with services input
+#
+# Agent example (after GitHub secrets are set):
+#   gh workflow run deploy.yml -f services=tenant-admin -f ref=main
+#   gh workflow run deploy.yml -f services=all
+#   gh workflow run deploy.yml -f services=system-admin
+#   gh workflow run deploy.yml -f services=api,tenant-admin
+
 on:
   push:
-    branches: ["main"]
+    tags:
+      - "platform-v*"
   workflow_dispatch:
+    inputs:
+      services:
+        description: "Services to rebuild (api, system-admin, tenant-admin, all — or aliases vit-admin, platform)"
+        required: true
+        default: "tenant-admin"
+        type: string
+      ref:
+        description: "Git ref to deploy (branch or tag). Empty = main for dispatch; tag push uses the tag."
+        required: false
+        default: "main"
+        type: string
+      use_cache:
+        description: "Use Docker build cache (faster, less clean)"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: deploy-production
@@ -13,41 +40,67 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy via SSH (Docker Compose build)
+      - name: Validate release tag
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if [[ ! "$tag" =~ ^platform-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid deploy tag format: $tag"
+            exit 1
+          fi
+
+      - name: Resolve deploy parameters
+        id: params
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "services=all" >> "$GITHUB_OUTPUT"
+            echo "ref=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "use_cache=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "services=${{ github.event.inputs.services }}" >> "$GITHUB_OUTPUT"
+            echo "ref=${{ github.event.inputs.ref || 'main' }}" >> "$GITHUB_OUTPUT"
+            echo "use_cache=${{ github.event.inputs.use_cache }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy via SSH (selective Docker Compose rebuild)
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          DEPLOY_SERVICES: ${{ steps.params.outputs.services }}
+          DEPLOY_REF: ${{ steps.params.outputs.ref }}
+          USE_CACHE: ${{ steps.params.outputs.use_cache }}
         with:
           host: ${{ secrets.DROPLET_HOST }}
           username: ${{ secrets.DROPLET_USERNAME }}
           key: ${{ secrets.DROPLET_SSH_PRIVATE_KEY }}
-          # port defaults to 22 if omitted
+          envs: DEPLOY_SERVICES,DEPLOY_REF,USE_CACHE
           script: |
-            # Use bash so we can rely on pipefail
             bash -lc '
             set -euo pipefail
 
             APP_DIR="${DROPLET_APP_DIR:-/opt/vehicle_income_tracker}"
-
             echo "Deploying in ${APP_DIR}"
             cd "${APP_DIR}"
 
             git fetch --all --prune
-            git reset --hard origin/main
+            REF="${DEPLOY_REF:-main}"
+            if [[ "${REF}" =~ ^platform-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              git checkout -f "${REF}"
+            else
+              git checkout -f "${REF}"
+              git reset --hard "origin/${REF}" 2>/dev/null || git reset --hard "${REF}"
+            fi
 
             cd deploy
-
-            # Safety checks (keep secrets on droplet, not in GitHub)
             test -f .env
             test -d secrets
+            test -x ./redeploy.sh || chmod +x ./redeploy.sh
 
-            # Clear Docker build cache (safe; does NOT remove volumes)
-            docker builder prune -af || true
+            EXTRA=()
+            if [[ "${USE_CACHE:-false}" == "true" ]]; then
+              EXTRA+=(--use-cache)
+            else
+              EXTRA+=(--no-cache)
+            fi
 
-            # Build fresh and redeploy using local Dockerfiles
-            docker compose -f docker-compose.yml build --no-cache
-            docker compose -f docker-compose.yml up -d --remove-orphans
-
-            # Clear unused images/containers (safe; does NOT remove volumes)
-            docker container prune -f || true
-            docker image prune -af || true
+            ./redeploy.sh --skip-pull --services "${DEPLOY_SERVICES}" "${EXTRA[@]}"
             '
-
