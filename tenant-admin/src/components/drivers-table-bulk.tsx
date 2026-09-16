@@ -195,52 +195,58 @@ export function DriversTableBulk({
 
   return (
     <div className="mt-8 flow-root">
-      <div className="flex flex-wrap items-center gap-4 mb-4">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          <Filter className="h-4 w-4" />
+          <Filter className="h-4 w-4 shrink-0" />
           Filters
         </div>
-        <select
-          className="input w-auto min-w-[120px] py-2 text-sm"
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value as "all" | "active" | "inactive");
-            setPageIndex(0);
-          }}
-        >
-          <option value="all">All statuses</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
-        <select
-          className="input w-auto min-w-[140px] py-2 text-sm"
-          value={mfaFilter}
-          onChange={(e) => {
-            setMfaFilter(e.target.value as "all" | "enabled" | "missing");
-            setPageIndex(0);
-          }}
-        >
-          <option value="all">All MFA</option>
-          <option value="enabled">MFA enabled</option>
-          <option value="missing">MFA missing</option>
-        </select>
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-          <input
-            type="search"
-            placeholder="Search by name or email..."
-            value={search}
+        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3 w-full sm:w-auto">
+          <select
+            className="input w-full sm:w-auto sm:min-w-[120px] py-2 text-sm"
+            value={statusFilter}
             onChange={(e) => {
-              setSearch(e.target.value);
+              setStatusFilter(e.target.value as "all" | "active" | "inactive");
               setPageIndex(0);
             }}
-            className="input pl-9 w-full"
-          />
+          >
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <select
+            className="input w-full sm:w-auto sm:min-w-[140px] py-2 text-sm"
+            value={mfaFilter}
+            onChange={(e) => {
+              setMfaFilter(e.target.value as "all" | "enabled" | "missing");
+              setPageIndex(0);
+            }}
+          >
+            <option value="all">All MFA</option>
+            <option value="enabled">MFA enabled</option>
+            <option value="missing">MFA missing</option>
+          </select>
+          <div className="relative w-full sm:flex-1 sm:min-w-[180px] sm:max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+            <input
+              type="search"
+              placeholder="Search by name or email..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPageIndex(0);
+              }}
+              className="input pl-9 w-full"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={exportCsv}
+            className="btn btn-secondary flex w-full sm:w-auto items-center justify-center gap-2 text-sm sm:ml-auto"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </button>
         </div>
-        <button type="button" onClick={exportCsv} className="ml-auto btn btn-secondary flex items-center gap-2 text-sm">
-          <Download className="h-4 w-4" />
-          Export CSV
-        </button>
       </div>
 
       {selectedList.length > 0 && (
@@ -279,13 +285,13 @@ export function DriversTableBulk({
         </div>
       )}
 
-      <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-        <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-          <div className="overflow-hidden shadow ring-1 ring-black/5 sm:rounded-lg">
+      <div className="table-responsive -my-2 rounded-lg shadow ring-1 ring-black/5 sm:rounded-lg">
+        <div className="inline-block min-w-full py-2 align-middle px-4 sm:px-6 lg:px-8">
+          <div className="overflow-hidden">
             <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
               <thead className="bg-gradient-to-r from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-zinc-800 border-b border-zinc-200 dark:border-zinc-700">
                   <tr>
-                    <th scope="col" className="py-3.5 pl-4 pr-3 text-left">
+                    <th scope="col" className="py-3.5 pl-3 pr-2 sm:pl-4 sm:pr-3 text-left">
                       <input
                         type="checkbox"
                         checked={paginated.length > 0 && paginated.every((d) => selected.has(d.id))}
@@ -299,25 +305,35 @@ export function DriversTableBulk({
                         <span>Name</span>
                       </>
                     ))}
-                    {th("email", (
-                      <>
+                    <th
+                      scope="col"
+                      className="hidden md:table-cell px-3 py-3.5 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50 cursor-pointer select-none hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      onClick={() => toggleSort("email")}
+                    >
+                      <div className="flex items-center gap-1">
                         <Mail className="h-4 w-4 text-teal-600 dark:text-teal-400" />
                         <span>Email</span>
-                      </>
-                    ))}
+                        <SortIcon current={sortKey === "email"} dir={sortKey === "email" ? sortDir : null} />
+                      </div>
+                    </th>
                     {th("status", (
                       <>
                         <Power className="h-4 w-4 text-teal-600 dark:text-teal-400" />
                         <span>Status</span>
                       </>
                     ))}
-                    {th("mfa", (
-                      <>
+                    <th
+                      scope="col"
+                      className="hidden sm:table-cell px-3 py-3.5 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50 cursor-pointer select-none hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      onClick={() => toggleSort("mfa")}
+                    >
+                      <div className="flex items-center gap-1">
                         <Shield className="h-4 w-4 text-teal-600 dark:text-teal-400" />
                         <span>MFA</span>
-                      </>
-                    ))}
-                    <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6 text-right text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                        <SortIcon current={sortKey === "mfa"} dir={sortKey === "mfa" ? sortDir : null} />
+                      </div>
+                    </th>
+                    <th scope="col" className="relative py-3.5 pl-2 pr-3 sm:pl-3 sm:pr-6 text-right text-sm font-semibold text-zinc-900 dark:text-zinc-50">
                       Actions
                     </th>
                   </tr>
@@ -332,7 +348,7 @@ export function DriversTableBulk({
                 ) : (
                   paginated.map((driver) => (
                     <tr key={driver.id}>
-                      <td className="py-4 pl-4 pr-3">
+                      <td className="py-3 pl-3 pr-2 sm:py-4 sm:pl-4 sm:pr-3">
                         <input
                           type="checkbox"
                           checked={selected.has(driver.id)}
@@ -340,30 +356,33 @@ export function DriversTableBulk({
                           className="rounded border-zinc-300 text-teal-600 focus:ring-teal-500"
                         />
                       </td>
-                      <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm">
-                        <div className="flex items-center gap-3">
+                      <td className="py-3 pl-2 pr-2 sm:py-4 sm:pl-4 sm:pr-3 text-sm max-w-[10rem] sm:max-w-none">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                           <DriverAvatar
                             driverId={driver.id}
                             firstName={driver.firstName}
                             lastName={driver.lastName}
-                            size={40}
+                            size={36}
                           />
-                          <div>
-                            <div className="font-semibold text-zinc-900 dark:text-zinc-50">
+                          <div className="min-w-0">
+                            <div className="font-semibold text-zinc-900 dark:text-zinc-50 truncate">
                               {driver.firstName} {driver.lastName}
+                            </div>
+                            <div className="md:hidden truncate text-xs text-zinc-500 dark:text-zinc-400">
+                              {driver.email}
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">
+                      <td className="hidden md:table-cell whitespace-nowrap px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">
                         <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-zinc-400 dark:text-zinc-500" />
+                          <Mail className="h-4 w-4 shrink-0 text-zinc-400 dark:text-zinc-500" />
                           <span>{driver.email}</span>
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm">
+                      <td className="whitespace-nowrap px-2 sm:px-3 py-3 sm:py-4 text-sm">
                         <span
-                          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold leading-5 ${
+                          className={`inline-flex items-center gap-1 rounded-full px-2 sm:px-3 py-1 text-xs font-semibold leading-5 ${
                             driver.isActive
                               ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                               : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
@@ -372,17 +391,17 @@ export function DriversTableBulk({
                           {driver.isActive ? (
                             <>
                               <CheckCircle2 className="h-3.5 w-3.5" />
-                              Active
+                              <span className="sr-only sm:not-sr-only">Active</span>
                             </>
                           ) : (
                             <>
                               <XCircle className="h-3.5 w-3.5" />
-                              Inactive
+                              <span className="sr-only sm:not-sr-only">Inactive</span>
                             </>
                           )}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
+                      <td className="hidden sm:table-cell whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
                         <span
                           className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold leading-5 ${
                             driver.mfaEnabled
@@ -407,41 +426,44 @@ export function DriversTableBulk({
                           )}
                         </span>
                       </td>
-                      <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="relative whitespace-nowrap py-3 pl-2 pr-3 text-right text-sm font-medium sm:py-4 sm:pl-3 sm:pr-6">
+                        <div className="inline-flex items-center justify-end gap-0.5 sm:gap-1">
                           <Link
                             href={`/drivers/${driver.id}`}
-                            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-teal-600 hover:bg-teal-50 hover:text-teal-700 dark:text-teal-400 dark:hover:bg-teal-900/20 transition-colors"
+                            className="inline-flex items-center justify-center rounded-md p-2 text-teal-600 hover:bg-teal-50 hover:text-teal-700 dark:text-teal-400 dark:hover:bg-teal-900/20 transition-colors"
                             title="View Profile"
+                            aria-label="View Profile"
                           >
                             <Eye className="h-4 w-4" />
-                            <span className="hidden sm:inline">Profile</span>
+                            <span className="hidden lg:inline ml-1.5">Profile</span>
                           </Link>
                           <form action={onToggle} className="inline">
                             <input type="hidden" name="id" value={driver.id} />
                             <input type="hidden" name="isActive" value={String(driver.isActive)} />
                             <button
                               type="submit"
-                              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors ${
+                              className={`inline-flex items-center justify-center rounded-md p-2 transition-colors ${
                                 driver.isActive
                                   ? "text-orange-600 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-900/20"
                                   : "text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
                               }`}
                               title={driver.isActive ? "Deactivate" : "Activate"}
+                              aria-label={driver.isActive ? "Deactivate" : "Activate"}
                             >
                               <Power className="h-4 w-4" />
-                              <span className="hidden sm:inline">{driver.isActive ? "Deactivate" : "Activate"}</span>
+                              <span className="hidden lg:inline ml-1.5">{driver.isActive ? "Deactivate" : "Activate"}</span>
                             </button>
                           </form>
                           <form action={onResetMfa} className="inline">
                             <input type="hidden" name="id" value={driver.id} />
                             <button
                               type="submit"
-                              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20 transition-colors"
+                              className="inline-flex items-center justify-center rounded-md p-2 text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20 transition-colors"
                               title="Reset MFA"
+                              aria-label="Reset MFA"
                             >
                               <RotateCcw className="h-4 w-4" />
-                              <span className="hidden sm:inline">Reset MFA</span>
+                              <span className="hidden lg:inline ml-1.5">Reset MFA</span>
                             </button>
                           </form>
                           {!driver.mfaEnabled && (
@@ -449,11 +471,12 @@ export function DriversTableBulk({
                               <input type="hidden" name="id" value={driver.id} />
                               <button
                                 type="submit"
-                                className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 transition-colors"
+                                className="inline-flex items-center justify-center rounded-md p-2 text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 transition-colors"
                                 title="Send MFA Reminder"
+                                aria-label="Send MFA Reminder"
                               >
                                 <Send className="h-4 w-4" />
-                                <span className="hidden sm:inline">Remind</span>
+                                <span className="hidden lg:inline ml-1.5">Remind</span>
                               </button>
                             </form>
                           )}

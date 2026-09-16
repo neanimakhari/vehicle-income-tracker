@@ -20,7 +20,7 @@ describe("LoginPage", () => {
 
   it("renders tenant input", () => {
     render(<LoginPage />);
-    expect(screen.getByPlaceholderText(/e\.g\. demo or acme/i)).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /select your tenant/i })).toBeInTheDocument();
   });
 
   it("renders email input", () => {

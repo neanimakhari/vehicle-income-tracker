@@ -16,6 +16,9 @@ interface Income {
   expenseDetail?: string;
   expensePrice?: number;
   loggedOn: string;
+  incomeStream?: string;
+  tripId?: string;
+  scholarPaymentId?: string;
 }
 
 interface Driver {
@@ -31,16 +34,30 @@ interface Vehicle {
   label: string;
   registrationNumber: string;
 }
+interface Trip {
+  id: string;
+  tripType: string;
+  status: string;
+}
+interface ScholarPayment {
+  id: string;
+  scholarName: string;
+  status: string;
+}
 
 export function IncomeEditButton({
   income,
   drivers,
   vehicles,
+  trips,
+  scholarPayments,
   updateIncome,
 }: {
   income: Income;
   drivers: Driver[];
   vehicles: Vehicle[];
+  trips: Trip[];
+  scholarPayments: ScholarPayment[];
   updateIncome: (formData: FormData) => Promise<unknown>;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -64,7 +81,7 @@ export function IncomeEditButton({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-2xl rounded-lg border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border border-zinc-200 bg-white p-4 sm:p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Edit Income</h3>
           <button
@@ -104,6 +121,42 @@ export function IncomeEditButton({
               {drivers.filter(d => d.isActive).map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.firstName} {d.lastName}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+              Income Stream
+            </label>
+            <select className="input w-full px-3 py-2 text-sm" name="incomeStream" defaultValue={income.incomeStream ?? "general"}>
+              <option value="general">General</option>
+              <option value="trip">Trip</option>
+              <option value="scholar">Scholar</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+              Linked Trip
+            </label>
+            <select className="input w-full px-3 py-2 text-sm" name="tripId" defaultValue={income.tripId ?? ""}>
+              <option value="">None</option>
+              {trips.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.tripType} ({t.status})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+              Linked Scholar Payment
+            </label>
+            <select className="input w-full px-3 py-2 text-sm" name="scholarPaymentId" defaultValue={income.scholarPaymentId ?? ""}>
+              <option value="">None</option>
+              {scholarPayments.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.scholarName} ({s.status})
                 </option>
               ))}
             </select>

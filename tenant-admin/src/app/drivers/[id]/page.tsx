@@ -259,31 +259,31 @@ export default async function DriverProfilePage({
         >
           ← Back to Drivers
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+        <h1 className="mt-2 text-xl sm:text-2xl font-semibold text-zinc-900 dark:text-zinc-50 break-words">
           Driver Profile: {profile.firstName} {profile.lastName}
         </h1>
       </div>
 
       {/* Profile Picture Section */}
-      <div className="mb-6 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="mb-6 rounded-lg border border-zinc-200 bg-white p-4 sm:p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
           Profile Picture
         </h2>
-        <div className="flex items-center gap-6">
-          <div className="relative">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+          <div className="relative shrink-0 self-center sm:self-auto">
             {profilePictureUrl ? (
               <img
                 src={profilePictureUrl}
                 alt={`${profile.firstName} ${profile.lastName}`}
-                className="h-32 w-32 rounded-full object-cover border-4 border-teal-500 shadow-lg"
+                className="h-28 w-28 sm:h-32 sm:w-32 rounded-full object-cover border-4 border-teal-500 shadow-lg"
               />
             ) : (
-              <div className="flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-teal-600 text-4xl font-bold text-white shadow-lg">
+              <div className="flex h-28 w-28 sm:h-32 sm:w-32 items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-teal-600 text-4xl font-bold text-white shadow-lg">
                 {profile.firstName[0]?.toUpperCase()}{profile.lastName[0]?.toUpperCase()}
               </div>
             )}
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <form action={uploadProfilePicture} className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
@@ -293,13 +293,13 @@ export default async function DriverProfilePage({
                   type="file"
                   name="file"
                   accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                  className="input w-full px-3 py-2 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 dark:file:bg-teal-900/30 dark:file:text-teal-300"
+                  className="input w-full max-w-full px-3 py-2 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 dark:file:bg-teal-900/30 dark:file:text-teal-300"
                 />
                 <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                   JPEG, PNG, GIF, or WebP (max 5MB)
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="submit"
                   className="btn btn-primary text-sm"

@@ -137,13 +137,13 @@ export function MaintenanceTableClient({ tasks, updateTask, deleteTask }: Props)
 
   return (
     <div className="mt-8 flow-root">
-      <div className="flex flex-wrap items-center gap-4 mb-4">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          <Filter className="h-4 w-4" />
+          <Filter className="h-4 w-4 shrink-0" />
           Filters
         </div>
         <select
-          className="input w-auto min-w-[140px] py-2 text-sm"
+          className="input w-full sm:w-auto sm:min-w-[140px] py-2 text-sm"
           value={statusFilter}
           onChange={(e) => {
             setStatusFilter(e.target.value as typeof statusFilter);
@@ -156,7 +156,7 @@ export function MaintenanceTableClient({ tasks, updateTask, deleteTask }: Props)
           <option value="due_soon">Due soon</option>
           <option value="completed">Completed</option>
         </select>
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+        <div className="relative w-full sm:flex-1 sm:min-w-[180px] sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
           <input
             type="search"
@@ -171,7 +171,7 @@ export function MaintenanceTableClient({ tasks, updateTask, deleteTask }: Props)
         </div>
       </div>
 
-      <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+      <div className="table-responsive -my-2">
         <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
           <div className="overflow-hidden shadow ring-1 ring-black/5 sm:rounded-lg">
             <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">

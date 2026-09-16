@@ -1,11 +1,17 @@
 import { requireAuth } from "@/lib/auth";
-import { fetchJson } from "../../lib/api";
+import { fetchJson, getApiUrl, getAuthHeaders } from "../../lib/api";
+import { revalidatePath } from "next/cache";
 
 type TenantPolicy = {
   tenantName: string;
   tenantSlug: string;
   requireMfa: boolean;
   requireMfaUsers: boolean;
+  missingIncomeReminderEnabled?: boolean;
+  missingIncomeCutoffHour?: number;
+  missingIncomeTimezone?: string;
+  missingIncomeEscalationEnabled?: boolean;
+  missingIncomeEscalationHour?: number;
 };
 
 async function fetchPolicy() {
@@ -26,6 +32,26 @@ export default async function TenantSecurityPage() {
     policy?.requireMfaUsers === true
       ? drivers.filter(driver => !driver.mfaEnabled).length
       : 0;
+
+  async function updateReminderSettings(formData: FormData) {
+    "use server";
+    const payload = {
+      missingIncomeReminderEnabled: formData.get("missingIncomeReminderEnabled") === "on",
+      missingIncomeCutoffHour: Number(formData.get("missingIncomeCutoffHour") ?? 21),
+      missingIncomeTimezone: String(formData.get("missingIncomeTimezone") ?? "Africa/Johannesburg"),
+      missingIncomeEscalationEnabled: formData.get("missingIncomeEscalationEnabled") === "on",
+      missingIncomeEscalationHour: Number(formData.get("missingIncomeEscalationHour") ?? 8),
+    };
+    await fetch(`${getApiUrl()}/tenant/policy`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...(await getAuthHeaders()),
+      },
+      body: JSON.stringify(payload),
+    });
+    revalidatePath("/tenant-security");
+  }
 
   return (
     <div>
@@ -73,6 +99,71 @@ export default async function TenantSecurityPage() {
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
               Contact a platform admin to change MFA enforcement policies.
             </p>
+            <div className="rounded-lg border border-zinc-200 px-4 py-4 dark:border-zinc-800">
+              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                Driver income reminder settings
+              </h3>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                You can switch reminders off completely, or configure cutoff and escalation times.
+              </p>
+              <form action={updateReminderSettings} className="mt-4 grid gap-3 md:grid-cols-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    name="missingIncomeReminderEnabled"
+                    defaultChecked={policy.missingIncomeReminderEnabled !== false}
+                  />
+                  Enable driver reminders
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    name="missingIncomeEscalationEnabled"
+                    defaultChecked={policy.missingIncomeEscalationEnabled !== false}
+                  />
+                  Enable next-morning escalation
+                </label>
+                <label className="text-sm">
+                  Cutoff hour (0-23)
+                  <input
+                    type="number"
+                    min={0}
+                    max={23}
+                    name="missingIncomeCutoffHour"
+                    defaultValue={policy.missingIncomeCutoffHour ?? 21}
+                    className="input mt-1 w-full"
+                  />
+                </label>
+                <label className="text-sm">
+                  Escalation hour (0-23)
+                  <input
+                    type="number"
+                    min={0}
+                    max={23}
+                    name="missingIncomeEscalationHour"
+                    defaultValue={policy.missingIncomeEscalationHour ?? 8}
+                    className="input mt-1 w-full"
+                  />
+                </label>
+                <label className="text-sm md:col-span-2">
+                  Timezone
+                  <input
+                    type="text"
+                    name="missingIncomeTimezone"
+                    defaultValue={policy.missingIncomeTimezone ?? "Africa/Johannesburg"}
+                    className="input mt-1 w-full"
+                  />
+                </label>
+                <div className="md:col-span-2">
+                  <button
+                    type="submit"
+                    className="rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+                  >
+                    Save reminder settings
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </div>

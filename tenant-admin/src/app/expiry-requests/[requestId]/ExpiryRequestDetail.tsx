@@ -107,14 +107,14 @@ export function ExpiryRequestDetail({
         </div>
       )}
 
-      <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
+      <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 overflow-x-auto">
         <h2 className="font-medium mb-3">Current vs requested dates</h2>
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[28rem] text-sm">
           <thead>
             <tr className="text-left text-zinc-600 dark:text-zinc-400">
-              <th className="pb-2 pr-4">Document</th>
-              <th className="pb-2 pr-4">Current expiry</th>
-              <th className="pb-2">Requested expiry</th>
+              <th className="pb-2 pr-4 whitespace-nowrap">Document</th>
+              <th className="pb-2 pr-4 whitespace-nowrap">Current expiry</th>
+              <th className="pb-2 whitespace-nowrap">Requested expiry</th>
             </tr>
           </thead>
           <tbody>
@@ -166,12 +166,12 @@ export function ExpiryRequestDetail({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-4 pt-4">
+      <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:flex-wrap sm:items-center">
         <button
           type="button"
           onClick={handleApprove}
           disabled={actionLoading !== null}
-          className="inline-flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+          className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
         >
           {actionLoading === "approve" ? (
             "Approving..."
@@ -182,19 +182,19 @@ export function ExpiryRequestDetail({
             </>
           )}
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <input
             type="text"
             placeholder="Rejection reason (optional)"
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
-            className="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm w-64"
+            className="rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm w-full sm:w-64"
           />
           <button
             type="button"
             onClick={handleReject}
             disabled={actionLoading !== null}
-            className="inline-flex items-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
           >
             {actionLoading === "reject" ? "Rejecting..." : <><X className="h-4 w-4" /> Reject</>}
           </button>

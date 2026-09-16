@@ -105,8 +105,8 @@ export function ExpensesClient({ expenses, createExpense, updateExpense, deleteE
         </div>
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center gap-4">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+      <div className="mt-6">
+        <div className="relative w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
           <input
             type="search"
@@ -122,7 +122,7 @@ export function ExpensesClient({ expenses, createExpense, updateExpense, deleteE
       </div>
 
       <div className="mt-6 flow-root">
-        <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+        <div className="table-responsive -my-2">
           <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
             <div className="overflow-hidden shadow ring-1 ring-black/5 sm:rounded-lg">
               <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -285,6 +285,7 @@ function EditExpenseModal({
   onSubmit: (formData: FormData) => Promise<void>;
 }) {
   const [receiptBase64, setReceiptBase64] = useState<string | null>(initialReceiptBase64);
+  const [expenseLogsJson, setExpenseLogsJson] = useState<string>("[]");
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -303,7 +304,7 @@ function EditExpenseModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-zinc-900/60 dark:bg-zinc-950/70" onClick={onCancel} aria-hidden />
-      <div className="relative w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Edit Expense</h2>
         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
           Source: {expense.sourceType === "income" ? "Income log" : "Manual expense"}
@@ -321,6 +322,7 @@ function EditExpenseModal({
           )}
           <input type="hidden" name="id" value={expense.id} />
           <input type="hidden" name="receiptImage" value={receiptBase64 ?? ""} />
+          <input type="hidden" name="expenseLogs" value={expenseLogsJson} />
           <div>
             <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Description</label>
             <input name="description" required defaultValue={expense.description} className="input w-full px-3 py-2 text-sm" />
@@ -350,6 +352,16 @@ function EditExpenseModal({
             ) : (
               <span className="mt-2 block text-xs text-zinc-500 dark:text-zinc-400">No receipt image</span>
             )}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Expense logs JSON (optional)</label>
+            <textarea
+              className="input w-full px-3 py-2 text-sm font-mono"
+              rows={3}
+              value={expenseLogsJson}
+              onChange={(e) => setExpenseLogsJson(e.target.value)}
+              placeholder='[{"description":"Fuel","amount":350}]'
+            />
           </div>
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onCancel} className="btn btn-secondary flex-1">

@@ -26,6 +26,33 @@ function formatDateForInput(dateValue: string | null | undefined): string {
   }
 }
 
+function parseOwnerAddress(raw: string | null | undefined): {
+  street: string;
+  suburb: string;
+  city: string;
+  postalCode: string;
+} {
+  if (!raw) {
+    return { street: "", suburb: "", city: "", postalCode: "" };
+  }
+  try {
+    const parsed = JSON.parse(raw) as Partial<{
+      street: string;
+      suburb: string;
+      city: string;
+      postalCode: string;
+    }>;
+    return {
+      street: parsed.street ?? "",
+      suburb: parsed.suburb ?? "",
+      city: parsed.city ?? "",
+      postalCode: parsed.postalCode ?? "",
+    };
+  } catch {
+    return { street: raw, suburb: "", city: "", postalCode: "" };
+  }
+}
+
 async function fetchVehicle(id: string) {
   try {
     const vehicles = await fetchJson<Array<{
@@ -82,6 +109,7 @@ export default async function VehicleDetailPage({
   if (!vehicle) {
     notFound();
   }
+  const ownerAddress = parseOwnerAddress(vehicle.ownerAddress);
 
   async function updateVehicle(formData: FormData) {
     "use server";
@@ -128,8 +156,16 @@ export default async function VehicleDetailPage({
     if (ownerName) payload.ownerName = ownerName;
     const ownerContact = formData.get("ownerContact");
     if (ownerContact) payload.ownerContact = ownerContact;
-    const ownerAddress = formData.get("ownerAddress");
-    if (ownerAddress) payload.ownerAddress = ownerAddress;
+    const ownerAddressStreet = String(formData.get("ownerAddressStreet") ?? "").trim();
+    const ownerAddressSuburb = String(formData.get("ownerAddressSuburb") ?? "").trim();
+    const ownerAddressCity = String(formData.get("ownerAddressCity") ?? "").trim();
+    const ownerAddressPostalCode = String(formData.get("ownerAddressPostalCode") ?? "").trim();
+    payload.ownerAddress = JSON.stringify({
+      street: ownerAddressStreet,
+      suburb: ownerAddressSuburb,
+      city: ownerAddressCity,
+      postalCode: ownerAddressPostalCode,
+    });
     
     // Additional docs
     const roadworthyCertificateNumber = formData.get("roadworthyCertificateNumber");
@@ -430,15 +466,48 @@ export default async function VehicleDetailPage({
                 className="input w-full"
               />
             </div>
-            <div className="md:col-span-2">
+            <div>
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                Owner Address
+                Street
               </label>
-              <textarea
-                name="ownerAddress"
-                defaultValue={vehicle.ownerAddress || ""}
+              <input
+                type="text"
+                name="ownerAddressStreet"
+                defaultValue={ownerAddress.street}
                 className="input w-full"
-                rows={3}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                Suburb
+              </label>
+              <input
+                type="text"
+                name="ownerAddressSuburb"
+                defaultValue={ownerAddress.suburb}
+                className="input w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                City
+              </label>
+              <input
+                type="text"
+                name="ownerAddressCity"
+                defaultValue={ownerAddress.city}
+                className="input w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                Postal Code
+              </label>
+              <input
+                type="text"
+                name="ownerAddressPostalCode"
+                defaultValue={ownerAddress.postalCode}
+                className="input w-full"
               />
             </div>
           </div>

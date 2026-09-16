@@ -108,7 +108,7 @@ export function CreateDriverModal({ createDriver }: Props) {
           setOpen(true);
           setError(null);
         }}
-        className="btn btn-primary flex items-center gap-2"
+        className="btn btn-primary flex w-full sm:w-auto items-center justify-center gap-2"
       >
         <UserPlus className="h-4 w-4" />
         Create New Driver
@@ -127,7 +127,7 @@ export function CreateDriverModal({ createDriver }: Props) {
             onClick={handleClose}
             aria-hidden
           />
-          <div className="relative w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-100 dark:bg-teal-900/30">

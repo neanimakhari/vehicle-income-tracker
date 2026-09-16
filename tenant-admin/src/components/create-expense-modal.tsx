@@ -13,6 +13,7 @@ export function CreateExpenseModal({ createExpense }: Props) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [receiptBase64, setReceiptBase64] = useState<string | null>(null);
+  const [expenseRows, setExpenseRows] = useState<Array<{ description: string; amount: string }>>([{ description: "", amount: "" }]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousActiveRef = useRef<HTMLElement | null>(null);
@@ -87,6 +88,7 @@ export function CreateExpenseModal({ createExpense }: Props) {
       handleClose();
       form.reset();
       setReceiptBase64(null);
+      setExpenseRows([{ description: "", amount: "" }]);
       if (fileInputRef.current) fileInputRef.current.value = "";
       router.push("/expenses?success=" + encodeURIComponent("Expense logged"));
       router.refresh();
@@ -103,7 +105,7 @@ export function CreateExpenseModal({ createExpense }: Props) {
           setOpen(true);
           setError(null);
         }}
-        className="btn btn-primary flex items-center gap-2"
+        className="btn btn-primary flex w-full sm:w-auto items-center justify-center gap-2"
       >
         <Receipt className="h-4 w-4" />
         Add Expense
@@ -118,7 +120,7 @@ export function CreateExpenseModal({ createExpense }: Props) {
           aria-labelledby="create-expense-title"
         >
           <div className="absolute inset-0 bg-zinc-900/60 dark:bg-zinc-950/70" onClick={handleClose} aria-hidden />
-          <div className="relative w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-100 dark:bg-teal-900/30">
@@ -152,6 +154,18 @@ export function CreateExpenseModal({ createExpense }: Props) {
                 <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Amount (R)</label>
                 <input name="amount" type="number" step="0.01" required className="input w-full px-3 py-2 text-sm" placeholder="0.00" />
               </div>
+              <div className="space-y-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Expense logs</p>
+                  <button type="button" className="text-xs text-teal-600" onClick={() => setExpenseRows((r) => [...r, { description: "", amount: "" }])}>Add row</button>
+                </div>
+                {expenseRows.map((row, idx) => (
+                  <div key={idx} className="grid gap-2 sm:grid-cols-2">
+                    <input className="input w-full px-3 py-2 text-sm" placeholder="Description" value={row.description} onChange={(e) => setExpenseRows((r) => r.map((x, i) => i === idx ? { ...x, description: e.target.value } : x))} />
+                    <input className="input w-full px-3 py-2 text-sm" placeholder="Amount (R)" value={row.amount} onChange={(e) => setExpenseRows((r) => r.map((x, i) => i === idx ? { ...x, amount: e.target.value } : x))} />
+                  </div>
+                ))}
+              </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Receipt image (optional)</label>
                 <input
@@ -166,6 +180,11 @@ export function CreateExpenseModal({ createExpense }: Props) {
                 )}
                 {receiptBase64 && <input type="hidden" name="receiptImage" value={receiptBase64} />}
               </div>
+              <input
+                type="hidden"
+                name="expenseLogs"
+                value={JSON.stringify(expenseRows.filter((r) => r.description.trim() || r.amount.trim()).map((r) => ({ description: r.description || null, amount: r.amount ? Number(r.amount) : null })))}
+              />
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={handleClose} className="btn btn-secondary flex-1">
                   Cancel

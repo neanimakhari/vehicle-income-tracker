@@ -12,9 +12,17 @@ async function fetchVehicles() {
   return vehicles ?? [];
 }
 
+async function fetchMissingVehicles() {
+  const missing = await fetchJson<{ vehicles?: Array<{ id: string }>; missingCount?: number }>(
+    "/tenant/incomes/missing-vehicles",
+  );
+  const vehicles = Array.isArray(missing?.vehicles) ? missing.vehicles : [];
+  return new Set(vehicles.map((v) => v.id));
+}
+
 export default async function VehiclesPage() {
   await requireAuth();
-  const vehicles = await fetchVehicles();
+  const [vehicles, missingVehicleIds] = await Promise.all([fetchVehicles(), fetchMissingVehicles()]);
 
   async function createVehicle(formData: FormData): Promise<{ success?: boolean; error?: string }> {
     "use server";
@@ -87,7 +95,7 @@ export default async function VehiclesPage() {
               <Car className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-teal-700 bg-clip-text text-transparent">Vehicles</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-teal-600 to-teal-700 bg-clip-text text-transparent">Vehicles</h1>
               <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
                 Manage tenant vehicles and registration details
               </p>
@@ -102,6 +110,7 @@ export default async function VehiclesPage() {
 
       <VehiclesTable
         vehicles={vehicles}
+        missingVehicleIds={Array.from(missingVehicleIds)}
         onToggle={toggleVehicle}
         onDelete={deleteVehicle}
       />

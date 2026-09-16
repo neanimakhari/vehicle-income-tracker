@@ -78,12 +78,28 @@ export function ReportsClient({
   driverStats,
   fuelEfficiencyVehicles,
   fuelEfficiencyDrivers,
+  advancedInsights,
+  incomeStreams,
 }: {
   summary: Summary | null;
   topVehicles: VehicleStat[];
   driverStats: DriverStat[];
   fuelEfficiencyVehicles: FuelEfficiency[];
   fuelEfficiencyDrivers: any[];
+  advancedInsights: {
+    topVehicles: Array<{ vehicle: string; totalIncome: number }>;
+    worstFuelEfficiency: Array<{ vehicle: string; kmPerLitre: number }>;
+    idleVehicles: string[];
+    profitPerVehicle: Array<{ vehicle: string; profit: number }>;
+  };
+  incomeStreams: Array<{
+    stream: string;
+    entries: number;
+    totalIncome: number;
+    totalExpenses: number;
+    totalPetrol: number;
+    netIncome: number;
+  }>;
 }) {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
@@ -114,6 +130,36 @@ export function ReportsClient({
     }
   }
 
+  async function downloadMonthlyPdfReport() {
+    const now = new Date();
+    const startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
+    const endDate = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
+    try {
+      const data = await fetchJsonClient<{ fileName: string; contentBase64: string }>(
+        `/api/proxy/tenant/reports/monthly-report/pdf?startDate=${startDate}&endDate=${endDate}`,
+      );
+      if (!data?.contentBase64) {
+        alert("Could not generate PDF");
+        return;
+      }
+      const bytes = atob(data.contentBase64);
+      const arr = new Uint8Array(bytes.length);
+      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+      const blob = new Blob([arr], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = data.fileName || `monthly-report-${startDate}-${endDate}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      alert("Failed to download PDF report");
+    }
+  }
+
   async function sendMonthlyReport() {
     try {
       const now = new Date();
@@ -140,17 +186,24 @@ export function ReportsClient({
       {/* Header */}
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-teal-700 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-teal-600 to-teal-700 bg-clip-text text-transparent">
             Reports & Analytics
           </h1>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
             Comprehensive financial insights and performance metrics
           </p>
         </div>
-        <div className="mt-4 sm:mt-0 flex gap-2">
+        <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row gap-2">
+          <button
+            onClick={downloadMonthlyPdfReport}
+            className="btn btn-secondary flex w-full sm:w-auto items-center justify-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Download Monthly PDF
+          </button>
           <button
             onClick={sendMonthlyReport}
-            className="btn btn-secondary flex items-center gap-2"
+            className="btn btn-secondary flex w-full sm:w-auto items-center justify-center gap-2"
           >
             <Mail className="h-4 w-4" />
             Send Monthly Report
@@ -282,6 +335,32 @@ export function ReportsClient({
         </div>
       </div>
 
+      <div className="card p-6">
+        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">Income Streams</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
+            <thead className="bg-zinc-50 dark:bg-zinc-900">
+              <tr>
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-zinc-500 dark:text-zinc-400">Stream</th>
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-zinc-500 dark:text-zinc-400">Entries</th>
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-zinc-500 dark:text-zinc-400">Income</th>
+                <th className="px-3 py-2 text-left text-xs font-medium uppercase text-zinc-500 dark:text-zinc-400">Net</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              {incomeStreams.map((row) => (
+                <tr key={row.stream}>
+                  <td className="px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50">{row.stream}</td>
+                  <td className="px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50">{row.entries}</td>
+                  <td className="px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50">{formatCurrency(row.totalIncome)}</td>
+                  <td className="px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50">{formatCurrency(row.netIncome)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* Charts Row 2 */}
       <div className="grid gap-6 md:grid-cols-2">
         {/* Fuel Efficiency by Vehicle */}
@@ -343,6 +422,29 @@ export function ReportsClient({
 
       {/* Advanced Custom Report Builder */}
       <AdvancedReportBuilder />
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="card p-6">
+          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">Advanced Insights</h3>
+          <ul className="space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
+            <li>Top 5 vehicles: {advancedInsights.topVehicles.map((v) => v.vehicle).join(", ") || "—"}</li>
+            <li>Worst fuel efficiency: {advancedInsights.worstFuelEfficiency.map((v) => `${v.vehicle} (${v.kmPerLitre.toFixed(2)} km/L)`).join(", ") || "—"}</li>
+            <li>Idle vehicles (14d): {advancedInsights.idleVehicles.join(", ") || "None"}</li>
+          </ul>
+        </div>
+        <div className="card p-6">
+          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">Profit per Vehicle</h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={advancedInsights.profitPerVehicle}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="vehicle" />
+              <YAxis />
+              <Tooltip formatter={(value: number | undefined) => value != null ? formatCurrency(value) : ''} />
+              <Bar dataKey="profit" fill="#14b8a6" name="Profit" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
 
       {/* Detailed Tables */}
       <div className="grid gap-6 md:grid-cols-2">

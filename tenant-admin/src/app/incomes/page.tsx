@@ -11,6 +11,17 @@ function toNum(v: unknown): number | undefined {
   return Number.isNaN(n) ? undefined : n;
 }
 
+function parseJsonLogs(formData: FormData, key: string): Array<Record<string, unknown>> {
+  const raw = String(formData.get(key) ?? "").trim();
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as Array<Record<string, unknown>>;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 async function fetchIncomes() {
   const raw = await fetchJson<Array<Record<string, unknown>>>("/tenant/incomes");
   const list = Array.isArray(raw) ? raw : [];
@@ -32,6 +43,9 @@ async function fetchIncomes() {
     approvalStatus: String(row.approvalStatus ?? row.approval_status ?? "auto"),
     approvedAt: row.approvedAt != null ? String(row.approvedAt) : row.approved_at != null ? String(row.approved_at) : undefined,
     approvedBy: row.approvedBy != null ? String(row.approvedBy) : row.approved_by != null ? String(row.approved_by) : undefined,
+    incomeStream: row.incomeStream != null ? String(row.incomeStream) : "general",
+    tripId: row.tripId != null ? String(row.tripId) : undefined,
+    scholarPaymentId: row.scholarPaymentId != null ? String(row.scholarPaymentId) : undefined,
   }));
 }
 
@@ -49,12 +63,35 @@ async function fetchVehicles() {
   return vehicles ?? [];
 }
 
+async function fetchMissingVehicles() {
+  const data = await fetchJson<{ vehicles?: Array<{ id: string; label: string }>; missingCount?: number }>(
+    "/tenant/incomes/missing-vehicles",
+  );
+  const vehicles = Array.isArray(data?.vehicles) ? data.vehicles : [];
+  return vehicles.map((v) => v.label);
+}
+
+async function fetchTrips() {
+  const trips = await fetchJson<Array<{ id: string; tripType: string; status: string }>>("/tenant/trips");
+  return trips ?? [];
+}
+
+async function fetchScholarPayments() {
+  const items = await fetchJson<Array<{ id: string; scholarName: string; status: string }>>(
+    "/tenant/scholar-payments",
+  );
+  return items ?? [];
+}
+
 export default async function IncomesPage() {
   await requireAuth();
-  const [incomes, drivers, vehicles] = await Promise.all([
+  const [incomes, drivers, vehicles, missingVehicleLabels, trips, scholarPayments] = await Promise.all([
     fetchIncomes(),
     fetchDrivers(),
     fetchVehicles(),
+    fetchMissingVehicles(),
+    fetchTrips(),
+    fetchScholarPayments(),
   ]);
 
   async function createIncome(formData: FormData): Promise<{ success: boolean; error?: string }> {
@@ -69,6 +106,12 @@ export default async function IncomesPage() {
     const expenseDetail = String(formData.get("expenseDetail") ?? "");
     const expensePrice = formData.get("expensePrice") ? Number(formData.get("expensePrice")) : null;
     const loggedOn = String(formData.get("loggedOn") ?? new Date().toISOString());
+    const incomeLogs = parseJsonLogs(formData, "incomeLogs");
+    const petrolLogs = parseJsonLogs(formData, "petrolLogs");
+    const expenseLogs = parseJsonLogs(formData, "expenseLogs");
+    const incomeStream = String(formData.get("incomeStream") ?? "general");
+    const tripId = String(formData.get("tripId") ?? "");
+    const scholarPaymentId = String(formData.get("scholarPaymentId") ?? "");
 
     if (!vehicle || !driverId || !income) {
       return { success: false, error: "Vehicle, driver and income are required" };
@@ -90,6 +133,12 @@ export default async function IncomesPage() {
           petrolLitres,
           expenseDetail: expenseDetail || null,
           expensePrice,
+          incomeLogs,
+          petrolLogs,
+          expenseLogs,
+          incomeStream,
+          tripId: tripId || null,
+          scholarPaymentId: scholarPaymentId || null,
           loggedOn,
         }),
       });
@@ -118,6 +167,12 @@ export default async function IncomesPage() {
     const expenseDetail = String(formData.get("expenseDetail") ?? "");
     const expensePrice = formData.get("expensePrice") ? Number(formData.get("expensePrice")) : null;
     const loggedOn = String(formData.get("loggedOn") ?? "");
+    const incomeLogs = parseJsonLogs(formData, "incomeLogs");
+    const petrolLogs = parseJsonLogs(formData, "petrolLogs");
+    const expenseLogs = parseJsonLogs(formData, "expenseLogs");
+    const incomeStream = String(formData.get("incomeStream") ?? "general");
+    const tripId = String(formData.get("tripId") ?? "");
+    const scholarPaymentId = String(formData.get("scholarPaymentId") ?? "");
 
     if (!id || !vehicle || !driverId || !income) {
       redirect("/incomes?error=" + encodeURIComponent("Required fields missing"));
@@ -139,6 +194,12 @@ export default async function IncomesPage() {
           petrolLitres,
           expenseDetail: expenseDetail || null,
           expensePrice,
+          incomeLogs,
+          petrolLogs,
+          expenseLogs,
+          incomeStream,
+          tripId: tripId || null,
+          scholarPaymentId: scholarPaymentId || null,
           loggedOn,
         }),
       });
@@ -220,6 +281,9 @@ export default async function IncomesPage() {
       incomes={incomes}
       drivers={drivers}
       vehicles={vehicles}
+      trips={trips}
+      scholarPayments={scholarPayments}
+      missingVehicleLabels={missingVehicleLabels}
       createIncome={createIncome}
       updateIncome={updateIncome}
       deleteIncome={deleteIncome}

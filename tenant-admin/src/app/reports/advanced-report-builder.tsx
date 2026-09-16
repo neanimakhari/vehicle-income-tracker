@@ -533,7 +533,7 @@ export function AdvancedReportBuilder() {
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                 Metrics to Include
               </label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
                 {metrics.map((metric) => (
                   <label 
                     key={metric.id} 
@@ -601,7 +601,7 @@ export function AdvancedReportBuilder() {
           {/* Summary */}
           <div className="card p-6">
             <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">Report Summary</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <p className="text-sm text-zinc-600 dark:text-zinc-400">Total Records</p>
                 <p className="text-xl font-bold text-zinc-900 dark:text-zinc-50">{reportData.summary.totalRecords}</p>

@@ -17,6 +17,7 @@ type SortDir = "asc" | "desc";
 
 type Props = {
   vehicles: Vehicle[];
+  missingVehicleIds?: string[];
   onToggle: (formData: FormData) => Promise<void>;
   onDelete: (formData: FormData) => Promise<void>;
 };
@@ -26,13 +27,14 @@ function SortIcon({ current, dir }: { current: boolean; dir: SortDir | null }) {
   return dir === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
 }
 
-export function VehiclesTable({ vehicles, onToggle, onDelete }: Props) {
+export function VehiclesTable({ vehicles, missingVehicleIds = [], onToggle, onDelete }: Props) {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("label");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [pageSize, setPageSize] = useState(10);
   const [pageIndex, setPageIndex] = useState(0);
+  const missingSet = useMemo(() => new Set(missingVehicleIds), [missingVehicleIds]);
 
   const filtered = useMemo(() => {
     let list = vehicles.filter((v) => {
@@ -102,13 +104,13 @@ export function VehiclesTable({ vehicles, onToggle, onDelete }: Props) {
 
   return (
     <div className="mt-8 flow-root">
-      <div className="flex flex-wrap items-center gap-4 mb-4">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          <Filter className="h-4 w-4" />
+          <Filter className="h-4 w-4 shrink-0" />
           Filters
         </div>
         <select
-          className="input w-auto min-w-[120px] py-2 text-sm"
+          className="input w-full sm:w-auto sm:min-w-[120px] py-2 text-sm"
           value={statusFilter}
           onChange={(e) => {
             setStatusFilter(e.target.value as "all" | "active" | "inactive");
@@ -119,7 +121,7 @@ export function VehiclesTable({ vehicles, onToggle, onDelete }: Props) {
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
         </select>
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+        <div className="relative w-full sm:flex-1 sm:min-w-[180px] sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
           <input
             type="search"
@@ -149,7 +151,7 @@ export function VehiclesTable({ vehicles, onToggle, onDelete }: Props) {
           <p className="text-sm text-zinc-500 dark:text-zinc-400">No vehicles match the current filter.</p>
         </div>
       ) : (
-        <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+        <div className="table-responsive -my-2">
           <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
             <div className="overflow-hidden shadow ring-1 ring-black/5 sm:rounded-lg">
               <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -158,6 +160,9 @@ export function VehiclesTable({ vehicles, onToggle, onDelete }: Props) {
                     {th("label", "Vehicle")}
                     {th("registrationNumber", "Registration")}
                     {th("status", "Status")}
+                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                      Income today
+                    </th>
                     <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
                       <span className="sr-only">Actions</span>
                     </th>
@@ -182,6 +187,17 @@ export function VehiclesTable({ vehicles, onToggle, onDelete }: Props) {
                         >
                           {vehicle.isActive ? "Active" : "Inactive"}
                         </span>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm">
+                        {missingSet.has(vehicle.id) ? (
+                          <span className="inline-flex rounded-full px-2 text-xs font-semibold leading-5 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                            Missing
+                          </span>
+                        ) : (
+                          <span className="inline-flex rounded-full px-2 text-xs font-semibold leading-5 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                            Submitted
+                          </span>
+                        )}
                       </td>
                       <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                         <div className="flex items-center justify-end gap-3">

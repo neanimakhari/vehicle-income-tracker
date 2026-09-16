@@ -166,7 +166,7 @@ export default async function DriversPage() {
               <Users className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-teal-700 bg-clip-text text-transparent">Drivers</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-teal-600 to-teal-700 bg-clip-text text-transparent">Drivers</h1>
               <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
                 Manage mobile app users and driver profiles
               </p>
@@ -175,8 +175,8 @@ export default async function DriversPage() {
         </div>
       </div>
       {requiresMfa ? (
-        <div className="mt-6 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100">
-          <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+        <div className="mt-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100">
+          <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
           <span>Driver MFA is required for this tenant. <strong>{missingMfaCount}</strong> user(s) still need to enable MFA.</span>
         </div>
       ) : null}

@@ -15,6 +15,10 @@ import {
   FileText,
   FileCheck,
   Smartphone,
+  Bell,
+  Route,
+  GraduationCap,
+  MapPinned,
 } from "lucide-react";
 
 export function Navigation({ onLinkClick }: { onLinkClick?: () => void }) {
@@ -28,10 +32,14 @@ export function Navigation({ onLinkClick }: { onLinkClick?: () => void }) {
     { href: "/expenses", icon: Receipt, label: "Expenses" },
     { href: "/vehicles", icon: Car, label: "Vehicles" },
     { href: "/maintenance", icon: Wrench, label: "Maintenance" },
+    { href: "/trips", icon: Route, label: "Trips" },
+    { href: "/scholar-payments", icon: GraduationCap, label: "Scholar Payments" },
+    { href: "/tracking", icon: MapPinned, label: "Live Tracking" },
     { href: "/reports", icon: BarChart3, label: "Reports" },
     { href: "/audit", icon: FileText, label: "Audit Trail" },
     { href: "/mfa", icon: Shield, label: "Security (MFA)" },
     { href: "/sessions", icon: Smartphone, label: "Sessions" },
+    { href: "/notifications", icon: Bell, label: "Notifications" },
     { href: "/tenant-security", icon: Settings, label: "Tenant Security" },
   ];
 

@@ -25,6 +25,8 @@ function SortIcon({ current, dir }: { current: boolean; dir: SortDir | null }) {
 
 export function AuditLogTable({ initialLogs }: { initialLogs: AuditEntry[] }) {
   const [actionFilter, setActionFilter] = useState<string>("");
+  const [tenantFilter, setTenantFilter] = useState<string>("");
+  const [sourceFilter, setSourceFilter] = useState<string>("");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [sortKey, setSortKey] = useState<SortKey>("date");
@@ -37,10 +39,34 @@ export function AuditLogTable({ initialLogs }: { initialLogs: AuditEntry[] }) {
     return Array.from(set).sort();
   }, [initialLogs]);
 
+  const tenants = useMemo(() => {
+    const set = new Set(
+      initialLogs
+        .map((l) => (l.metadata?.tenant ?? l.metadata?.tenantId) as string | undefined)
+        .filter((v): v is string => Boolean(v)),
+    );
+    return Array.from(set).sort();
+  }, [initialLogs]);
+
+  const sources = useMemo(() => {
+    const set = new Set(
+      initialLogs
+        .map((l) => (l.metadata?.source ?? l.metadata?.applicationSource) as string | undefined)
+        .filter((v): v is string => Boolean(v)),
+    );
+    return Array.from(set).sort();
+  }, [initialLogs]);
+
   const filtered = useMemo(() => {
     let list = initialLogs;
     if (actionFilter) {
       list = list.filter((l) => l.action === actionFilter);
+    }
+    if (tenantFilter) {
+      list = list.filter((l) => String(l.metadata?.tenant ?? l.metadata?.tenantId ?? "") === tenantFilter);
+    }
+    if (sourceFilter) {
+      list = list.filter((l) => String(l.metadata?.source ?? l.metadata?.applicationSource ?? "") === sourceFilter);
     }
     if (dateFrom) {
       const from = new Date(dateFrom);
@@ -52,7 +78,7 @@ export function AuditLogTable({ initialLogs }: { initialLogs: AuditEntry[] }) {
       list = list.filter((l) => new Date((l as { created_at?: string }).created_at ?? l.createdAt) <= to);
     }
     return list;
-  }, [initialLogs, actionFilter, dateFrom, dateTo]);
+  }, [initialLogs, actionFilter, tenantFilter, sourceFilter, dateFrom, dateTo]);
 
   const sorted = useMemo(() => {
     const list = [...filtered];
@@ -131,13 +157,13 @@ export function AuditLogTable({ initialLogs }: { initialLogs: AuditEntry[] }) {
 
   return (
     <div className="card overflow-hidden">
-      <div className="flex flex-wrap items-center gap-4 p-4 border-b border-zinc-200 dark:border-zinc-700">
+      <div className="flex flex-col gap-3 p-4 border-b border-zinc-200 dark:border-zinc-700 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          <Filter className="h-4 w-4" />
+          <Filter className="h-4 w-4 shrink-0" />
           Filters
         </div>
         <select
-          className="input w-auto min-w-[160px] py-2 text-sm"
+          className="input w-full sm:w-auto sm:min-w-[160px] py-2 text-sm"
           value={actionFilter}
           onChange={(e) => {
             setActionFilter(e.target.value);
@@ -151,9 +177,39 @@ export function AuditLogTable({ initialLogs }: { initialLogs: AuditEntry[] }) {
             </option>
           ))}
         </select>
+        <select
+          className="input w-full sm:w-auto sm:min-w-[160px] py-2 text-sm"
+          value={tenantFilter}
+          onChange={(e) => {
+            setTenantFilter(e.target.value);
+            setPageIndex(0);
+          }}
+        >
+          <option value="">All tenants</option>
+          {tenants.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+        <select
+          className="input w-full sm:w-auto sm:min-w-[160px] py-2 text-sm"
+          value={sourceFilter}
+          onChange={(e) => {
+            setSourceFilter(e.target.value);
+            setPageIndex(0);
+          }}
+        >
+          <option value="">All sources</option>
+          {sources.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
         <input
           type="date"
-          className="input w-auto py-2 text-sm"
+          className="input w-full sm:w-auto py-2 text-sm"
           value={dateFrom}
           onChange={(e) => {
             setDateFrom(e.target.value);
@@ -163,7 +219,7 @@ export function AuditLogTable({ initialLogs }: { initialLogs: AuditEntry[] }) {
         />
         <input
           type="date"
-          className="input w-auto py-2 text-sm"
+          className="input w-full sm:w-auto py-2 text-sm"
           value={dateTo}
           onChange={(e) => {
             setDateTo(e.target.value);
@@ -174,7 +230,7 @@ export function AuditLogTable({ initialLogs }: { initialLogs: AuditEntry[] }) {
         <button
           type="button"
           onClick={exportCsv}
-          className="ml-auto btn btn-secondary flex items-center gap-2 text-sm"
+          className="btn btn-secondary flex w-full sm:w-auto sm:ml-auto items-center justify-center gap-2 text-sm"
         >
           <Download className="h-4 w-4" />
           Export CSV

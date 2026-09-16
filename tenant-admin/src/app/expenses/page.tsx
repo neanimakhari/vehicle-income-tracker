@@ -28,6 +28,17 @@ async function fetchExpenses() {
   }));
 }
 
+function parseJsonLogs(formData: FormData, key: string): Array<Record<string, unknown>> {
+  const raw = String(formData.get(key) ?? "").trim();
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as Array<Record<string, unknown>>;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export default async function ExpensesPage() {
   await requireAuth();
   const expenses = await fetchExpenses();
@@ -37,6 +48,7 @@ export default async function ExpensesPage() {
     const description = String(formData.get("description") ?? "").trim();
     const amount = Number(formData.get("amount") ?? 0);
     const receiptImage = formData.get("receiptImage");
+    const expenseLogs = parseJsonLogs(formData, "expenseLogs");
     const receiptImageStr = typeof receiptImage === "string" && receiptImage.trim() ? receiptImage.trim() : undefined;
     if (!description || !amount) {
       return { success: false, error: "Description and amount are required" };
@@ -52,6 +64,7 @@ export default async function ExpensesPage() {
           description,
           amount,
           receiptImage: receiptImageStr ?? undefined,
+          expenseLogs,
           loggedOn: new Date().toISOString(),
         }),
       });
@@ -85,6 +98,7 @@ export default async function ExpensesPage() {
     const amount = Number(formData.get("amount") ?? 0);
     const loggedOn = String(formData.get("loggedOn") ?? "").trim();
     const receiptImage = formData.get("receiptImage");
+    const expenseLogs = parseJsonLogs(formData, "expenseLogs");
     const receiptImageValue =
       typeof receiptImage === "string"
         ? receiptImage.trim() === ""
@@ -107,6 +121,7 @@ export default async function ExpensesPage() {
           description,
           amount,
           loggedOn: new Date(loggedOn).toISOString(),
+          expenseLogs,
           ...(receiptImageValue !== undefined ? { receiptImage: receiptImageValue } : {}),
         }),
       });

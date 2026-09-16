@@ -35,8 +35,6 @@ export async function fetchJson<T>(path: string, options?: { tolerate401?: boole
           console.warn(`fetchJson 401 tolerated for path ${path}`);
           return null;
         }
-        const { clearAuthSession } = await import("./auth");
-        await clearAuthSession();
         const { redirect } = await import("next/navigation");
         redirect("/login?error=expired");
       }

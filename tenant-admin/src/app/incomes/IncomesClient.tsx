@@ -27,17 +27,27 @@ type Income = {
   approvalStatus?: string;
   approvedAt?: string;
   approvedBy?: string;
+  incomeStream?: string;
+  tripId?: string;
+  scholarPaymentId?: string;
 };
 type Driver = { id: string; firstName: string; lastName: string; email: string; isActive: boolean };
 type Vehicle = { id: string; label: string; registrationNumber: string };
+type Trip = { id: string; tripType: string; status: string };
+type ScholarPayment = { id: string; scholarName: string; status: string };
 
 type SortKey = "loggedOn" | "vehicle" | "driverName" | "income" | "startingKm" | "endKm";
 type SortDir = "asc" | "desc";
+
+type StatusFilter = "all" | "pending" | "missing";
 
 type Props = {
   incomes: Income[];
   drivers: Driver[];
   vehicles: Vehicle[];
+  trips: Trip[];
+  scholarPayments: ScholarPayment[];
+  missingVehicleLabels?: string[];
   createIncome: (formData: FormData) => Promise<{ success: boolean; error?: string }>;
   updateIncome: (formData: FormData) => Promise<unknown>;
   deleteIncome: (formData: FormData) => Promise<unknown>;
@@ -61,6 +71,9 @@ export function IncomesClient({
   incomes = [],
   drivers = [],
   vehicles = [],
+  trips = [],
+  scholarPayments = [],
+  missingVehicleLabels = [],
   createIncome,
   updateIncome,
   deleteIncome,
@@ -68,7 +81,7 @@ export function IncomesClient({
   rejectIncome,
 }: Props) {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "pending">("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("loggedOn");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [pageSize, setPageSize] = useState(10);
@@ -78,10 +91,19 @@ export function IncomesClient({
   const router = useRouter();
 
   const safeIncomes = Array.isArray(incomes) ? incomes : [];
+  const missingSet = useMemo(
+    () => new Set((missingVehicleLabels ?? []).map((label) => label.toLowerCase())),
+    [missingVehicleLabels],
+  );
   const statusFiltered = useMemo(() => {
-    if (statusFilter !== "pending") return safeIncomes;
-    return safeIncomes.filter((i) => (i.approvalStatus ?? "auto") === "pending");
-  }, [safeIncomes, statusFilter]);
+    if (statusFilter === "pending") {
+      return safeIncomes.filter((i) => (i.approvalStatus ?? "auto") === "pending");
+    }
+    if (statusFilter === "missing") {
+      return safeIncomes.filter((i) => missingSet.has(String(i.vehicle ?? "").toLowerCase()));
+    }
+    return safeIncomes;
+  }, [safeIncomes, statusFilter, missingSet]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -163,28 +185,41 @@ export function IncomesClient({
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">A list of all vehicle income records.</p>
         </div>
         <div className="mt-4 sm:mt-0">
-          <CreateIncomeModal vehicles={vehicles} drivers={drivers} createIncome={createIncome} />
+          <CreateIncomeModal
+            vehicles={vehicles}
+            drivers={drivers}
+            trips={trips}
+            scholarPayments={scholarPayments}
+            createIncome={createIncome}
+          />
         </div>
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center gap-4">
-        <div className="flex rounded-lg border border-zinc-200 dark:border-zinc-700 p-0.5 bg-zinc-50 dark:bg-zinc-900/50">
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex w-full sm:w-auto flex-col rounded-lg border border-zinc-200 dark:border-zinc-700 p-0.5 bg-zinc-50 dark:bg-zinc-900/50 sm:flex-row">
           <button
             type="button"
             onClick={() => { setStatusFilter("all"); setPageIndex(0); }}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md ${statusFilter === "all" ? "bg-white dark:bg-zinc-800 shadow text-zinc-900 dark:text-zinc-50" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50"}`}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md text-left sm:text-center ${statusFilter === "all" ? "bg-white dark:bg-zinc-800 shadow text-zinc-900 dark:text-zinc-50" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50"}`}
           >
             All
           </button>
           <button
             type="button"
+            onClick={() => { setStatusFilter("missing"); setPageIndex(0); }}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md text-left sm:text-center ${statusFilter === "missing" ? "bg-white dark:bg-zinc-800 shadow text-zinc-900 dark:text-zinc-50" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50"}`}
+          >
+            Missing income today
+          </button>
+          <button
+            type="button"
             onClick={() => { setStatusFilter("pending"); setPageIndex(0); }}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md ${statusFilter === "pending" ? "bg-white dark:bg-zinc-800 shadow text-zinc-900 dark:text-zinc-50" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50"}`}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md text-left sm:text-center ${statusFilter === "pending" ? "bg-white dark:bg-zinc-800 shadow text-zinc-900 dark:text-zinc-50" : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50"}`}
           >
             Pending approval
           </button>
         </div>
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+        <div className="relative w-full sm:flex-1 sm:min-w-[180px] sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
           <input
             type="search"
@@ -198,9 +233,14 @@ export function IncomesClient({
           />
         </div>
       </div>
+      {missingVehicleLabels.length > 0 && (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100">
+          Missing income today for {missingVehicleLabels.length} active vehicle(s).
+        </div>
+      )}
 
       <div className="mt-6 flow-root">
-        <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+        <div className="table-responsive -my-2">
           <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
             <div className="overflow-hidden shadow ring-1 ring-black/5 sm:rounded-lg">
               <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -210,6 +250,9 @@ export function IncomesClient({
                     {th("vehicle", "Vehicle")}
                     {th("driverName", "Driver")}
                     {th("income", "Income")}
+                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                      Stream
+                    </th>
                     {th("startingKm", "Starting KM")}
                     {th("endKm", "End KM")}
                     <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50">
@@ -226,7 +269,7 @@ export function IncomesClient({
                 <tbody className="divide-y divide-zinc-200 bg-white dark:divide-zinc-800 dark:bg-zinc-950">
                   {safeIncomes.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-4 py-12">
+                      <td colSpan={10} className="px-4 py-12">
                         <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 p-8 text-center">
                           <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">No income records yet</p>
                           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Log your first income using the button above.</p>
@@ -235,7 +278,7 @@ export function IncomesClient({
                     </tr>
                   ) : sorted.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                      <td colSpan={10} className="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
                         No records match your search.
                       </td>
                     </tr>
@@ -250,6 +293,7 @@ export function IncomesClient({
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">{income.vehicle}</td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">{income.driverName}</td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">R {safeNum(income.income).toFixed(2)}</td>
+                        <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">{income.incomeStream ?? "general"}</td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">{income.startingKm ?? "—"}</td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">{income.endKm ?? "—"}</td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm">
@@ -339,7 +383,14 @@ export function IncomesClient({
                             >
                               <Eye className="h-4 w-4" /> View
                             </Link>
-                            <IncomeEditButton income={income} drivers={drivers} vehicles={vehicles} updateIncome={updateIncome} />
+                            <IncomeEditButton
+                              income={income}
+                              drivers={drivers}
+                              vehicles={vehicles}
+                              trips={trips}
+                              scholarPayments={scholarPayments}
+                              updateIncome={updateIncome}
+                            />
                             <form action={async (formData) => { await deleteIncome(formData); }} className="inline">
                               <input type="hidden" name="id" value={income.id} />
                               <button className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" type="submit">

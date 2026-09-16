@@ -87,7 +87,7 @@ export function CreateMaintenanceTaskModal({ vehicles, createTask }: Props) {
           setOpen(true);
           setError(null);
         }}
-        className="btn btn-primary flex items-center gap-2"
+        className="btn btn-primary flex w-full sm:w-auto items-center justify-center gap-2"
       >
         <Plus className="h-4 w-4" />
         Add Task

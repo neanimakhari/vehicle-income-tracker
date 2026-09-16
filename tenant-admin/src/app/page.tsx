@@ -24,6 +24,7 @@ async function fetchSummary() {
       incomeCount?: number;
       expenseCount?: number;
       activeDrivers?: number;
+      missingIncomeVehicles?: number;
     }>("/tenant/reports/summary");
     return summary;
   } catch {
@@ -105,7 +106,7 @@ export default async function Home() {
     <div className="space-y-8">
       <OnboardingBanner hasDrivers={hasDrivers} hasVehicles={hasVehicles} />
       <div>
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-teal-700 bg-clip-text text-transparent">
+        <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-teal-600 to-teal-700 bg-clip-text text-transparent">
           Dashboard
         </h1>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
@@ -163,6 +164,13 @@ export default async function Home() {
           icon={Wrench}
           color={pendingMaintenance > 0 ? "amber" : "teal"}
           description="Overdue or due soon"
+        />
+        <StatCard
+          title="Missing income today"
+          value={summary?.missingIncomeVehicles ?? 0}
+          icon={AlertCircle}
+          color={(summary?.missingIncomeVehicles ?? 0) > 0 ? "amber" : "emerald"}
+          description="Active vehicles without income"
         />
         <StatCard
           title="Documents expiring soon"

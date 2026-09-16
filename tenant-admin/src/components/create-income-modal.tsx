@@ -6,17 +6,24 @@ import { DollarSign, X } from "lucide-react";
 
 type Vehicle = { id: string; label: string; registrationNumber: string };
 type Driver = { id: string; firstName: string; lastName: string; email: string; isActive: boolean };
+type Trip = { id: string; tripType: string; status: string };
+type ScholarPayment = { id: string; scholarName: string; status: string };
 
 type Props = {
   vehicles: Vehicle[];
   drivers: Driver[];
+  trips: Trip[];
+  scholarPayments: ScholarPayment[];
   createIncome: (formData: FormData) => Promise<{ success: boolean; error?: string }>;
 };
 
-export function CreateIncomeModal({ vehicles, drivers, createIncome }: Props) {
+export function CreateIncomeModal({ vehicles, drivers, trips, scholarPayments, createIncome }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [petrolRows, setPetrolRows] = useState<Array<{ amount: string; litres: string }>>([{ amount: "", litres: "" }]);
+  const [expenseRows, setExpenseRows] = useState<Array<{ detail: string; amount: string }>>([{ detail: "", amount: "" }]);
+  const [incomeRows, setIncomeRows] = useState<Array<{ amount: string; note: string }>>([{ amount: "", note: "" }]);
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousActiveRef = useRef<HTMLElement | null>(null);
 
@@ -74,6 +81,9 @@ export function CreateIncomeModal({ vehicles, drivers, createIncome }: Props) {
     if (result?.success) {
       handleClose();
       form.reset();
+      setPetrolRows([{ amount: "", litres: "" }]);
+      setExpenseRows([{ detail: "", amount: "" }]);
+      setIncomeRows([{ amount: "", note: "" }]);
       router.push("/incomes?success=" + encodeURIComponent("Income logged"));
       router.refresh();
     } else if (result?.error) {
@@ -91,7 +101,7 @@ export function CreateIncomeModal({ vehicles, drivers, createIncome }: Props) {
           setOpen(true);
           setError(null);
         }}
-        className="btn btn-primary flex items-center gap-2"
+        className="btn btn-primary flex w-full sm:w-auto items-center justify-center gap-2"
       >
         <DollarSign className="h-4 w-4" />
         Add Income
@@ -156,6 +166,50 @@ export function CreateIncomeModal({ vehicles, drivers, createIncome }: Props) {
                   </select>
                 </div>
               </div>
+              <div className="space-y-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Income logs</p>
+                  <button type="button" className="text-xs text-teal-600" onClick={() => setIncomeRows((r) => [...r, { amount: "", note: "" }])}>Add row</button>
+                </div>
+                {incomeRows.map((row, idx) => (
+                  <div key={idx} className="grid gap-2 sm:grid-cols-2">
+                    <input className="input w-full px-3 py-2 text-sm" placeholder="Amount" value={row.amount} onChange={(e) => setIncomeRows((r) => r.map((x, i) => i === idx ? { ...x, amount: e.target.value } : x))} />
+                    <input className="input w-full px-3 py-2 text-sm" placeholder="Note (optional)" value={row.note} onChange={(e) => setIncomeRows((r) => r.map((x, i) => i === idx ? { ...x, note: e.target.value } : x))} />
+                  </div>
+                ))}
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Income stream</label>
+                  <select name="incomeStream" className="input w-full px-3 py-2 text-sm" defaultValue="general">
+                    <option value="general">General</option>
+                    <option value="trip">Trip</option>
+                    <option value="scholar">Scholar</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Linked trip (optional)</label>
+                  <select name="tripId" className="input w-full px-3 py-2 text-sm" defaultValue="">
+                    <option value="">None</option>
+                    {trips.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.tripType} ({t.status})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Linked scholar payment (optional)</label>
+                <select name="scholarPaymentId" className="input w-full px-3 py-2 text-sm" defaultValue="">
+                  <option value="">None</option>
+                  {scholarPayments.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.scholarName} ({s.status})
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Income (R)</label>
@@ -165,6 +219,18 @@ export function CreateIncomeModal({ vehicles, drivers, createIncome }: Props) {
                   <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Date</label>
                   <input name="loggedOn" type="datetime-local" defaultValue={new Date().toISOString().slice(0, 16)} className="input w-full px-3 py-2 text-sm" />
                 </div>
+              </div>
+              <div className="space-y-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Petrol logs</p>
+                  <button type="button" className="text-xs text-teal-600" onClick={() => setPetrolRows((r) => [...r, { amount: "", litres: "" }])}>Add row</button>
+                </div>
+                {petrolRows.map((row, idx) => (
+                  <div key={idx} className="grid gap-2 sm:grid-cols-2">
+                    <input className="input w-full px-3 py-2 text-sm" placeholder="Cost (R)" value={row.amount} onChange={(e) => setPetrolRows((r) => r.map((x, i) => i === idx ? { ...x, amount: e.target.value } : x))} />
+                    <input className="input w-full px-3 py-2 text-sm" placeholder="Litres" value={row.litres} onChange={(e) => setPetrolRows((r) => r.map((x, i) => i === idx ? { ...x, litres: e.target.value } : x))} />
+                  </div>
+                ))}
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -176,6 +242,33 @@ export function CreateIncomeModal({ vehicles, drivers, createIncome }: Props) {
                   <input name="endKm" type="number" className="input w-full px-3 py-2 text-sm" />
                 </div>
               </div>
+              <div className="space-y-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Expense logs</p>
+                  <button type="button" className="text-xs text-teal-600" onClick={() => setExpenseRows((r) => [...r, { detail: "", amount: "" }])}>Add row</button>
+                </div>
+                {expenseRows.map((row, idx) => (
+                  <div key={idx} className="grid gap-2 sm:grid-cols-2">
+                    <input className="input w-full px-3 py-2 text-sm" placeholder="Detail" value={row.detail} onChange={(e) => setExpenseRows((r) => r.map((x, i) => i === idx ? { ...x, detail: e.target.value } : x))} />
+                    <input className="input w-full px-3 py-2 text-sm" placeholder="Amount (R)" value={row.amount} onChange={(e) => setExpenseRows((r) => r.map((x, i) => i === idx ? { ...x, amount: e.target.value } : x))} />
+                  </div>
+                ))}
+              </div>
+              <input
+                type="hidden"
+                name="incomeLogs"
+                value={JSON.stringify(incomeRows.filter((r) => r.amount.trim()).map((r) => ({ amount: Number(r.amount), note: r.note || null })))}
+              />
+              <input
+                type="hidden"
+                name="petrolLogs"
+                value={JSON.stringify(petrolRows.filter((r) => r.amount.trim() || r.litres.trim()).map((r) => ({ amount: r.amount ? Number(r.amount) : null, litres: r.litres ? Number(r.litres) : null })))}
+              />
+              <input
+                type="hidden"
+                name="expenseLogs"
+                value={JSON.stringify(expenseRows.filter((r) => r.detail.trim() || r.amount.trim()).map((r) => ({ detail: r.detail || null, amount: r.amount ? Number(r.amount) : null })))}
+              />
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Petrol Cost (optional)</label>

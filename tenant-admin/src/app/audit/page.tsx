@@ -30,7 +30,7 @@ export default async function AuditPage() {
           <FileText className="h-6 w-6 text-white" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-teal-700 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-teal-600 to-teal-700 bg-clip-text text-transparent">
             Audit Trail
           </h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">

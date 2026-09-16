@@ -67,13 +67,37 @@ async function fetchFuelEfficiencyDrivers() {
   return efficiency ?? [];
 }
 
+async function fetchAdvancedInsights() {
+  const insights = await fetchJson<{
+    topVehicles: Array<{ vehicle: string; totalIncome: number }>;
+    worstFuelEfficiency: Array<{ vehicle: string; kmPerLitre: number }>;
+    idleVehicles: string[];
+    profitPerVehicle: Array<{ vehicle: string; profit: number }>;
+  }>("/tenant/reports/advanced-insights", { tolerate401: true });
+  return insights ?? { topVehicles: [], worstFuelEfficiency: [], idleVehicles: [], profitPerVehicle: [] };
+}
+
+async function fetchIncomeStreams() {
+  const streams = await fetchJson<Array<{
+    stream: string;
+    entries: number;
+    totalIncome: number;
+    totalExpenses: number;
+    totalPetrol: number;
+    netIncome: number;
+  }>>("/tenant/reports/income-streams", { tolerate401: true });
+  return streams ?? [];
+}
+
 export default async function ReportsPage() {
-  const [summary, topVehicles, driverStats, fuelEfficiencyVehicles, fuelEfficiencyDrivers] = await Promise.all([
+  const [summary, topVehicles, driverStats, fuelEfficiencyVehicles, fuelEfficiencyDrivers, advancedInsights, incomeStreams] = await Promise.all([
     fetchSummary(),
     fetchTopVehicles(),
     fetchDriverStats(),
     fetchFuelEfficiencyVehicles(),
     fetchFuelEfficiencyDrivers(),
+    fetchAdvancedInsights(),
+    fetchIncomeStreams(),
   ]);
 
   return (
@@ -83,6 +107,8 @@ export default async function ReportsPage() {
       driverStats={driverStats}
       fuelEfficiencyVehicles={fuelEfficiencyVehicles}
       fuelEfficiencyDrivers={fuelEfficiencyDrivers}
+      advancedInsights={advancedInsights}
+      incomeStreams={incomeStreams}
     />
   );
 }

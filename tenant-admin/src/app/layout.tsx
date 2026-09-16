@@ -56,7 +56,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${inter.variable} bg-gradient-to-br from-zinc-100 via-zinc-50 to-teal-50/40 text-zinc-900 antialiased dark:from-zinc-950 dark:via-zinc-900 dark:to-teal-950/20 dark:text-zinc-50`}
+        className={`${inter.variable} bg-gradient-to-br from-zinc-950 via-zinc-900 to-teal-950/20 text-zinc-100 antialiased dark:from-zinc-100 dark:via-zinc-50 dark:to-teal-50/40 dark:text-zinc-900`}
       >
         {process.env.NEXT_PUBLIC_USERWAY_ACCOUNT_ID ? (
           <Script
@@ -78,8 +78,8 @@ export default async function RootLayout({
               <MobileSidebarWrapper tenantName={tenantName} />
               <div className="min-h-screen">
                 {/* Desktop Sidebar */}
-                <aside className="hidden lg:block fixed inset-y-0 left-0 z-40 w-72 overflow-y-auto bg-gradient-to-b from-zinc-900 via-zinc-900 to-zinc-950 border-r border-zinc-800 shadow-2xl">
-                  <div className="flex h-20 items-center px-6 border-b border-zinc-800">
+                <aside className="hidden lg:flex lg:flex-col fixed inset-y-0 left-0 z-40 w-72 bg-gradient-to-b from-zinc-900 via-zinc-900 to-zinc-950 border-r border-zinc-800 shadow-2xl">
+                  <div className="flex h-20 shrink-0 items-center px-6 border-b border-zinc-800">
                     <Link href="/" className="flex items-center gap-3 group w-full">
                       <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 shadow-lg group-hover:shadow-teal-500/50 transition-all group-hover:scale-105 overflow-hidden flex-shrink-0">
                         <Image 
@@ -99,8 +99,10 @@ export default async function RootLayout({
                       </div>
                     </Link>
                   </div>
-                  <Navigation />
-                  <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-zinc-800 space-y-2">
+                  <div className="flex-1 overflow-y-auto">
+                    <Navigation />
+                  </div>
+                  <div className="shrink-0 p-4 border-t border-zinc-800 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="text-xs text-zinc-400">Theme</div>
                       <ThemeToggle />
@@ -116,9 +118,9 @@ export default async function RootLayout({
                     <ToastFromUrl />
                   </Suspense>
                   <header className="sticky top-0 z-30 flex h-16 lg:h-20 items-center gap-x-4 border-b border-zinc-200/80 bg-white/80 backdrop-blur-lg shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/80">
-                    <div className="flex flex-1 items-center justify-between px-4 lg:px-8">
-                      <div className="flex items-center gap-3">
-                        <div className="text-sm sm:text-base lg:text-lg font-semibold bg-gradient-to-r from-teal-600 to-teal-700 bg-clip-text text-transparent">
+                    <div className="flex flex-1 items-center justify-between pl-14 pr-4 lg:px-8">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="truncate text-sm sm:text-base lg:text-lg font-semibold bg-gradient-to-r from-teal-600 to-teal-700 bg-clip-text text-transparent">
                           Tenant Administration
                         </div>
                       </div>
@@ -152,7 +154,7 @@ export default async function RootLayout({
                       </div>
                     </div>
                   </header>
-                  <main id="main-content" className="px-4 lg:px-8 py-6 lg:py-10" tabIndex={-1}>{children}</main>
+                  <main id="main-content" className="px-4 sm:px-6 lg:px-8 py-6 lg:py-10 overflow-x-hidden" tabIndex={-1}>{children}</main>
                 </div>
               </div>
             </>
