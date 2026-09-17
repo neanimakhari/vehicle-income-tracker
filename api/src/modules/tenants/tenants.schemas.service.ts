@@ -36,6 +36,7 @@ export class TenantSchemasService {
         "bank_branch_code" varchar NULL,
         "account_holder_name" varchar NULL,
         "salary" numeric NULL,
+        "daily_target_amount" numeric NULL,
         "address" text NULL,
                "emergency_contact_name" varchar NULL,
                "emergency_contact_phone" varchar NULL,
@@ -49,7 +50,7 @@ export class TenantSchemasService {
                "created_at" timestamptz NOT NULL DEFAULT now(),
                "updated_at" timestamptz NOT NULL DEFAULT now()
              )`,
-           );
+    );
     await this.dataSource.query(
       `CREATE TABLE IF NOT EXISTS "${schemaName}"."driver_documents" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -80,6 +81,12 @@ export class TenantSchemasService {
         "expense_price" numeric NULL DEFAULT NULL,
         "expense_image" text NULL DEFAULT NULL,
         "petrol_slip" text NULL DEFAULT NULL,
+        "petrol_logs" text NULL DEFAULT NULL,
+        "expense_logs" text NULL DEFAULT NULL,
+        "income_logs" text NULL DEFAULT NULL,
+        "income_stream" varchar NOT NULL DEFAULT 'general',
+        "trip_id" uuid NULL DEFAULT NULL,
+        "scholar_payment_id" uuid NULL DEFAULT NULL,
         "driver_id" uuid NULL DEFAULT NULL,
         "logged_on" timestamptz NOT NULL,
         "approval_status" varchar(20) NOT NULL DEFAULT 'auto',
@@ -87,6 +94,55 @@ export class TenantSchemasService {
         "approved_by" uuid NULL DEFAULT NULL,
         "created_at" timestamptz NOT NULL DEFAULT now(),
         "updated_at" timestamptz NOT NULL DEFAULT now()
+      )`,
+    );
+    await this.dataSource.query(
+      `CREATE TABLE IF NOT EXISTS "${schemaName}"."trips" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "vehicle_id" uuid NULL DEFAULT NULL,
+        "driver_id" uuid NULL DEFAULT NULL,
+        "status" varchar(30) NOT NULL DEFAULT 'scheduled',
+        "trip_type" varchar NOT NULL DEFAULT 'general',
+        "pickup_location" varchar NULL DEFAULT NULL,
+        "dropoff_location" varchar NULL DEFAULT NULL,
+        "scheduled_at" timestamptz NULL DEFAULT NULL,
+        "started_at" timestamptz NULL DEFAULT NULL,
+        "completed_at" timestamptz NULL DEFAULT NULL,
+        "fare_amount" numeric NULL DEFAULT NULL,
+        "distance_km" numeric NULL DEFAULT NULL,
+        "notes" text NULL DEFAULT NULL,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "updated_at" timestamptz NOT NULL DEFAULT now()
+      )`,
+    );
+    await this.dataSource.query(
+      `CREATE TABLE IF NOT EXISTS "${schemaName}"."scholar_payments" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "scholar_name" varchar NOT NULL,
+        "guardian_name" varchar NULL DEFAULT NULL,
+        "amount" numeric NOT NULL DEFAULT 0,
+        "status" varchar NOT NULL DEFAULT 'pending',
+        "due_date" date NULL DEFAULT NULL,
+        "paid_at" timestamptz NULL DEFAULT NULL,
+        "notes" text NULL DEFAULT NULL,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "updated_at" timestamptz NOT NULL DEFAULT now()
+      )`,
+    );
+    await this.dataSource.query(
+      `CREATE TABLE IF NOT EXISTS "${schemaName}"."gps_tracking_points" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "vehicle_id" uuid NULL DEFAULT NULL,
+        "vehicle_label" varchar NULL DEFAULT NULL,
+        "device_id" varchar NULL DEFAULT NULL,
+        "source" varchar NULL DEFAULT 'dashcam',
+        "latitude" numeric NOT NULL,
+        "longitude" numeric NOT NULL,
+        "speed_kph" numeric NULL DEFAULT NULL,
+        "heading" numeric NULL DEFAULT NULL,
+        "recorded_at" timestamptz NOT NULL,
+        "raw_payload" text NULL DEFAULT NULL,
+        "created_at" timestamptz NOT NULL DEFAULT now()
       )`,
     );
     await this.dataSource.query(
@@ -162,6 +218,45 @@ export class TenantSchemasService {
         "updated_at" timestamptz NOT NULL DEFAULT now()
       )`,
     );
+    await this.dataSource.query(
+      `CREATE TABLE IF NOT EXISTS "${schemaName}"."notification_categories" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "name" varchar NOT NULL,
+        "description" text NULL,
+        "is_default" boolean NOT NULL DEFAULT false,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "updated_at" timestamptz NOT NULL DEFAULT now()
+      )`,
+    );
+    await this.dataSource.query(
+      `CREATE TABLE IF NOT EXISTS "${schemaName}"."notifications" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "category_id" uuid NULL,
+        "title" varchar NOT NULL,
+        "message" text NOT NULL,
+        "target_role" varchar NULL,
+        "target_user_id" uuid NULL,
+        "status" varchar NOT NULL DEFAULT 'sent',
+        "created_by" uuid NULL,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "updated_at" timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT "fk_notifications_category_id" FOREIGN KEY ("category_id")
+          REFERENCES "${schemaName}"."notification_categories"("id") ON DELETE SET NULL
+      )`,
+    );
+    await this.dataSource.query(
+      `INSERT INTO "${schemaName}"."notification_categories" ("name","description","is_default")
+       SELECT x.name, x.description, true
+       FROM (VALUES
+         ('Alerts', 'General alerts'),
+         ('Payments', 'Payment notices'),
+         ('Maintenance', 'Maintenance updates'),
+         ('System', 'System messages')
+       ) AS x(name, description)
+       WHERE NOT EXISTS (
+         SELECT 1 FROM "${schemaName}"."notification_categories" c WHERE c.name = x.name
+       )`,
+    );
   }
 
   toSchemaName(slug: string): string {
@@ -203,4 +298,3 @@ export class TenantSchemasService {
     }
   }
 }
-

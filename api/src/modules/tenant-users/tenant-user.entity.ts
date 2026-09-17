@@ -1,4 +1,10 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity({ name: 'users' })
 export class TenantUser {
@@ -29,13 +35,28 @@ export class TenantUser {
   @Column({ name: 'failed_login_attempts', type: 'int', default: 0 })
   failedLoginAttempts: number;
 
-  @Column({ name: 'locked_until', type: 'timestamptz', nullable: true, default: null })
+  @Column({
+    name: 'locked_until',
+    type: 'timestamptz',
+    nullable: true,
+    default: null,
+  })
   lockedUntil: Date | null;
 
-  @Column({ name: 'last_login_ip', type: 'varchar', nullable: true, default: null })
+  @Column({
+    name: 'last_login_ip',
+    type: 'varchar',
+    nullable: true,
+    default: null,
+  })
   lastLoginIp: string | null;
 
-  @Column({ name: 'last_login_at', type: 'timestamptz', nullable: true, default: null })
+  @Column({
+    name: 'last_login_at',
+    type: 'timestamptz',
+    nullable: true,
+    default: null,
+  })
   lastLoginAt: Date | null;
 
   @Column({ name: 'is_active', default: true })
@@ -81,6 +102,15 @@ export class TenantUser {
   @Column({ name: 'salary', type: 'numeric', nullable: true })
   salary: number | null;
 
+  /** Personal daily income target in ZAR; falls back to tenant default when null */
+  @Column({
+    name: 'daily_target_amount',
+    type: 'numeric',
+    nullable: true,
+    default: null,
+  })
+  dailyTargetAmount: number | null;
+
   @Column({ name: 'address', type: 'text', nullable: true })
   address: string | null;
 
@@ -96,7 +126,11 @@ export class TenantUser {
   @Column({ name: 'password_reset_token', type: 'varchar', nullable: true })
   passwordResetToken: string | null;
 
-  @Column({ name: 'password_reset_expires', type: 'timestamptz', nullable: true })
+  @Column({
+    name: 'password_reset_expires',
+    type: 'timestamptz',
+    nullable: true,
+  })
   passwordResetExpires: Date | null;
 
   @Column({ name: 'email_verified', type: 'boolean', default: false })
@@ -105,7 +139,11 @@ export class TenantUser {
   @Column({ name: 'email_verification_token', type: 'varchar', nullable: true })
   emailVerificationToken: string | null;
 
-  @Column({ name: 'email_verification_expires', type: 'timestamptz', nullable: true })
+  @Column({
+    name: 'email_verification_expires',
+    type: 'timestamptz',
+    nullable: true,
+  })
   emailVerificationExpires: Date | null;
 
   @Column({ name: 'must_change_password', type: 'boolean', default: true })
@@ -117,4 +155,3 @@ export class TenantUser {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }
-

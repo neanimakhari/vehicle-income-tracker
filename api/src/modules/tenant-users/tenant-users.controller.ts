@@ -19,9 +19,11 @@ import { TenantAccessGuard } from '../../tenancy/guards/tenant-access.guard';
 import {
   IsEmail,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   Matches,
+  Min,
   MinLength,
 } from 'class-validator';
 import { ApiTags } from '@nestjs/swagger';
@@ -54,6 +56,11 @@ class CreateTenantUserDto {
 class UpdateTenantUserDto {
   @IsOptional()
   isActive?: boolean;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  dailyTargetAmount?: number | null;
 }
 
 @Controller('tenant/users')

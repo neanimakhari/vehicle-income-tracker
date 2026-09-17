@@ -34,6 +34,7 @@ const _headerBgAssets = [
 class _DashboardScreenState extends State<DashboardScreen> {
   final _api = ApiService();
   Map<String, dynamic>? _summary;
+  Map<String, dynamic>? _dailyTargets;
   Map<String, dynamic>? _tenantPolicy;
   Map<String, dynamic>? _driverProfile;
   List<Map<String, dynamic>> _recentIncomes = [];
@@ -71,13 +72,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => _loading = true);
     final currentUserId = Session.userId;
     try {
-      final data = await _api.fetchSummary();
+      final results = await Future.wait([
+        _api.fetchSummary(),
+        _api.fetchDailyTargets(),
+      ]);
       if (!mounted) return;
       if (Session.userId != currentUserId) return;
-      setState(() => _summary = data);
+      setState(() {
+        _summary = results[0];
+        _dailyTargets = results[1];
+      });
     } catch (_) {
       if (mounted && Session.userId == currentUserId) {
-        setState(() => _summary = null);
+        setState(() {
+          _summary = null;
+          _dailyTargets = null;
+        });
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -772,6 +782,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final totalIncome = _summary?['totalIncome'] ?? 0;
     final totalExpenses = _summary?['totalExpenses'] ?? 0;
     final netIncome = _summary?['netIncome'] ?? 0;
+    final drivers = (_dailyTargets?['drivers'] as List?) ?? const [];
+    final me = drivers.isNotEmpty ? drivers.first as Map<String, dynamic> : null;
+    final target = me?['target'];
+    final actual = me?['actual'];
+    final variance = me?['variance'];
+    final percentHit = me?['percentHit'];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -784,6 +800,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         const SizedBox(height: 16),
+        if (target != null) ...[
+          _buildDashboardCard(
+            'Today vs target',
+            'R ${actual ?? 0} / R $target'
+                '${percentHit != null ? ' (${percentHit}%)' : ''}'
+                '${variance != null ? (Number(variance) >= 0 ? ' · +R $variance' : ' · short R ${(-Number(variance)).toString()}') : ''}',
+            Icons.flag,
+            (variance is num && variance < 0) ? AppTheme.danger : AppTheme.success,
+            isDarkMode,
+          ),
+          const SizedBox(height: 16),
+        ],
         Row(
           children: [
             Expanded(

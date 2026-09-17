@@ -141,12 +141,39 @@ class ApiService {
     return _decodeObject(response, errorPrefix: 'Failed to fetch summary');
   }
 
+  Future<Map<String, dynamic>> fetchDailyTargets({String? date}) async {
+    final query = date != null ? '?date=$date' : '';
+    final response = await http.get(
+      Uri.parse('$baseUrl/tenant/reports/targets/daily$query'),
+      headers: _authHeaders(),
+    );
+    return _decodeObject(response, errorPrefix: 'Failed to fetch daily targets');
+  }
+
   Future<List<Map<String, dynamic>>> fetchVehicles() async {
     final response = await http.get(
       Uri.parse('$baseUrl/tenant/vehicles'),
       headers: _authHeaders(),
     );
     final data = await _decodeList(response, errorPrefix: 'Failed to fetch vehicles');
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> fetchTrips() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/tenant/trips'),
+      headers: _authHeaders(),
+    );
+    final data = await _decodeList(response, errorPrefix: 'Failed to fetch trips');
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> fetchScholarPayments() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/tenant/scholar-payments'),
+      headers: _authHeaders(),
+    );
+    final data = await _decodeList(response, errorPrefix: 'Failed to fetch scholar payments');
     return data.cast<Map<String, dynamic>>();
   }
 
@@ -201,6 +228,19 @@ class ApiService {
       headers: _authHeaders(),
     );
     final data = await _decodeList(response, errorPrefix: 'Failed to fetch audit logs');
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> fetchTenantNotifications() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/tenant/notifications'),
+      headers: _authHeaders(),
+    );
+    if (response.statusCode == 403) {
+      // Notifications can be tenant-feature-flagged. Treat disabled as no data.
+      return [];
+    }
+    final data = await _decodeList(response, errorPrefix: 'Failed to fetch notifications');
     return data.cast<Map<String, dynamic>>();
   }
 

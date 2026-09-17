@@ -4,6 +4,7 @@ import { Shield, Users, AlertCircle, ArrowRight, DollarSign, TrendingUp, UserChe
 import Link from "next/link";
 import { clearTenantAdminCache } from "./actions/clear-cache";
 import { OnboardingBanner } from "@/components/onboarding-banner";
+import { DailyTargetsPanel } from "@/components/daily-targets-panel";
 
 async function fetchPolicy() {
   const policy = await fetchJson<{ requireMfaUsers?: boolean; requireMfa?: boolean }>("/tenant/policy");
@@ -82,9 +83,50 @@ async function fetchExpirySummary() {
   }
 }
 
+async function fetchDailyTargets() {
+  try {
+    return await fetchJson<{
+      date: string;
+      defaultDailyTargetAmount: number | null;
+      summary: {
+        drivers: number;
+        driversWithTarget: number;
+        hitCount: number;
+        missCount: number;
+        totalTarget: number;
+        totalActual: number;
+        totalVariance: number | null;
+      };
+      drivers: Array<{
+        driverId: string;
+        driverName: string;
+        target: number | null;
+        actual: number;
+        variance: number | null;
+        shortfall: number;
+        surplus: number;
+        percentHit: number | null;
+        hit: boolean | null;
+        entryCount: number;
+      }>;
+    }>("/tenant/reports/targets/daily");
+  } catch {
+    return null;
+  }
+}
+
+async function fetchPolicyForTargets() {
+  try {
+    const policy = await fetchJson<{ defaultDailyTargetAmount?: number | null }>("/tenant/policy");
+    return policy?.defaultDailyTargetAmount ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function Home() {
   await requireAuth();
-  const [policy, drivers, summary, topVehicles, topDrivers, pendingMaintenance, vehicles, driversExpiringSoon] = await Promise.all([
+  const [policy, drivers, summary, topVehicles, topDrivers, pendingMaintenance, vehicles, driversExpiringSoon, dailyTargets, defaultDailyTarget] = await Promise.all([
     fetchPolicy(),
     fetchDrivers(),
     fetchSummary(),
@@ -93,6 +135,8 @@ export default async function Home() {
     fetchMaintenanceCount(),
     fetchVehicles(),
     fetchExpirySummary(),
+    fetchDailyTargets(),
+    fetchPolicyForTargets(),
   ]);
   const requiresMfa = policy?.requireMfaUsers === true;
   const pendingMfa = requiresMfa ? drivers.filter(driver => !driver.mfaEnabled).length : 0;
@@ -256,6 +300,11 @@ export default async function Home() {
           )}
         </div>
       </div>
+
+      <DailyTargetsPanel
+        initial={dailyTargets}
+        defaultTarget={defaultDailyTarget ?? dailyTargets?.defaultDailyTargetAmount ?? null}
+      />
 
       {/* Top Performers */}
       <div className="grid gap-6 md:grid-cols-2">

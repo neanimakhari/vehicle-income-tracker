@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Tenant } from './tenant.entity';
+import { TenantSlaDocument } from './tenant-sla-document.entity';
 import { TenantSchemasService } from './tenants.schemas.service';
 import { AuditService } from '../../modules/audit/audit.service';
 import { EmailService } from '../email/email.service';
@@ -12,6 +13,8 @@ export class TenantsService {
   constructor(
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
+    @InjectRepository(TenantSlaDocument)
+    private readonly tenantSlaRepository: Repository<TenantSlaDocument>,
     private readonly tenantSchemasService: TenantSchemasService,
     private readonly auditService: AuditService,
     private readonly emailService: EmailService,
@@ -67,6 +70,88 @@ export class TenantsService {
     return result;
   }
 
+  async getTenantMetrics(): Promise<
+    Array<{
+      tenantId: string;
+      tenantName: string;
+      tenantSlug: string;
+      isActive: boolean;
+      drivers: number;
+      vehicles: number;
+      incomes: number;
+      totalIncome: number;
+      maxDrivers: number | null;
+      usagePercentDrivers: number | null;
+    }>
+  > {
+    const [tenants, usage] = await Promise.all([
+      this.findAll(),
+      this.getUsageForAll(),
+    ]);
+    const usageBySlug = new Map(usage.map((u) => [u.slug, u]));
+    return tenants.map((tenant) => {
+      const u = usageBySlug.get(tenant.slug);
+      const drivers = u?.drivers ?? 0;
+      const maxDrivers = tenant.maxDrivers ?? null;
+      return {
+        tenantId: tenant.id,
+        tenantName: tenant.name,
+        tenantSlug: tenant.slug,
+        isActive: tenant.isActive,
+        drivers,
+        vehicles: u?.vehicles ?? 0,
+        incomes: u?.incomes ?? 0,
+        totalIncome: u?.totalIncome ?? 0,
+        maxDrivers,
+        usagePercentDrivers:
+          maxDrivers && maxDrivers > 0
+            ? Math.round((drivers / maxDrivers) * 100)
+            : null,
+      };
+    });
+  }
+
+  async listSlaDocuments(tenantId: string): Promise<TenantSlaDocument[]> {
+    return this.tenantSlaRepository.find({
+      where: { tenantId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async createSlaDocument(payload: {
+    tenantId: string;
+    title: string;
+    fileName: string;
+    mimeType: string;
+    contentBase64: string;
+    effectiveFrom?: string | null;
+    effectiveTo?: string | null;
+    notes?: string | null;
+  }): Promise<TenantSlaDocument> {
+    const item = this.tenantSlaRepository.create({
+      tenantId: payload.tenantId,
+      title: payload.title,
+      fileName: payload.fileName,
+      mimeType: payload.mimeType,
+      contentBase64: payload.contentBase64,
+      effectiveFrom: payload.effectiveFrom ?? null,
+      effectiveTo: payload.effectiveTo ?? null,
+      notes: payload.notes ?? null,
+    });
+    return this.tenantSlaRepository.save(item);
+  }
+
+  async getSlaDocument(
+    tenantId: string,
+    documentId: string,
+  ): Promise<TenantSlaDocument> {
+    const item = await this.tenantSlaRepository.findOne({
+      where: { id: documentId, tenantId },
+    });
+    if (!item) throw new NotFoundException('SLA document not found');
+    return item;
+  }
+
   async findBySlug(slug: string): Promise<Tenant> {
     const tenant = await this.tenantRepository.findOne({ where: { slug } });
     if (!tenant) {
@@ -116,12 +201,20 @@ export class TenantsService {
     });
 
     // Notify platform admins (optional: skip if disabled via env)
-    if (this.configService.get<boolean>('platform.sendNewTenantCreatedEmail') === false) {
+    if (
+      this.configService.get<boolean>('platform.sendNewTenantCreatedEmail') ===
+      false
+    ) {
       return saved;
     }
-    const notifyEmails = this.configService.get<string>('platform.adminNotifyEmails');
+    const notifyEmails = this.configService.get<string>(
+      'platform.adminNotifyEmails',
+    );
     const recipientList = notifyEmails
-      ? notifyEmails.split(',').map((e) => e.trim()).filter(Boolean)
+      ? notifyEmails
+          .split(',')
+          .map((e) => e.trim())
+          .filter(Boolean)
       : await this.dataSource
           .query(
             `SELECT email FROM "platform"."auth_users" WHERE role = 'PLATFORM_ADMIN' AND is_active = true`,
@@ -162,6 +255,13 @@ export class TenantsService {
       notes?: string | null;
       maxDrivers?: number | null;
       maxStorageMb?: number | null;
+      featureFlags?: string[];
+      missingIncomeReminderEnabled?: boolean;
+      missingIncomeCutoffHour?: number;
+      missingIncomeTimezone?: string;
+      missingIncomeEscalationEnabled?: boolean;
+      missingIncomeEscalationHour?: number;
+      defaultDailyTargetAmount?: number | null;
     },
   ): Promise<Tenant> {
     const tenant = await this.tenantRepository.findOne({ where: { id } });
@@ -222,6 +322,28 @@ export class TenantsService {
     if (data.maxStorageMb !== undefined) {
       tenant.maxStorageMb = data.maxStorageMb;
     }
+    if (data.featureFlags !== undefined) {
+      tenant.featureFlags = data.featureFlags;
+    }
+    if (data.missingIncomeReminderEnabled !== undefined) {
+      tenant.missingIncomeReminderEnabled = data.missingIncomeReminderEnabled;
+    }
+    if (data.missingIncomeCutoffHour !== undefined) {
+      tenant.missingIncomeCutoffHour = data.missingIncomeCutoffHour;
+    }
+    if (data.missingIncomeTimezone !== undefined) {
+      tenant.missingIncomeTimezone = data.missingIncomeTimezone;
+    }
+    if (data.missingIncomeEscalationEnabled !== undefined) {
+      tenant.missingIncomeEscalationEnabled =
+        data.missingIncomeEscalationEnabled;
+    }
+    if (data.missingIncomeEscalationHour !== undefined) {
+      tenant.missingIncomeEscalationHour = data.missingIncomeEscalationHour;
+    }
+    if (data.defaultDailyTargetAmount !== undefined) {
+      tenant.defaultDailyTargetAmount = data.defaultDailyTargetAmount;
+    }
     const saved = await this.tenantRepository.save(tenant);
     await this.auditService.log({
       action: 'tenant.update',
@@ -239,9 +361,15 @@ export class TenantsService {
         enforceIpAllowlist: saved.enforceIpAllowlist,
         allowedIps: saved.allowedIps,
         enforceDeviceAllowlist: saved.enforceDeviceAllowlist,
+        featureFlags: saved.featureFlags,
+        missingIncomeReminderEnabled: saved.missingIncomeReminderEnabled,
+        missingIncomeCutoffHour: saved.missingIncomeCutoffHour,
+        missingIncomeTimezone: saved.missingIncomeTimezone,
+        missingIncomeEscalationEnabled: saved.missingIncomeEscalationEnabled,
+        missingIncomeEscalationHour: saved.missingIncomeEscalationHour,
+        defaultDailyTargetAmount: saved.defaultDailyTargetAmount,
       },
     });
     return saved;
   }
 }
-

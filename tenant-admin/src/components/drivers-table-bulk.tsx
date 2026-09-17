@@ -23,6 +23,7 @@ import {
 import { DriverAvatar } from "./driver-avatar";
 import { TablePagination } from "@/components/table-pagination";
 import { ResetDriverPasswordButton } from "@/components/reset-driver-password-button";
+import { DriverDailyTargetCell } from "@/components/driver-daily-target-cell";
 
 type Driver = {
   id: string;
@@ -31,6 +32,7 @@ type Driver = {
   email: string;
   isActive: boolean;
   mfaEnabled?: boolean;
+  dailyTargetAmount?: number | null;
 };
 
 type SortKey = "name" | "email" | "status" | "mfa";
@@ -331,6 +333,12 @@ export function DriversTableBulk({
                     ))}
                     <th
                       scope="col"
+                      className="hidden lg:table-cell px-3 py-3.5 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50"
+                    >
+                      Daily target
+                    </th>
+                    <th
+                      scope="col"
                       className="hidden sm:table-cell px-3 py-3.5 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50 cursor-pointer select-none hover:bg-zinc-100 dark:hover:bg-zinc-800"
                       onClick={() => toggleSort("mfa")}
                     >
@@ -348,7 +356,7 @@ export function DriversTableBulk({
               <tbody className="divide-y divide-zinc-200 bg-white dark:divide-zinc-800 dark:bg-zinc-950">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                    <td colSpan={7} className="px-4 py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">
                       No drivers match the filters.
                     </td>
                   </tr>
@@ -407,6 +415,16 @@ export function DriversTableBulk({
                             </>
                           )}
                         </span>
+                      </td>
+                      <td className="hidden lg:table-cell whitespace-nowrap px-3 py-4 text-sm">
+                        <DriverDailyTargetCell
+                          driverId={driver.id}
+                          initial={
+                            driver.dailyTargetAmount != null
+                              ? Number(driver.dailyTargetAmount)
+                              : null
+                          }
+                        />
                       </td>
                       <td className="hidden sm:table-cell whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
                         <span
