@@ -35,6 +35,8 @@ import { AddPaymentsTripsAndIncomeStreams1700000000028 } from './migrations/1700
 import { AddGpsTrackingPoints1700000000029 } from './migrations/1700000000029-add-gps-tracking-points';
 import { AddPlatformTenantSlaDocuments1700000000030 } from './migrations/1700000000030-add-platform-tenant-sla-documents';
 import { AddDailyIncomeTargets1700000000031 } from './migrations/1700000000031-add-daily-income-targets';
+import { AddReportRecipientsAndTargetRules1700000000032 } from './migrations/1700000000032-add-report-recipients-and-target-rules';
+import { AddCommercialPackagingAndSys1700000000033 } from './migrations/1700000000033-add-commercial-packaging-and-sys';
 
 export default new DataSource({
   type: 'postgres',
@@ -78,5 +80,7 @@ export default new DataSource({
     AddGpsTrackingPoints1700000000029,
     AddPlatformTenantSlaDocuments1700000000030,
     AddDailyIncomeTargets1700000000031,
+    AddReportRecipientsAndTargetRules1700000000032,
+    AddCommercialPackagingAndSys1700000000033,
   ],
 });

@@ -13,6 +13,7 @@ import { Navigation } from "@/components/navigation";
 import { AuthChecker } from "@/components/auth-checker";
 import { MobileSidebarWrapper } from "@/components/mobile-sidebar-wrapper";
 import { ToastFromUrl } from "@/components/toast-from-url";
+import { SysImpersonationBanner } from "@/components/sys-impersonation-banner";
 import {
   LogOut,
   Bell,
@@ -38,16 +39,23 @@ export default async function RootLayout({
   const isAuthenticated = Boolean(token);
   let pendingMfaUsers: number | null = null;
   let tenantName: string | null = null;
+  let entitlements: string[] | null = null;
   if (isAuthenticated) {
     try {
       const [policy, drivers] = await Promise.all([
-        fetchJson<{ requireMfaUsers?: boolean; tenantName?: string }>("/tenant/policy", { tolerate401: true }),
+        fetchJson<{
+          requireMfaUsers?: boolean;
+          tenantName?: string;
+          entitlements?: string[];
+          featureFlags?: string[];
+        }>("/tenant/policy", { tolerate401: true }),
         fetchJson<Array<{ mfaEnabled?: boolean }>>("/tenant/users", { tolerate401: true }),
       ]);
       if (policy?.requireMfaUsers) {
         pendingMfaUsers = (drivers ?? []).filter(driver => !driver.mfaEnabled).length;
       }
       tenantName = policy?.tenantName ?? null;
+      entitlements = policy?.entitlements ?? policy?.featureFlags ?? null;
     } catch (err) {
       pendingMfaUsers = null;
       tenantName = null;
@@ -81,8 +89,9 @@ export default async function RootLayout({
         <ThemeProvider>
           {isAuthenticated ? (
             <>
+              <SysImpersonationBanner />
               <AuthChecker />
-              <MobileSidebarWrapper tenantName={tenantName} />
+              <MobileSidebarWrapper tenantName={tenantName} entitlements={entitlements} />
               <div className="min-h-screen">
                 {/* Desktop Sidebar */}
                 <aside className="hidden lg:flex lg:flex-col fixed inset-y-0 left-0 z-40 w-72 bg-gradient-to-b from-zinc-900 via-zinc-900 to-zinc-950 border-r border-zinc-800 shadow-2xl">
@@ -107,7 +116,7 @@ export default async function RootLayout({
                     </Link>
                   </div>
                   <div className="flex-1 overflow-y-auto">
-                    <Navigation />
+                    <Navigation entitlements={entitlements} />
                   </div>
                   <div className="shrink-0 p-4 border-t border-zinc-800 space-y-2">
                     <div className="flex items-center justify-between">

@@ -23,6 +23,7 @@ import { HealthModule } from './health/health.module';
 import { TenantMaintenanceModule } from './modules/tenant-maintenance/tenant-maintenance.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { CommercialModule } from './modules/commercial/commercial.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     TenantReportsModule,
     TenantMaintenanceModule,
     WebhooksModule,
+    CommercialModule,
     PlatformAdminModule,
     TenantAdminModule,
     HealthModule,

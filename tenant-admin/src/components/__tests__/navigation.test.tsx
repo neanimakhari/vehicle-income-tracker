@@ -39,6 +39,11 @@ describe("Navigation", () => {
     expect(screen.getByRole("link", { name: /reports/i })).toBeInTheDocument();
   });
 
+  it("renders Target calendar link", () => {
+    render(<Navigation entitlements={null} />);
+    expect(screen.getByRole("link", { name: /target calendar/i })).toBeInTheDocument();
+  });
+
   it("renders Audit Trail link", () => {
     render(<Navigation />);
     expect(screen.getByRole("link", { name: /audit trail/i })).toBeInTheDocument();

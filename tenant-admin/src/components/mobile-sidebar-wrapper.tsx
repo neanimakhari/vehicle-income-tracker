@@ -8,7 +8,13 @@ import { Navigation } from "./navigation";
 import { ThemeToggle } from "./theme-toggle";
 import { Menu, X } from "lucide-react";
 
-export function MobileSidebarWrapper({ tenantName }: { tenantName: string | null }) {
+export function MobileSidebarWrapper({
+  tenantName,
+  entitlements,
+}: {
+  tenantName: string | null;
+  entitlements?: string[] | null;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
 
@@ -60,7 +66,7 @@ export function MobileSidebarWrapper({ tenantName }: { tenantName: string | null
           </button>
         </div>
         <div className="flex-1 overflow-y-auto">
-          <Navigation onLinkClick={() => setIsOpen(false)} />
+          <Navigation onLinkClick={() => setIsOpen(false)} entitlements={entitlements} />
         </div>
         <div className="shrink-0 p-4 border-t border-zinc-800 space-y-2">
           <div className="flex items-center justify-between">

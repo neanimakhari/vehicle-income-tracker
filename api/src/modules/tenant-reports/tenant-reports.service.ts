@@ -4,7 +4,39 @@ import { TenantScopeService } from '../../tenancy/tenant-scope.service';
 import { EmailService } from '../email/email.service';
 import { TenantContextService } from '../../tenancy/tenant-context.service';
 import { TenantsService } from '../tenants/tenants.service';
+import { DailyTargetRulesService } from '../tenants/daily-target-rules.service';
+import { TenantReportRecipientsService } from '../tenants/tenant-report-recipients.service';
 import PDFDocument from 'pdfkit';
+
+export type MonthlyReportData = {
+  period: { startDate: Date; endDate: Date };
+  summary: {
+    totalIncome: number;
+    totalExpenses: number;
+    totalPetrolCost: number;
+    netIncome: number;
+    trips: number;
+  };
+  topVehicles: Array<{ vehicle: string; totalIncome: number; trips: number }>;
+  topDrivers: Array<{ driverName: string; totalIncome: number; trips: number }>;
+  fuelEfficiency: Array<{ vehicle: string; kmPerLitre: number }>;
+  priorMonth: {
+    totalIncome: number;
+    netIncome: number;
+    trips: number;
+    incomeDeltaPct: number | null;
+    netDeltaPct: number | null;
+    tripsDeltaPct: number | null;
+  } | null;
+  dailyIncome: Array<{ date: string; income: number; expenses: number; petrol: number }>;
+  targetHitRate: {
+    driversWithTargetDays: number;
+    hitDays: number;
+    missDays: number;
+    hitPercent: number | null;
+  } | null;
+  maintenanceSpend: number;
+};
 
 @Injectable()
 export class TenantReportsService {
@@ -14,6 +46,8 @@ export class TenantReportsService {
     private readonly emailService: EmailService,
     private readonly tenantContext: TenantContextService,
     private readonly tenantsService: TenantsService,
+    private readonly dailyTargetRulesService: DailyTargetRulesService,
+    private readonly reportRecipientsService: TenantReportRecipientsService,
   ) {}
 
   async getSummary(actor?: { sub?: string; role?: string }) {
@@ -405,7 +439,7 @@ export class TenantReportsService {
     startDate: Date,
     endDate: Date,
     actor?: { sub?: string; role?: string },
-  ) {
+  ): Promise<MonthlyReportData> {
     return this.withTenantQueryRunner(async (queryRunner) => {
       const params: Array<string | number | Date> = [startDate, endDate];
       let whereClause = `WHERE logged_on >= $1 AND logged_on <= $2`;
@@ -414,20 +448,50 @@ export class TenantReportsService {
         whereClause += ` AND driver_id = $3`;
       }
 
-      const [summary, vehicleStats, driverStats, fuelEfficiency] =
-        await Promise.all([
-          queryRunner.query(
-            `SELECT 
+      const priorStart = new Date(startDate);
+      priorStart.setMonth(priorStart.getMonth() - 1);
+      const priorEnd = new Date(startDate);
+      priorEnd.setDate(0);
+      priorEnd.setHours(23, 59, 59, 999);
+      const priorParams: Array<string | number | Date> = [priorStart, priorEnd];
+      let priorWhere = `WHERE logged_on >= $1 AND logged_on <= $2`;
+      if (actor?.role === 'TENANT_USER' && actor.sub) {
+        priorParams.push(actor.sub);
+        priorWhere += ` AND driver_id = $3`;
+      }
+
+      const tenantSlug = this.tenantContext.getTenantId();
+      const tenant = tenantSlug
+        ? await this.tenantsService.findBySlug(tenantSlug)
+        : null;
+      const timezone = tenant?.missingIncomeTimezone ?? 'Africa/Johannesburg';
+      const defaultTarget =
+        tenant?.defaultDailyTargetAmount != null
+          ? Number(tenant.defaultDailyTargetAmount)
+          : null;
+
+      const [
+        summary,
+        vehicleStats,
+        driverStats,
+        fuelEfficiency,
+        priorSummary,
+        dailyRows,
+        maintenanceRows,
+        driverFlatRows,
+      ] = await Promise.all([
+        queryRunner.query(
+          `SELECT 
             COALESCE(SUM(income), 0) AS total_income,
             COALESCE(SUM(expense_price), 0) AS total_expenses,
             COALESCE(SUM(petrol_poured), 0) AS total_petrol_cost,
             COUNT(*) AS trips
           FROM vehicle_incomes
           ${whereClause}`,
-            params,
-          ),
-          queryRunner.query(
-            `SELECT vehicle,
+          params,
+        ),
+        queryRunner.query(
+          `SELECT vehicle,
             COALESCE(SUM(income), 0) AS total_income,
             COUNT(*) AS trips
           FROM vehicle_incomes
@@ -435,10 +499,10 @@ export class TenantReportsService {
           GROUP BY vehicle
           ORDER BY total_income DESC
           LIMIT 10`,
-            params,
-          ),
-          queryRunner.query(
-            `SELECT 
+          params,
+        ),
+        queryRunner.query(
+          `SELECT 
             u.first_name || ' ' || u.last_name AS driver_name,
             COALESCE(SUM(vi.income), 0) AS total_income,
             COUNT(*) AS trips
@@ -448,10 +512,10 @@ export class TenantReportsService {
           GROUP BY u.id, u.first_name, u.last_name
           ORDER BY total_income DESC
           LIMIT 10`,
-            params,
-          ),
-          queryRunner.query(
-            `SELECT vehicle,
+          params,
+        ),
+        queryRunner.query(
+          `SELECT vehicle,
             COALESCE(SUM(petrol_litres), 0) AS total_litres,
             COALESCE(SUM(CASE
               WHEN end_km IS NOT NULL AND starting_km IS NOT NULL AND end_km > starting_km
@@ -462,11 +526,62 @@ export class TenantReportsService {
           ${whereClause}
           GROUP BY vehicle
           HAVING SUM(petrol_litres) > 0`,
-            params,
-          ),
-        ]);
+          params,
+        ),
+        queryRunner.query(
+          `SELECT 
+            COALESCE(SUM(income), 0) AS total_income,
+            COALESCE(SUM(expense_price), 0) AS total_expenses,
+            COALESCE(SUM(petrol_poured), 0) AS total_petrol_cost,
+            COUNT(*) AS trips
+          FROM vehicle_incomes
+          ${priorWhere}`,
+          priorParams,
+        ),
+        queryRunner.query(
+          `SELECT DATE((logged_on AT TIME ZONE 'UTC') AT TIME ZONE $3)::text AS day,
+            COALESCE(SUM(income), 0) AS income,
+            COALESCE(SUM(expense_price), 0) AS expenses,
+            COALESCE(SUM(petrol_poured), 0) AS petrol
+          FROM vehicle_incomes
+          WHERE logged_on >= $1 AND logged_on <= $2
+          ${actor?.role === 'TENANT_USER' && actor.sub ? 'AND driver_id = $4' : ''}
+          GROUP BY day
+          ORDER BY day ASC`,
+          actor?.role === 'TENANT_USER' && actor.sub
+            ? [startDate, endDate, timezone, actor.sub]
+            : [startDate, endDate, timezone],
+        ),
+        queryRunner.query(
+          `SELECT COALESCE(SUM(COALESCE(cost, 0)), 0) AS total
+           FROM maintenance_tasks
+           WHERE is_completed = true
+             AND completed_at IS NOT NULL
+             AND completed_at >= $1 AND completed_at <= $2`,
+          [startDate, endDate],
+        ).catch(() => [{ total: 0 }]),
+        queryRunner.query(
+          `SELECT id, daily_target_amount FROM users WHERE is_active = true`,
+        ),
+      ]);
 
       const summaryData = summary[0];
+      const totalIncome = Number(summaryData.total_income ?? 0);
+      const totalExpenses = Number(summaryData.total_expenses ?? 0);
+      const totalPetrolCost = Number(summaryData.total_petrol_cost ?? 0);
+      const netIncome = totalIncome - totalExpenses - totalPetrolCost;
+      const trips = Number(summaryData.trips ?? 0);
+
+      const prior = priorSummary[0];
+      const priorIncome = Number(prior?.total_income ?? 0);
+      const priorNet =
+        Number(prior?.total_income ?? 0) -
+        Number(prior?.total_expenses ?? 0) -
+        Number(prior?.total_petrol_cost ?? 0);
+      const priorTrips = Number(prior?.trips ?? 0);
+      const pct = (cur: number, prev: number) =>
+        prev === 0 ? (cur === 0 ? 0 : null) : Number((((cur - prev) / prev) * 100).toFixed(1));
+
       const fuelEfficiencyData = fuelEfficiency.map(
         (row: Record<string, string>) => {
           const litres = Number(row.total_litres ?? 0);
@@ -478,17 +593,80 @@ export class TenantReportsService {
         },
       );
 
+      const dailyIncome = dailyRows.map((row: Record<string, string>) => ({
+        date: row.day,
+        income: Number(row.income ?? 0),
+        expenses: Number(row.expenses ?? 0),
+        petrol: Number(row.petrol ?? 0),
+      }));
+
+      let targetHitRate: MonthlyReportData['targetHitRate'] = null;
+      if (tenantSlug) {
+        const rules = await this.dailyTargetRulesService.listForTenant(tenantSlug);
+        const actualByDriverDay = await queryRunner.query(
+          `SELECT driver_id::text AS driver_id,
+            DATE((logged_on AT TIME ZONE 'UTC') AT TIME ZONE $3)::text AS day,
+            COALESCE(SUM(CASE WHEN COALESCE(approval_status, 'auto') IN ('auto', 'approved') THEN income ELSE 0 END), 0) AS actual
+           FROM vehicle_incomes
+           WHERE logged_on >= $1 AND logged_on <= $2
+           GROUP BY driver_id, day`,
+          [startDate, endDate, timezone],
+        );
+        const actualMap = new Map<string, number>();
+        for (const row of actualByDriverDay as Array<Record<string, string>>) {
+          actualMap.set(`${row.driver_id}|${row.day}`, Number(row.actual ?? 0));
+        }
+
+        const startStr = startDate.toISOString().slice(0, 10);
+        const endStr = endDate.toISOString().slice(0, 10);
+        const days: string[] = [];
+        {
+          const cursor = new Date(`${startStr}T12:00:00Z`);
+          const end = new Date(`${endStr}T12:00:00Z`);
+          while (cursor <= end) {
+            days.push(cursor.toISOString().slice(0, 10));
+            cursor.setUTCDate(cursor.getUTCDate() + 1);
+          }
+        }
+
+        let hitDays = 0;
+        let missDays = 0;
+        for (const driver of driverFlatRows as Array<Record<string, string>>) {
+          const personal =
+            driver.daily_target_amount != null && driver.daily_target_amount !== ''
+              ? Number(driver.daily_target_amount)
+              : null;
+          for (const day of days) {
+            const resolved = this.dailyTargetRulesService.resolveForDate(
+              rules,
+              day,
+              driver.id,
+              personal,
+              defaultTarget,
+            );
+            if (resolved.closed || resolved.amount == null) continue;
+            const actual = actualMap.get(`${driver.id}|${day}`) ?? 0;
+            if (actual >= resolved.amount) hitDays += 1;
+            else missDays += 1;
+          }
+        }
+        const total = hitDays + missDays;
+        targetHitRate = {
+          driversWithTargetDays: total,
+          hitDays,
+          missDays,
+          hitPercent: total > 0 ? Number(((hitDays / total) * 100).toFixed(1)) : null,
+        };
+      }
+
       return {
         period: { startDate, endDate },
         summary: {
-          totalIncome: Number(summaryData.total_income ?? 0),
-          totalExpenses: Number(summaryData.total_expenses ?? 0),
-          totalPetrolCost: Number(summaryData.total_petrol_cost ?? 0),
-          netIncome:
-            Number(summaryData.total_income ?? 0) -
-            Number(summaryData.total_expenses ?? 0) -
-            Number(summaryData.total_petrol_cost ?? 0),
-          trips: Number(summaryData.trips ?? 0),
+          totalIncome,
+          totalExpenses,
+          totalPetrolCost,
+          netIncome,
+          trips,
         },
         topVehicles: vehicleStats.map((row: Record<string, string>) => ({
           vehicle: row.vehicle,
@@ -501,8 +679,35 @@ export class TenantReportsService {
           trips: Number(row.trips ?? 0),
         })),
         fuelEfficiency: fuelEfficiencyData,
+        priorMonth: {
+          totalIncome: priorIncome,
+          netIncome: priorNet,
+          trips: priorTrips,
+          incomeDeltaPct: pct(totalIncome, priorIncome),
+          netDeltaPct: pct(netIncome, priorNet),
+          tripsDeltaPct: pct(trips, priorTrips),
+        },
+        dailyIncome,
+        targetHitRate,
+        maintenanceSpend: Number(maintenanceRows?.[0]?.total ?? 0),
       };
     });
+  }
+
+  async resolveMonthlyReportRecipients(
+    tenantSlug: string,
+    overrideEmail?: string,
+  ): Promise<string[]> {
+    if (overrideEmail) return [overrideEmail];
+    const configured =
+      await this.reportRecipientsService.listActiveEmails(tenantSlug);
+    if (configured.length) return configured;
+    const adminUsers = await this.dataSource.query(
+      `SELECT email FROM "platform"."auth_users" WHERE role = 'TENANT_ADMIN' AND tenant_id = $1 AND is_active = true LIMIT 1`,
+      [tenantSlug],
+    );
+    const fallback = adminUsers?.[0]?.email;
+    return fallback ? [fallback] : [];
   }
 
   async sendMonthlyReportEmail(startDate: Date, endDate: Date, email?: string) {
@@ -513,28 +718,187 @@ export class TenantReportsService {
 
     const tenant = await this.tenantsService.findBySlug(tenantId);
     const reportData = await this.getMonthlyReport(startDate, endDate);
-
-    // Get tenant admin email from platform auth_users if not provided
-    let adminEmail = email;
-    if (!adminEmail) {
-      const adminUsers = await this.dataSource.query(
-        `SELECT email FROM "platform"."auth_users" WHERE role = 'TENANT_ADMIN' AND tenant_id = $1 AND is_active = true LIMIT 1`,
-        [tenantId],
-      );
-      adminEmail = adminUsers?.[0]?.email;
+    const recipients = await this.resolveMonthlyReportRecipients(tenantId, email);
+    if (!recipients.length) {
+      throw new Error('No report recipients found for this tenant');
     }
 
-    if (!adminEmail) {
-      throw new Error('No tenant admin email found for this tenant');
-    }
+    const pdf = await this.buildMonthlyReportPdfBuffer(
+      reportData,
+      tenant.name || tenant.slug,
+    );
+    const fileName = `monthly-report-${startDate.toISOString().slice(0, 10)}-${endDate.toISOString().slice(0, 10)}.pdf`;
 
     await this.emailService.sendMonthlyReport(
-      adminEmail,
+      recipients,
       tenant.name || tenant.slug,
       reportData,
+      { filename: fileName, content: pdf },
     );
 
-    return { sent: true, email: adminEmail };
+    return { sent: true, emails: recipients };
+  }
+
+  async buildMonthlyReportPdfBuffer(
+    report: MonthlyReportData,
+    tenantName: string,
+  ): Promise<Buffer> {
+    const chunks: Buffer[] = [];
+    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+
+    const fmt = (n: number) => `R ${n.toFixed(2)}`;
+    const delta = (pct: number | null | undefined) =>
+      pct == null ? 'n/a' : `${pct >= 0 ? '+' : ''}${pct}%`;
+
+    doc
+      .fillColor('#0f766e')
+      .fontSize(20)
+      .text('Monthly Fleet Report', { underline: false });
+    doc.moveDown(0.3);
+    doc.fillColor('#111827').fontSize(11).text(tenantName);
+    doc
+      .fontSize(10)
+      .fillColor('#4b5563')
+      .text(
+        `Period: ${report.period.startDate.toISOString().slice(0, 10)} to ${report.period.endDate.toISOString().slice(0, 10)}`,
+      );
+    doc.moveDown();
+
+    doc.fillColor('#111827').fontSize(13).text('Summary');
+    doc.moveDown(0.3);
+    doc.fontSize(10);
+    doc.text(`Total income: ${fmt(report.summary.totalIncome)}`);
+    doc.text(`Total expenses: ${fmt(report.summary.totalExpenses)}`);
+    doc.text(`Petrol cost: ${fmt(report.summary.totalPetrolCost)}`);
+    doc.text(`Net income: ${fmt(report.summary.netIncome)}`);
+    doc.text(`Trips: ${report.summary.trips}`);
+    doc.text(`Maintenance spend: ${fmt(report.maintenanceSpend)}`);
+    if (report.priorMonth) {
+      doc.moveDown(0.3);
+      doc.text(
+        `Vs prior month — Income: ${delta(report.priorMonth.incomeDeltaPct)}, Net: ${delta(report.priorMonth.netDeltaPct)}, Trips: ${delta(report.priorMonth.tripsDeltaPct)}`,
+      );
+    }
+    if (report.targetHitRate) {
+      doc.text(
+        `Target hit rate: ${report.targetHitRate.hitDays} hit / ${report.targetHitRate.missDays} miss` +
+          (report.targetHitRate.hitPercent != null
+            ? ` (${report.targetHitRate.hitPercent}%)`
+            : ''),
+      );
+    }
+
+    doc.moveDown();
+    this.drawLineChart(
+      doc,
+      'Daily income trend',
+      report.dailyIncome.map((d) => ({
+        label: d.date.slice(8),
+        value: d.income,
+      })),
+    );
+
+    doc.moveDown(1.2);
+    this.drawBarChart(
+      doc,
+      'Top vehicles by income',
+      report.topVehicles.slice(0, 6).map((v) => ({
+        label: v.vehicle.slice(0, 10),
+        value: v.totalIncome,
+      })),
+    );
+
+    if (doc.y > 620) doc.addPage();
+    else doc.moveDown(1.2);
+
+    this.drawBarChart(
+      doc,
+      'Top drivers by income',
+      report.topDrivers.slice(0, 6).map((d) => ({
+        label: d.driverName.slice(0, 12),
+        value: d.totalIncome,
+      })),
+    );
+
+    doc.moveDown(1);
+    doc.fillColor('#111827').fontSize(12).text('Fuel efficiency');
+    report.fuelEfficiency.slice(0, 10).forEach((f, idx) => {
+      doc
+        .fontSize(9)
+        .fillColor('#374151')
+        .text(`${idx + 1}. ${f.vehicle}: ${f.kmPerLitre.toFixed(2)} km/L`);
+    });
+
+    doc.end();
+    await new Promise<void>((resolve) => doc.on('end', () => resolve()));
+    return Buffer.concat(chunks);
+  }
+
+  private drawBarChart(
+    doc: InstanceType<typeof PDFDocument>,
+    title: string,
+    points: Array<{ label: string; value: number }>,
+  ) {
+    doc.fillColor('#111827').fontSize(12).text(title);
+    doc.moveDown(0.3);
+    const chartX = doc.page.margins.left;
+    const chartY = doc.y;
+    const chartW = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const chartH = 110;
+    if (!points.length) {
+      doc.fontSize(9).fillColor('#6b7280').text('No data');
+      doc.y = chartY + 20;
+      return;
+    }
+    const max = Math.max(...points.map((p) => p.value), 1);
+    const barW = Math.min(40, (chartW - 20) / points.length - 8);
+    points.forEach((p, i) => {
+      const h = (p.value / max) * (chartH - 24);
+      const x = chartX + i * ((chartW - 20) / points.length) + 10;
+      const y = chartY + chartH - h;
+      doc.rect(x, y, barW, h).fill('#14b8a6');
+      doc
+        .fillColor('#374151')
+        .fontSize(7)
+        .text(p.label, x - 4, chartY + chartH + 2, {
+          width: barW + 8,
+          align: 'center',
+        });
+    });
+    doc.y = chartY + chartH + 18;
+  }
+
+  private drawLineChart(
+    doc: InstanceType<typeof PDFDocument>,
+    title: string,
+    points: Array<{ label: string; value: number }>,
+  ) {
+    doc.fillColor('#111827').fontSize(12).text(title);
+    doc.moveDown(0.3);
+    const chartX = doc.page.margins.left;
+    const chartY = doc.y;
+    const chartW = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const chartH = 100;
+    if (points.length < 2) {
+      doc.fontSize(9).fillColor('#6b7280').text('Not enough daily data for trend');
+      doc.y = chartY + 20;
+      return;
+    }
+    const max = Math.max(...points.map((p) => p.value), 1);
+    doc
+      .strokeColor('#e5e7eb')
+      .rect(chartX, chartY, chartW, chartH)
+      .stroke();
+    doc.strokeColor('#0d9488').lineWidth(1.5);
+    points.forEach((p, i) => {
+      const x = chartX + (i / (points.length - 1)) * chartW;
+      const y = chartY + chartH - (p.value / max) * (chartH - 8) - 4;
+      if (i === 0) doc.moveTo(x, y);
+      else doc.lineTo(x, y);
+    });
+    doc.stroke();
+    doc.y = chartY + chartH + 12;
   }
 
   async getMonthlyReportPdf(
@@ -547,47 +911,14 @@ export class TenantReportsService {
   }> {
     const report = await this.getMonthlyReport(startDate, endDate);
     const tenantId = this.tenantContext.getTenantId() ?? 'tenant';
-    const chunks: Buffer[] = [];
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
-    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
-    doc.fontSize(18).text('Monthly Fleet Report', { underline: true });
-    doc.moveDown(0.5);
-    doc.fontSize(10).text(`Tenant: ${tenantId}`);
-    doc.text(
-      `Period: ${startDate.toISOString().slice(0, 10)} to ${endDate.toISOString().slice(0, 10)}`,
-    );
-    doc.moveDown();
-    doc.fontSize(12).text('Summary');
-    doc
-      .fontSize(10)
-      .text(`Total income: R ${report.summary.totalIncome.toFixed(2)}`);
-    doc.text(`Total expenses: R ${report.summary.totalExpenses.toFixed(2)}`);
-    doc.text(
-      `Total petrol cost: R ${report.summary.totalPetrolCost.toFixed(2)}`,
-    );
-    doc.text(`Net income: R ${report.summary.netIncome.toFixed(2)}`);
-    doc.text(`Trips: ${report.summary.trips}`);
-    doc.moveDown();
-    doc.fontSize(12).text('Top Vehicles');
-    report.topVehicles.slice(0, 10).forEach((v, idx) => {
-      doc
-        .fontSize(10)
-        .text(
-          `${idx + 1}. ${v.vehicle} - Income: R ${v.totalIncome.toFixed(2)} - Trips: ${v.trips}`,
-        );
-    });
-    doc.moveDown();
-    doc.fontSize(12).text('Top Drivers');
-    report.topDrivers.slice(0, 10).forEach((d, idx) => {
-      doc
-        .fontSize(10)
-        .text(
-          `${idx + 1}. ${d.driverName} - Income: R ${d.totalIncome.toFixed(2)} - Trips: ${d.trips}`,
-        );
-    });
-    doc.end();
-    await new Promise<void>((resolve) => doc.on('end', () => resolve()));
-    const buffer = Buffer.concat(chunks);
+    let tenantName = tenantId;
+    try {
+      const tenant = await this.tenantsService.findBySlug(tenantId);
+      tenantName = tenant.name || tenantId;
+    } catch {
+      /* keep slug */
+    }
+    const buffer = await this.buildMonthlyReportPdfBuffer(report, tenantName);
     return {
       fileName: `monthly-report-${startDate.toISOString().slice(0, 10)}-${endDate.toISOString().slice(0, 10)}.pdf`,
       mimeType: 'application/pdf',
@@ -953,6 +1284,10 @@ export class TenantReportsService {
               day: '2-digit',
             }).format(new Date());
 
+      const rules = tenantSlug
+        ? await this.dailyTargetRulesService.listForTenant(tenantSlug)
+        : [];
+
       const params: Array<string | number> = [timezone, targetDate];
       let driverFilter = '';
       if (actor?.role === 'TENANT_USER' && actor.sub) {
@@ -996,7 +1331,14 @@ export class TenantReportsService {
           row.daily_target_amount != null && row.daily_target_amount !== ''
             ? Number(row.daily_target_amount)
             : null;
-        const target = personal ?? defaultTarget;
+        const resolved = this.dailyTargetRulesService.resolveForDate(
+          rules,
+          targetDate,
+          row.driver_id,
+          personal,
+          defaultTarget,
+        );
+        const target = resolved.closed ? null : resolved.amount;
         const actual = Number(row.actual_income ?? 0);
         const variance = target != null ? actual - target : null;
         const percentHit =
@@ -1009,6 +1351,8 @@ export class TenantReportsService {
           email: row.email,
           personalTarget: personal,
           target,
+          targetSource: resolved.source,
+          closedDay: resolved.closed,
           actual,
           variance,
           shortfall: variance != null && variance < 0 ? Math.abs(variance) : 0,

@@ -1,6 +1,6 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 
-export type AuthRole = 'PLATFORM_ADMIN' | 'TENANT_ADMIN';
+export type AuthRole = 'PLATFORM_ADMIN' | 'TENANT_ADMIN' | 'SYS';
 
 @Entity({ name: 'auth_users', schema: 'platform' })
 export class AuthUser {

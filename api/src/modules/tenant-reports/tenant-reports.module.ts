@@ -7,6 +7,7 @@ import { TenantIncome } from '../tenant-incomes/tenant-income.entity';
 import { EmailModule } from '../email/email.module';
 import { MonthlyReportSchedulerService } from './monthly-report-scheduler.service';
 import { TenantsModule } from '../tenants/tenants.module';
+import { CommercialModule } from '../commercial/commercial.module';
 
 @Module({
   imports: [
@@ -14,11 +15,9 @@ import { TenantsModule } from '../tenants/tenants.module';
     TypeOrmModule.forFeature([TenantIncome]),
     EmailModule,
     forwardRef(() => TenantsModule),
+    CommercialModule,
   ],
   controllers: [TenantReportsController],
   providers: [TenantReportsService, MonthlyReportSchedulerService],
 })
 export class TenantReportsModule {}
-
-
-

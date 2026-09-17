@@ -1,12 +1,21 @@
 import { Body, Controller, Post, Request, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { IsNotEmpty, IsString } from 'class-validator';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
+import { Roles } from './roles.decorator';
 import { MfaVerifyDto } from './dto/mfa-verify.dto';
+
+class ImpersonateDto {
+  @IsString()
+  @IsNotEmpty()
+  tenantSlug: string;
+}
 
 @ApiTags('auth')
 @Controller('auth')
@@ -21,6 +30,22 @@ export class AuthController {
       deviceName: dto.deviceName,
       pushToken: dto.pushToken,
       tenantSlug: dto.tenantSlug?.trim() || undefined,
+    });
+  }
+
+  @Post('impersonate')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PLATFORM_ADMIN', 'SYS')
+  impersonate(
+    @Body() dto: ImpersonateDto,
+    @Request()
+    req: {
+      ip?: string;
+      user: { sub: string; email: string; role: string };
+    },
+  ) {
+    return this.authService.impersonateTenant(req.user, dto.tenantSlug, {
+      ip: req.ip,
     });
   }
 

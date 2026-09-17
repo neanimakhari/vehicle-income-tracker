@@ -172,6 +172,200 @@ export default async function TenantsPage() {
     }
   }
 
+  async function listReportRecipients(slug: string) {
+    "use server";
+    const rows = await fetchJson<
+      Array<{ id: string; email: string; label: string | null; isActive: boolean }>
+    >(`/tenants/${encodeURIComponent(slug)}/report-recipients`);
+    return rows ?? [];
+  }
+
+  async function addReportRecipient(
+    slug: string,
+    data: { email: string; label?: string },
+  ): Promise<{ success: boolean; error?: string }> {
+    "use server";
+    try {
+      const res = await fetch(
+        `${getApiUrl()}/tenants/${encodeURIComponent(slug)}/report-recipients`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(await getAuthHeaders()),
+          },
+          body: JSON.stringify(data),
+        },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const msg =
+          (err as { message?: string | string[] }).message ?? "Failed to add recipient";
+        return {
+          success: false,
+          error: Array.isArray(msg) ? msg.join(", ") : String(msg),
+        };
+      }
+      return { success: true };
+    } catch {
+      return { success: false, error: "Request failed" };
+    }
+  }
+
+  async function updateReportRecipient(
+    slug: string,
+    id: string,
+    data: { isActive?: boolean },
+  ): Promise<{ success: boolean; error?: string }> {
+    "use server";
+    try {
+      const res = await fetch(
+        `${getApiUrl()}/tenants/${encodeURIComponent(slug)}/report-recipients/${id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...(await getAuthHeaders()),
+          },
+          body: JSON.stringify(data),
+        },
+      );
+      if (!res.ok) {
+        return { success: false, error: "Failed to update recipient" };
+      }
+      return { success: true };
+    } catch {
+      return { success: false, error: "Request failed" };
+    }
+  }
+
+  async function deleteReportRecipient(
+    slug: string,
+    id: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    "use server";
+    try {
+      const res = await fetch(
+        `${getApiUrl()}/tenants/${encodeURIComponent(slug)}/report-recipients/${id}`,
+        {
+          method: "DELETE",
+          headers: { ...(await getAuthHeaders()) },
+        },
+      );
+      if (!res.ok) {
+        return { success: false, error: "Failed to delete recipient" };
+      }
+      return { success: true };
+    } catch {
+      return { success: false, error: "Request failed" };
+    }
+  }
+
+  async function enterTenant(
+    slug: string,
+  ): Promise<{ success: boolean; error?: string; url?: string }> {
+    "use server";
+    try {
+      const res = await fetch(`${getApiUrl()}/auth/impersonate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(await getAuthHeaders()),
+        },
+        body: JSON.stringify({ tenantSlug: slug }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return {
+          success: false,
+          error:
+            (err as { message?: string }).message ?? "Failed to enter tenant",
+        };
+      }
+      const data = (await res.json()) as {
+        accessToken: string;
+        tenant: { slug: string; name: string };
+      };
+      const tenantAdminBase =
+        process.env.NEXT_PUBLIC_TENANT_ADMIN_URL ??
+        (process.env.NODE_ENV === "production"
+          ? "https://vit-admin.vehinc.co.za"
+          : "http://localhost:3022");
+      const url = `${tenantAdminBase.replace(/\/$/, "")}/sys-enter?token=${encodeURIComponent(data.accessToken)}&tenant=${encodeURIComponent(data.tenant.slug)}&name=${encodeURIComponent(data.tenant.name)}`;
+      return { success: true, url };
+    } catch {
+      return { success: false, error: "Request failed" };
+    }
+  }
+
+  async function loadCommercialCatalog() {
+    "use server";
+    const [modules, plans] = await Promise.all([
+      fetchJson<Array<{ key: string; name: string; description: string | null }>>(
+        "/platform/commercial/modules",
+      ),
+      fetchJson<
+        Array<{
+          id: string;
+          code: string;
+          name: string;
+          moduleKeys: string[];
+          maxDriversDefault: number | null;
+        }>
+      >("/platform/commercial/plans"),
+    ]);
+    return { modules: modules ?? [], plans: plans ?? [] };
+  }
+
+  async function loadTenantEntitlement(slug: string) {
+    "use server";
+    return fetchJson<{
+      tenantId: string;
+      planId: string | null;
+      moduleOverrides: Record<string, boolean>;
+      entitlements: string[];
+      legacyUnrestricted: boolean;
+      notes: string | null;
+      trialEndsAt: string | null;
+    }>(`/platform/commercial/tenants/${encodeURIComponent(slug)}/entitlements`);
+  }
+
+  async function saveTenantEntitlement(
+    slug: string,
+    data: {
+      planId: string | null;
+      moduleOverrides: Record<string, boolean>;
+      notes?: string | null;
+      syncLimitsFromPlan?: boolean;
+    },
+  ): Promise<{ success: boolean; error?: string }> {
+    "use server";
+    try {
+      const res = await fetch(
+        `${getApiUrl()}/platform/commercial/tenants/${encodeURIComponent(slug)}/entitlements`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...(await getAuthHeaders()),
+          },
+          body: JSON.stringify(data),
+        },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return {
+          success: false,
+          error: (err as { message?: string }).message ?? "Failed to save",
+        };
+      }
+      revalidatePath("/tenants");
+      return { success: true };
+    } catch {
+      return { success: false, error: "Request failed" };
+    }
+  }
+
   return (
     <TenantsClient
       tenants={tenants}
@@ -182,6 +376,14 @@ export default async function TenantsPage() {
       toggleTenant={toggleTenant}
       toggleMfa={toggleMfa}
       toggleUserMfa={toggleUserMfa}
+      listReportRecipients={listReportRecipients}
+      addReportRecipient={addReportRecipient}
+      updateReportRecipient={updateReportRecipient}
+      deleteReportRecipient={deleteReportRecipient}
+      enterTenant={enterTenant}
+      loadCommercialCatalog={loadCommercialCatalog}
+      loadTenantEntitlement={loadTenantEntitlement}
+      saveTenantEntitlement={saveTenantEntitlement}
     />
   );
 }

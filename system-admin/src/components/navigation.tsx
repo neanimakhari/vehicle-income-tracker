@@ -21,6 +21,7 @@ export function Navigation({ onLinkClick }: { onLinkClick?: () => void }) {
     { href: "/health", icon: Activity, label: "Health" },
     { href: "/tenants", icon: Building2, label: "Tenants" },
     { href: "/platform-admins", icon: Users, label: "Platform Admins" },
+    { href: "/sys-accounts", icon: Shield, label: "SYS Accounts" },
     { href: "/tenant-admins", icon: Users, label: "Tenant Admins" },
     { href: "/audit", icon: FileText, label: "Audit Logs" },
     { href: "/alerts", icon: Bell, label: "Alerts" },
