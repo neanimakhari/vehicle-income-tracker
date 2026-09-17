@@ -11,6 +11,9 @@ ENV API_URL=${API_URL}
 # Client-side: public API URL (set at build for production e.g. https://api.yourdomain.com)
 ARG NEXT_PUBLIC_API_URL=
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+# Shown in sidebar footer; keep in sync with package.json version / platform tag
+ARG NEXT_PUBLIC_APP_VERSION=1.0.0
+ENV NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build

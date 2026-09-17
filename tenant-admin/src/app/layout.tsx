@@ -115,7 +115,7 @@ export default async function RootLayout({
                       <ThemeToggle />
                     </div>
                     <div className="text-xs text-zinc-500 font-mono">
-                      v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0"}
+                      v{process.env.NEXT_PUBLIC_APP_VERSION ?? "1.0.0"}
                     </div>
                   </div>
                 </aside>
