@@ -7,7 +7,7 @@ import { CreateDriverModal } from "@/components/create-driver-modal";
 
 async function fetchDrivers() {
   try {
-    const drivers = await fetchJson<Array<{ id: string; firstName: string; lastName: string; email: string; isActive: boolean; mfaEnabled?: boolean }>>(
+    const drivers = await fetchJson<Array<{ id: string; firstName: string; lastName: string; email: string; isActive: boolean; mfaEnabled?: boolean; dailyTargetAmount?: number | null }>>(
       "/tenant/users",
     );
     return drivers ?? [];
@@ -24,7 +24,7 @@ async function fetchPolicy() {
 
 export default async function DriversPage() {
   await requireAuth();
-  let drivers: Array<{ id: string; firstName: string; lastName: string; email: string; isActive: boolean; mfaEnabled?: boolean }> = [];
+  let drivers: Array<{ id: string; firstName: string; lastName: string; email: string; isActive: boolean; mfaEnabled?: boolean; dailyTargetAmount?: number | null }> = [];
   let policy: { requireMfaUsers?: boolean } | null = null;
   
   try {

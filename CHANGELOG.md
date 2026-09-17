@@ -5,6 +5,12 @@ All notable changes to Vehicle Income Tracker (VIT) are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — feature/p0-sa-taxi-ops
+
+### Added
+
+- Daily income **target vs actual**: tenant default + per-driver targets, `GET /tenant/reports/targets/daily`, tenant-admin dashboard panel, Drivers table editor, mobile dashboard card.
+
 ## [1.0.0] — 2026-09-17
 
 First **stable production** platform release (`platform-v1.0.0`). Aligns API, tenant-admin, and system-admin package versions at `1.0.0` (mobile remains `1.0.0+1`).

@@ -30,6 +30,7 @@ type CreateTenantUserPayload = {
 
 type UpdateTenantUserPayload = {
   isActive?: boolean;
+  dailyTargetAmount?: number | null;
 };
 
 @Injectable()
@@ -158,6 +159,9 @@ export class TenantUsersService {
       if (typeof payload.isActive === 'boolean') {
         existing.isActive = payload.isActive;
       }
+      if (payload.dailyTargetAmount !== undefined) {
+        existing.dailyTargetAmount = payload.dailyTargetAmount;
+      }
 
       const saved = await repo.save(existing);
       await this.auditService.log({
@@ -169,6 +173,7 @@ export class TenantUsersService {
         metadata: {
           tenant: this.tenantContext.getTenantId(),
           isActive: saved.isActive,
+          dailyTargetAmount: saved.dailyTargetAmount,
         },
       });
       if (existing.isActive && !saved.isActive) {

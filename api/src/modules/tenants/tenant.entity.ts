@@ -1,4 +1,10 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity({ name: 'tenants', schema: 'platform' })
 export class Tenant {
@@ -66,10 +72,40 @@ export class Tenant {
   @Column({ name: 'max_storage_mb', type: 'int', nullable: true })
   maxStorageMb: number | null;
 
+  @Column({ name: 'feature_flags', type: 'text', array: true, default: '{}' })
+  featureFlags: string[];
+
+  @Column({ name: 'missing_income_reminder_enabled', default: true })
+  missingIncomeReminderEnabled: boolean;
+
+  @Column({ name: 'missing_income_cutoff_hour', type: 'int', default: 21 })
+  missingIncomeCutoffHour: number;
+
+  @Column({
+    name: 'missing_income_timezone',
+    type: 'varchar',
+    default: 'Africa/Johannesburg',
+  })
+  missingIncomeTimezone: string;
+
+  @Column({ name: 'missing_income_escalation_enabled', default: true })
+  missingIncomeEscalationEnabled: boolean;
+
+  @Column({ name: 'missing_income_escalation_hour', type: 'int', default: 8 })
+  missingIncomeEscalationHour: number;
+
+  /** Default daily income target (ZAR) applied when a driver has no personal target */
+  @Column({
+    name: 'default_daily_target_amount',
+    type: 'numeric',
+    nullable: true,
+    default: null,
+  })
+  defaultDailyTargetAmount: number | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }
-

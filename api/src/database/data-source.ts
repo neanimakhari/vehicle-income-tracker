@@ -27,6 +27,14 @@ import { AddIncomeApprovalStatus1700000000020 } from './migrations/1700000000020
 import { AddDriverExpiryUpdateRequests1700000000021 } from './migrations/1700000000021-add-driver-expiry-update-requests';
 import { EnsureIncomeApprovalColumns1700000000022 } from './migrations/1700000000022-ensure-income-approval-columns';
 import { AddMustChangePassword1700000000023 } from './migrations/1700000000023-add-must-change-password';
+import { AddMissingIncomeReminderSettings1700000000024 } from './migrations/1700000000024-add-missing-income-reminder-settings';
+import { AddVehicleDocumentsAndMaintenanceProofs1700000000025 } from './migrations/1700000000025-add-vehicle-documents-and-maintenance-proofs';
+import { AddMultiEntryLogColumns1700000000026 } from './migrations/1700000000026-add-multi-entry-log-columns';
+import { AddNotificationsAndFeatureFlags1700000000027 } from './migrations/1700000000027-add-notifications-and-feature-flags';
+import { AddPaymentsTripsAndIncomeStreams1700000000028 } from './migrations/1700000000028-add-payments-trips-and-income-streams';
+import { AddGpsTrackingPoints1700000000029 } from './migrations/1700000000029-add-gps-tracking-points';
+import { AddPlatformTenantSlaDocuments1700000000030 } from './migrations/1700000000030-add-platform-tenant-sla-documents';
+import { AddDailyIncomeTargets1700000000031 } from './migrations/1700000000031-add-daily-income-targets';
 
 export default new DataSource({
   type: 'postgres',
@@ -62,6 +70,13 @@ export default new DataSource({
     AddDriverExpiryUpdateRequests1700000000021,
     EnsureIncomeApprovalColumns1700000000022,
     AddMustChangePassword1700000000023,
+    AddMissingIncomeReminderSettings1700000000024,
+    AddVehicleDocumentsAndMaintenanceProofs1700000000025,
+    AddMultiEntryLogColumns1700000000026,
+    AddNotificationsAndFeatureFlags1700000000027,
+    AddPaymentsTripsAndIncomeStreams1700000000028,
+    AddGpsTrackingPoints1700000000029,
+    AddPlatformTenantSlaDocuments1700000000030,
+    AddDailyIncomeTargets1700000000031,
   ],
 });
-
