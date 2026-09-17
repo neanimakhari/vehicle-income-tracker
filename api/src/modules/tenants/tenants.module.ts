@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Tenant } from './tenant.entity';
+import { TenantSlaDocument } from './tenant-sla-document.entity';
 import { TenantsController } from './tenants.controller';
 import { TenantPolicyController } from './tenant-policy.controller';
 import { TenantsService } from './tenants.service';
@@ -11,7 +12,12 @@ import { TenancyModule } from '../../tenancy/tenancy.module';
 import { PublicTenantsController } from './public-tenants.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Tenant]), AuditModule, EmailModule, forwardRef(() => TenancyModule)],
+  imports: [
+    TypeOrmModule.forFeature([Tenant, TenantSlaDocument]),
+    AuditModule,
+    EmailModule,
+    forwardRef(() => TenancyModule),
+  ],
   controllers: [TenantsController, TenantPolicyController, PublicTenantsController],
   providers: [TenantsService, TenantSchemasService],
   exports: [TenantsService, TenantSchemasService],
