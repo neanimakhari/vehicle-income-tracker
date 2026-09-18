@@ -87,29 +87,37 @@ export class AuthService {
       deviceName?: string;
       pushToken?: string;
       tenantSlug?: string;
+      clientApp?: string;
     },
   ) {
     const user = await this.validateUser(email, password);
-    // Enforce app separation: tenant admin credentials cannot log into platform and vice versa.
-    const isTenantAdminLogin = context?.tenantSlug != null && context.tenantSlug !== '';
-    if (isTenantAdminLogin) {
+    const clientApp = context?.clientApp?.trim() || '';
+    const requestedSlug = context?.tenantSlug?.trim() || '';
+    const isTenantAdminClient =
+      clientApp === 'tenant-admin' || (!!requestedSlug && clientApp !== 'platform-admin');
+
+    if (isTenantAdminClient) {
       if (user.role !== 'TENANT_ADMIN') {
         throw new UnauthorizedException(
           'This account is for platform/sys admin. Sign in at the system admin app.',
         );
       }
+      const resolvedSlug = requestedSlug || user.tenantId || '';
+      if (!resolvedSlug) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+      if (requestedSlug && user.tenantId && user.tenantId !== requestedSlug) {
+        throw new UnauthorizedException('This account is not for the specified tenant.');
+      }
+      context = { ...context, tenantSlug: resolvedSlug };
     } else {
       if (user.role !== 'PLATFORM_ADMIN' && user.role !== 'SYS') {
         throw new UnauthorizedException(
-          'This account is for tenant admin. Sign in at the tenant admin app with your tenant.',
+          'This account is for tenant admin. Sign in at the tenant admin app.',
         );
       }
     }
-    if (user.role === 'TENANT_ADMIN' && user.tenantId && context?.tenantSlug) {
-      if (user.tenantId !== context.tenantSlug) {
-        throw new UnauthorizedException('This account is not for the specified tenant.');
-      }
-    }
+
     const forceMfaForAdmins =
       this.configService.get<boolean>('auth.forceMfaForAdmins') ?? false;
     const ipAddress = context?.ip ?? null;

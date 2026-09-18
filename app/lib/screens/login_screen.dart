@@ -20,57 +20,29 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _tenantController = TextEditingController();
   final _mfaController = TextEditingController();
   final _api = ApiService();
   bool _isLoading = false;
-  bool _policyLoading = false;
   bool _showPassword = false;
   bool _biometricAvailable = false;
-  Map<String, dynamic>? _tenantPolicy;
-  List<Map<String, dynamic>> _tenants = [];
-  String? _selectedTenantSlug;
+  /// Set after needTenantChoice; used only for that rare multi-org email.
+  String? _chosenTenantSlug;
+  List<Map<String, dynamic>> _tenantChoices = [];
   final LocalAuthentication _auth = LocalAuthentication();
 
   @override
   void initState() {
     super.initState();
-    if (Session.tenantId != null) {
-      _tenantController.text = Session.tenantId!;
-    }
-    _loadTenants();
-     _checkBiometricLogin();
+    _chosenTenantSlug = Session.tenantId;
+    _checkBiometricLogin();
   }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _tenantController.dispose();
     _mfaController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadTenants() async {
-    try {
-      final tenants = await _api.fetchPublicTenants();
-      if (!mounted) return;
-      setState(() {
-        _tenants = tenants;
-        // Keep previously selected tenant if still valid, otherwise pick first.
-        final current = _tenantController.text.trim();
-        if (current.isNotEmpty && tenants.any((t) => t['slug'] == current)) {
-          _selectedTenantSlug = current;
-        } else if (_selectedTenantSlug == null && tenants.isNotEmpty) {
-          _selectedTenantSlug = tenants.first['slug']?.toString();
-        }
-        if (_selectedTenantSlug != null) {
-          _tenantController.text = _selectedTenantSlug!;
-        }
-      });
-    } catch (_) {
-      // Ignore failures; user can still type manually.
-    }
   }
 
   Future<void> _checkBiometricLogin() async {
@@ -89,18 +61,41 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _login() async {
+  Future<void> _login({String? forceTenantSlug}) async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
     setState(() => _isLoading = true);
     try {
+      // Prefer explicit choice, then remembered tenant as a hint; cold start = email-first.
+      final tenantHint = forceTenantSlug ??
+          _chosenTenantSlug ??
+          (Session.tenantId?.isNotEmpty == true ? Session.tenantId : null);
+
       final result = await _api.login(
         email: _emailController.text.trim(),
         password: _passwordController.text,
         mfaToken: _mfaController.text.trim().isEmpty ? null : _mfaController.text.trim(),
-        tenantId: _tenantController.text.trim(),
+        tenantId: tenantHint,
       );
+
+      if (result['needTenantChoice'] == true) {
+        final raw = result['tenants'];
+        final list = (raw is List)
+            ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+            : <Map<String, dynamic>>[];
+        if (!mounted) return;
+        setState(() {
+          _tenantChoices = list;
+          _isLoading = false;
+        });
+        final picked = await _pickTenant(list);
+        if (picked == null || !mounted) return;
+        setState(() => _chosenTenantSlug = picked);
+        await _login(forceTenantSlug: picked);
+        return;
+      }
+
       // Full clear so no stale data from previous user can reappear (memory or storage)
       await Session.clear();
       Session.accessToken = result['accessToken'] as String?;
@@ -109,10 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
       Session.role = result['user']?['role'] as String?;
       Session.userId = result['user']?['id'] as String?;
       Session.mfaEnabled = result['user']?['mfaEnabled'] as bool?;
-      Session.tenantId =
-          _tenantController.text.trim().isNotEmpty
-              ? _tenantController.text.trim()
-              : result['user']?['tenantId'] as String?;
+      Session.tenantId = result['user']?['tenantId'] as String? ?? tenantHint;
       Session.tenantName = result['tenantName'] as String? ?? result['user']?['tenantName'] as String?;
       Session.rememberMe = true;
       Session.mustChangePassword = result['user']?['mustChangePassword'] as bool? ?? false;
@@ -135,6 +127,17 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (!mounted) return;
+      // If remembered tenant fails, retry once as pure email-first.
+      final triedHint = forceTenantSlug ?? _chosenTenantSlug ?? Session.tenantId;
+      if (triedHint != null &&
+          triedHint.isNotEmpty &&
+          forceTenantSlug == null) {
+        _chosenTenantSlug = null;
+        Session.tenantId = null;
+        if (mounted) setState(() => _isLoading = false);
+        await _login(forceTenantSlug: '');
+        return;
+      }
       final message = e.toString();
       if (message.contains('MFA setup required')) {
         if (!mounted) return;
@@ -157,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       builder: (_) => MfaSetupScreen(
                         prefillEmail: _emailController.text.trim(),
                         prefillPassword: _passwordController.text,
-                        prefillTenant: _tenantController.text.trim(),
+                        prefillTenant: Session.tenantId,
                         forceUnauth: true,
                       ),
                     ),
@@ -179,18 +182,10 @@ class _LoginScreenState extends State<LoginScreen> {
         String? friendly;
         if (message.contains('Invalid credentials') || message.contains('incorrect password')) {
           friendly = 'Incorrect email or password.';
-        } else if (message.contains('Tenant not found') || message.contains('Tenant context missing')) {
-          friendly = 'Tenant not found. Please check the tenant selection.';
         } else if (message.contains('Invalid MFA token')) {
           friendly = 'Invalid MFA code. Please try again.';
         } else if (message.contains('Account locked')) {
           friendly = 'Account locked. Please try again later.';
-        } else if (message.contains('Sign in at the tenant admin app')) {
-          friendly = 'This account is for tenant admins. Please sign in in the tenant admin app.';
-        } else if (message.contains('Sign in at the system admin app')) {
-          friendly = 'This account is for platform admins. Please sign in in the system admin app.';
-        } else if (message.contains('not for the specified tenant')) {
-          friendly = 'This account is not for the selected tenant.';
         }
         if (friendly != null) {
           AppToast.error(context, friendly);
@@ -203,6 +198,34 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<String?> _pickTenant(List<Map<String, dynamic>> tenants) async {
+    if (tenants.isEmpty) return null;
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Choose company'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: tenants.length,
+            itemBuilder: (_, i) {
+              final t = tenants[i];
+              final slug = t['slug']?.toString() ?? '';
+              final name = (t['name']?.toString().trim().isNotEmpty == true)
+                  ? t['name'].toString()
+                  : slug;
+              return ListTile(
+                title: Text(name),
+                onTap: () => Navigator.pop(ctx, slug),
+              );
+            },
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _loginWithBiometrics() async {
@@ -241,28 +264,6 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  Future<void> _checkPolicy() async {
-    final tenantId = _tenantController.text.trim();
-    if (tenantId.isEmpty) {
-      AppToast.error(context, 'Enter a tenant slug first');
-      return;
-    }
-    setState(() => _policyLoading = true);
-    try {
-      final policy = await _api.fetchTenantPolicyPublic(tenantId);
-      if (!mounted) return;
-      setState(() => _tenantPolicy = policy);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _tenantPolicy = null);
-      AppToast.error(context, 'Unable to load policy', e);
-    } finally {
-      if (mounted) {
-        setState(() => _policyLoading = false);
       }
     }
   }
@@ -357,105 +358,31 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                _tenants.isNotEmpty
-                                    ? DropdownButtonFormField<String>(
-                                        value: _selectedTenantSlug,
-                                        items: _tenants
-                                            .map(
-                                              (t) => DropdownMenuItem<String>(
-                                                value: t['slug']?.toString(),
-                                                child: Text(
-                                                  (t['name']?.toString().trim().isNotEmpty == true
-                                                          ? t['name']?.toString()
-                                                          : t['slug']?.toString()) ??
-                                                      '',
-                                                ),
-                                              ),
-                                            )
-                                            .toList(),
-                                        onChanged: (value) {
-                                          setState(() {
-                                            _selectedTenantSlug = value;
-                                            _tenantController.text = value ?? '';
-                                            _tenantPolicy = null;
-                                          });
-                                        },
-                                        decoration: InputDecoration(
-                                          filled: true,
-                                          fillColor: (isDarkMode ? Colors.black : Colors.white).withOpacity(0.35),
-                                          labelText: 'Tenant',
-                                          labelStyle: TextStyle(
-                                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                          ),
-                                          floatingLabelStyle: const TextStyle(color: AppTheme.primary),
-                                          prefixIcon: Icon(
-                                            Icons.business_outlined,
-                                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                          ),
-                                        ),
-                                        validator: (value) {
-                                          if (value == null || value.isEmpty) {
-                                            return 'Tenant is required';
-                                          }
-                                          return null;
-                                        },
-                                      )
-                                    : TextFormField(
-                                        controller: _tenantController,
-                                        cursorColor: AppTheme.primary,
-                                        decoration: InputDecoration(
-                                          filled: true,
-                                          fillColor: (isDarkMode ? Colors.black : Colors.white).withOpacity(0.35),
-                                          labelText: 'Tenant',
-                                          labelStyle: TextStyle(
-                                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                          ),
-                                          floatingLabelStyle: const TextStyle(color: AppTheme.primary),
-                                          hintText: 'e.g. demo',
-                                          hintStyle: TextStyle(
-                                            color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
-                                          ),
-                                          prefixIcon: Icon(
-                                            Icons.business_outlined,
-                                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                          ),
-                                        ),
-                                        style: TextStyle(
-                                          color: isDarkMode ? Colors.white : Colors.black87,
-                                        ),
-                                        textCapitalization: TextCapitalization.none,
-                                        validator: (value) {
-                                          if (value == null || value.isEmpty) {
-                                            return 'Tenant is required';
-                                          }
-                                          return null;
-                                        },
-                                      ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        _policyLoading
-                                            ? 'Checking tenant policy...'
-                                            : (_tenantPolicy == null
-                                                ? 'Need MFA? Check tenant policy.'
-                                                : (_tenantPolicy?['requireMfaUsers'] == true
-                                                    ? 'Tenant requires driver MFA.'
-                                                    : 'Tenant MFA optional.')),
-                                        style: TextStyle(
-                                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                          fontSize: 12,
-                                        ),
-                                      ),
+                                if (_tenantChoices.isNotEmpty) ...[
+                                  Text(
+                                    'Select your company to continue',
+                                    style: TextStyle(
+                                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                      fontSize: 13,
                                     ),
-                                    TextButton(
-                                      onPressed: _policyLoading ? null : _checkPolicy,
-                                      child: const Text('Check'),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 20),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ..._tenantChoices.map((t) {
+                                    final slug = t['slug']?.toString() ?? '';
+                                    final name = (t['name']?.toString().trim().isNotEmpty == true)
+                                        ? t['name'].toString()
+                                        : slug;
+                                    return ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: Text(name, style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87)),
+                                      trailing: _chosenTenantSlug == slug
+                                          ? const Icon(Icons.check, color: AppTheme.primary)
+                                          : null,
+                                      onTap: () => setState(() => _chosenTenantSlug = slug),
+                                    );
+                                  }),
+                                  const SizedBox(height: 12),
+                                ],
                                 AutofillGroup(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.stretch,

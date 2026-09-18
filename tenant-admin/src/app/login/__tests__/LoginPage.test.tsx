@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import LoginPage from "../page";
 
-// Mock the server action so we don't trigger real auth
 vi.mock("@/lib/auth-actions", () => ({
   loginAction: vi.fn(() => Promise.resolve(null)),
 }));
@@ -13,14 +12,14 @@ describe("LoginPage", () => {
     expect(screen.getByRole("heading", { name: /welcome back/i })).toBeInTheDocument();
   });
 
-  it("renders sign in subtitle", () => {
+  it("renders email-first subtitle", () => {
     render(<LoginPage />);
-    expect(screen.getByText(/sign in to your tenant admin account/i)).toBeInTheDocument();
+    expect(screen.getByText(/sign in with your tenant admin email/i)).toBeInTheDocument();
   });
 
-  it("renders tenant input", () => {
+  it("does not render tenant picker", () => {
     render(<LoginPage />);
-    expect(screen.getByRole("option", { name: /select your tenant/i })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /select your tenant/i })).not.toBeInTheDocument();
   });
 
   it("renders email input", () => {
@@ -45,5 +44,3 @@ describe("LoginPage", () => {
     expect(link).toHaveAttribute("href", "/forgot-password");
   });
 });
-
-

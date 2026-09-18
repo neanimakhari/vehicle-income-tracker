@@ -13,6 +13,11 @@ export class TenantContextService {
     this.storage.run({ tenantId }, callback);
   }
 
+  /** Run async work under a specific tenant (e.g. email-first login probes). */
+  runAsync<T>(tenantId: string | null, callback: () => Promise<T>): Promise<T> {
+    return this.storage.run({ tenantId }, callback);
+  }
+
   getTenantId(): string | null {
     return this.storage.getStore()?.tenantId ?? null;
   }

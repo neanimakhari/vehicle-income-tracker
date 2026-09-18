@@ -39,6 +39,7 @@ import { AddReportRecipientsAndTargetRules1700000000032 } from './migrations/170
 import { AddCommercialPackagingAndSys1700000000033 } from './migrations/1700000000033-add-commercial-packaging-and-sys';
 import { AddScholarStaffTransport1700000000034 } from './migrations/1700000000034-add-scholar-staff-transport';
 import { AddPlatformSettingsAndSysEnter1700000000035 } from './migrations/1700000000035-add-platform-settings-and-sys-enter';
+import { AddDriverEmailIndex1700000000036 } from './migrations/1700000000036-add-driver-email-index';
 
 export default new DataSource({
   type: 'postgres',
@@ -86,5 +87,6 @@ export default new DataSource({
     AddCommercialPackagingAndSys1700000000033,
     AddScholarStaffTransport1700000000034,
     AddPlatformSettingsAndSysEnter1700000000035,
+    AddDriverEmailIndex1700000000036,
   ],
 });

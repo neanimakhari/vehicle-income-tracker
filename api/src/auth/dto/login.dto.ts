@@ -31,6 +31,15 @@ export class LoginDto {
   @IsOptional()
   deviceName?: string;
 
+  @ApiProperty({
+    example: 'tenant-admin',
+    required: false,
+    description: 'tenant-admin | platform-admin — separates apps when tenantSlug is omitted',
+  })
+  @IsString()
+  @IsOptional()
+  clientApp?: string;
+
   @ApiProperty({ example: 'push-token', required: false })
   @IsString()
   @IsOptional()

@@ -44,6 +44,7 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
         email,
         password,
         mfaToken: mfaToken || undefined,
+        clientApp: "platform-admin",
       }),
     });
 

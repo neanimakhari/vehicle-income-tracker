@@ -108,9 +108,17 @@ export function CreateTenantModal({ isOpen, onClose, createTenant }: CreateTenan
             <input
               name="slug"
               required
+              pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+              title="Lowercase letters, numbers, and hyphens only"
               className="input w-full px-3 py-2 text-sm"
-              placeholder="e.g. acme-transport"
+              placeholder="e.g. nei-m"
             />
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              Admin URL:{" "}
+              <span className="font-mono text-teal-700 dark:text-teal-400">
+                https://vit-admin.vehinc.co.za/&lt;slug&gt;
+              </span>
+            </p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Contact name</label>

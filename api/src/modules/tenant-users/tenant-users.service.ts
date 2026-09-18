@@ -19,6 +19,7 @@ import { Repository } from 'typeorm';
 import { Tenant } from '../tenants/tenant.entity';
 import { WebhooksService } from '../webhooks/webhooks.service';
 import { TenantSchemasService } from '../tenants/tenants.schemas.service';
+import { DriverEmailIndexService } from './driver-email-index.service';
 
 type CreateTenantUserPayload = {
   firstName: string;
@@ -44,6 +45,7 @@ export class TenantUsersService {
     private readonly configService: ConfigService,
     private readonly webhooksService: WebhooksService,
     private readonly tenantSchemasService: TenantSchemasService,
+    private readonly driverEmailIndex: DriverEmailIndexService,
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
   ) {}
@@ -137,6 +139,10 @@ export class TenantUsersService {
           email: saved.email,
         },
       });
+      const slug = this.tenantContext.getTenantId();
+      if (slug) {
+        await this.driverEmailIndex.upsert(saved.email, slug, saved.id);
+      }
       return saved;
     });
   }
@@ -183,6 +189,15 @@ export class TenantUsersService {
           firstName: saved.firstName,
           lastName: saved.lastName,
         });
+        const slug = this.tenantContext.getTenantId();
+        if (slug) {
+          await this.driverEmailIndex.remove(saved.email, slug);
+        }
+      } else if (!existing.isActive && saved.isActive) {
+        const slug = this.tenantContext.getTenantId();
+        if (slug) {
+          await this.driverEmailIndex.upsert(saved.email, slug, saved.id);
+        }
       }
       return saved;
     });
@@ -200,6 +215,10 @@ export class TenantUsersService {
         throw new NotFoundException('User not found');
       }
       await repo.remove(existing);
+      const slug = this.tenantContext.getTenantId();
+      if (slug) {
+        await this.driverEmailIndex.remove(existing.email, slug);
+      }
       await this.auditService.log({
         action: 'tenant.user.delete',
         actorUserId: null,

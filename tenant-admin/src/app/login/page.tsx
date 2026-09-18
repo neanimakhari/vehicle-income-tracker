@@ -1,13 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Eye, EyeOff, Lock, Mail, Shield, ArrowRight, BookmarkCheck } from "lucide-react";
 import { loginAction } from "@/lib/auth-actions";
 import Link from "next/link";
 import Image from "next/image";
-import { getApiUrl } from "@/lib/api-client";
-
-type TenantOption = { slug: string; name?: string };
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -15,26 +12,6 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<{ error: string; message?: string } | null>(null);
-  const [tenants, setTenants] = useState<TenantOption[]>([]);
-  const [tenantSlug, setTenantSlug] = useState<string>("");
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadTenants() {
-      try {
-        const res = await fetch(`${getApiUrl()}/public/tenants`, { cache: "no-store" });
-        if (!res.ok) return;
-        const data = (await res.json()) as TenantOption[];
-        if (!cancelled && Array.isArray(data)) setTenants(data);
-      } catch {
-        // ignore - tenant dropdown remains manual fallback
-      }
-    }
-    loadTenants();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -46,7 +23,6 @@ export default function LoginPage() {
       const result = await loginAction(formData);
       if (result?.error) setError(result);
     } catch (e) {
-      // Server Action redirect() throws; let it propagate so Next.js can handle navigation
       const err = e as { digest?: string };
       if (typeof err?.digest === "string" && err.digest.startsWith("NEXT_REDIRECT")) throw e;
       setError({ error: "invalid", message: "Something went wrong. Please try again." });
@@ -55,13 +31,16 @@ export default function LoginPage() {
     }
   }
 
-  const displayMessage = error?.message ?? (error?.error === "missing" ? "Tenant, email and password are required." : error ? "Login failed." : null);
+  const displayMessage =
+    error?.message ??
+    (error?.error === "missing" ? "Email and password are required." : error ? "Login failed." : null);
 
   return (
     <div
       className="min-h-screen flex items-center justify-center px-4 py-12 relative overflow-hidden"
       style={{
-        background: "linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(13,148,136,0.6) 50%, rgba(0,0,0,0.85) 100%), url('/bg.jpg') center/cover no-repeat",
+        background:
+          "linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(13,148,136,0.6) 50%, rgba(0,0,0,0.85) 100%), url('/bg.jpg') center/cover no-repeat",
         backgroundColor: "#0a0a0a",
       }}
     >
@@ -78,7 +57,7 @@ export default function LoginPage() {
             />
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">Welcome Back</h1>
-          <p className="text-teal-200/90">Sign in to your tenant admin account</p>
+          <p className="text-teal-200/90">Sign in with your tenant admin email</p>
         </div>
 
         <div className="bg-zinc-900/95 backdrop-blur rounded-2xl shadow-xl border border-zinc-700 p-8 text-white">
@@ -89,27 +68,6 @@ export default function LoginPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">Tenant</label>
-              <select
-                name="tenantSlug"
-                required
-                value={tenantSlug}
-                onChange={(e) => setTenantSlug(e.target.value)}
-                className="block w-full px-3 py-3 border border-zinc-600 rounded-lg bg-zinc-800/80 text-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              >
-                <option value="">Select your tenant</option>
-                {tenants.map((t) => (
-                  <option key={t.slug} value={t.slug}>
-                    {t.name ? `${t.name} (${t.slug})` : t.slug}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-xs text-zinc-400">
-                Choose the tenant you belong to. If you don&apos;t see it, contact support.
-              </p>
-            </div>
-
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-2">Email Address</label>
               <div className="relative">
@@ -215,17 +173,23 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-6 pt-6 border-t border-zinc-700 flex flex-wrap items-center justify-center gap-4 text-xs text-zinc-400">
-            <Link href="/privacy" className="hover:text-teal-400">Privacy Policy</Link>
+            <Link href="/privacy" className="hover:text-teal-400">
+              Privacy Policy
+            </Link>
             <span className="hidden sm:inline">•</span>
-            <Link href="/terms" className="hover:text-teal-400">Terms of Service</Link>
+            <Link href="/terms" className="hover:text-teal-400">
+              Terms of Service
+            </Link>
             <span className="hidden sm:inline">•</span>
-            <Link href="/help" className="hover:text-teal-400">Help & Support</Link>
+            <Link href="/help" className="hover:text-teal-400">
+              Help & Support
+            </Link>
           </div>
         </div>
 
         <p className="mt-6 text-center text-xs text-teal-200/80 flex items-center justify-center gap-1">
           <Lock className="w-3 h-3" />
-          Secure login
+          Secure login — your company is resolved from your email
         </p>
       </div>
     </div>
