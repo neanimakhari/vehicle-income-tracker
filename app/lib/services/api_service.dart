@@ -420,6 +420,24 @@ class ApiService {
     return _decodeObject(response, errorPrefix: 'Failed to fetch expiry status');
   }
 
+  /// Public platform banner (no auth). Returns enabled/severity/message/blockWrites.
+  Future<Map<String, dynamic>?> fetchActiveAnnouncement() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/platform/announcement/active'))
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode < 200 || response.statusCode >= 300) return null;
+      final json = jsonDecode(response.body);
+      if (json is! Map<String, dynamic>) return null;
+      if (json['enabled'] != true) return null;
+      final message = json['message']?.toString().trim() ?? '';
+      if (message.isEmpty) return null;
+      return json;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<Map<String, dynamic>> createExpiryUpdateRequest({
     String? requestedLicenseExpiry,
     String? requestedPrdpExpiry,
