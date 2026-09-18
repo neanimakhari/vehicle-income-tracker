@@ -18,8 +18,10 @@ import { DeviceBinding } from '../../auth/device-binding.entity';
 import { AuditService } from '../audit/audit.service';
 import { randomUUID } from 'crypto';
 import { EmailService } from '../email/email.service';
+import { DriverEmailIndexService } from './driver-email-index.service';
 
 const EMAIL_OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+const MAX_EMAIL_LOGIN_CANDIDATES = 5;
 
 @Injectable()
 export class TenantAuthService {
@@ -42,6 +44,7 @@ export class TenantAuthService {
     private readonly deviceBindingRepository: Repository<DeviceBinding>,
     private readonly auditService: AuditService,
     private readonly emailService: EmailService,
+    private readonly driverEmailIndex: DriverEmailIndexService,
   ) {}
 
   private getTenantRepo() {
@@ -89,6 +92,20 @@ export class TenantAuthService {
     });
   }
 
+  /** Password check without lockout side-effects (email-first multi-tenant probe). */
+  private async passwordMatchesInCurrentTenant(
+    email: string,
+    password: string,
+  ): Promise<boolean> {
+    const tenantRepo = this.getTenantRepo();
+    return tenantRepo.withSchema(async (repo) => {
+      const user = await repo.findOne({ where: { email } });
+      if (!user || !user.isActive) return false;
+      if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) return false;
+      return bcrypt.compare(password, user.passwordHash);
+    });
+  }
+
   async login(
     email: string,
     password: string,
@@ -100,10 +117,84 @@ export class TenantAuthService {
       pushToken?: string;
     },
   ) {
-    const tenantSlug = this.tenantContext.getTenantId();
-    if (!tenantSlug) {
-      throw new UnauthorizedException('Tenant context missing');
+    const headerTenant = this.tenantContext.getTenantId()?.trim() || null;
+
+    if (headerTenant) {
+      return this.loginInTenant(headerTenant, email, password, mfaToken, context);
     }
+
+    const indexed = await this.driverEmailIndex.findTenantsByEmail(email);
+    const candidates = indexed
+      .map((r) => r.tenantSlug)
+      .filter(Boolean)
+      .slice(0, MAX_EMAIL_LOGIN_CANDIDATES);
+
+    if (candidates.length === 0) {
+      await this.auditService.log({
+        action: 'tenant.auth.login_failed',
+        actorUserId: null,
+        actorRole: null,
+        targetType: null,
+        targetId: null,
+        metadata: { email, reason: 'no_index' },
+      });
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const matches: Array<{ slug: string; name: string }> = [];
+    for (const slug of candidates) {
+      try {
+        const ok = await this.tenantContext.runAsync(slug, () =>
+          this.passwordMatchesInCurrentTenant(email, password),
+        );
+        if (!ok) continue;
+        const tenant = await this.tenantRepository.findOne({
+          where: { slug, isActive: true },
+        });
+        if (tenant) {
+          matches.push({ slug: tenant.slug, name: tenant.name });
+        }
+      } catch {
+        // schema missing / other — skip
+      }
+    }
+
+    if (matches.length === 0) {
+      await this.auditService.log({
+        action: 'tenant.auth.login_failed',
+        actorUserId: null,
+        actorRole: null,
+        targetType: null,
+        targetId: null,
+        metadata: { email, reason: 'no_password_match' },
+      });
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (matches.length > 1) {
+      return {
+        needTenantChoice: true as const,
+        tenants: matches,
+      };
+    }
+
+    return this.tenantContext.runAsync(matches[0].slug, () =>
+      this.loginInTenant(matches[0].slug, email, password, mfaToken, context),
+    );
+  }
+
+  private async loginInTenant(
+    tenantSlug: string,
+    email: string,
+    password: string,
+    mfaToken?: string,
+    context?: {
+      ip?: string;
+      deviceId?: string;
+      deviceName?: string;
+      pushToken?: string;
+    },
+  ) {
     let user;
     try {
       user = await this.validateUser(email, password);
@@ -125,7 +216,7 @@ export class TenantAuthService {
         where: { slug: tenantSlug },
       });
       if (!tenant) {
-        throw new UnauthorizedException('Tenant not found');
+        throw new UnauthorizedException('Invalid credentials');
       }
       if (!user.mfaEnabled) {
         if (tenant?.requireMfaUsers) {
@@ -157,9 +248,7 @@ export class TenantAuthService {
           deviceBindingId = device?.id ?? null;
         }
       } catch (deviceError) {
-        // Log device binding errors but don't fail login if device binding is optional
         console.error('Device binding error (non-fatal):', deviceError);
-        // Only fail if device allowlist is enforced
         if (tenant?.enforceDeviceAllowlist) {
           throw deviceError;
         }
@@ -204,7 +293,6 @@ export class TenantAuthService {
         });
       } catch (saveError) {
         console.error('Error saving user login info (non-fatal):', saveError);
-        // Continue even if saving login info fails
       }
 
       try {
@@ -229,13 +317,13 @@ export class TenantAuthService {
         }
       } catch (auditError) {
         console.error('Error logging audit (non-fatal):', auditError);
-        // Continue even if audit logging fails
       }
 
       return {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         deviceBindingId,
+        tenantName: tenant.name,
         user: {
           id: user.id,
           email: user.email,
@@ -249,25 +337,16 @@ export class TenantAuthService {
       };
     } catch (error) {
       console.error('Login error:', error);
-      // Re-throw UnauthorizedException as-is so the client gets the real message
       if (error instanceof UnauthorizedException) {
         throw error;
       }
-      // Surface common causes with user-friendly messages
       const msg = error instanceof Error ? error.message : String(error);
       if (
         msg.includes('does not exist') ||
         msg.includes('relation') ||
         msg.includes('schema')
       ) {
-        throw new UnauthorizedException(
-          'Tenant not found or not set up. Check the tenant slug or contact your administrator.',
-        );
-      }
-      if (msg.includes('Tenant not found') || msg.includes('tenant')) {
-        throw new UnauthorizedException(
-          'Tenant not found. Please check the tenant slug.',
-        );
+        throw new UnauthorizedException('Invalid credentials');
       }
       throw new UnauthorizedException('Login failed. Please try again.');
     }

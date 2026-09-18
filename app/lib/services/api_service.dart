@@ -19,13 +19,14 @@ class ApiService {
     String? pushToken,
   }) async {
     try {
+      final hasTenant = tenantId != null && tenantId.isNotEmpty;
       print('API Login: POST $baseUrl/tenant/auth/login');
-      print('Headers: ${tenantId != null && tenantId.isNotEmpty ? 'X-Tenant-Id: $tenantId' : 'No tenant ID'}');
+      print('Headers: ${hasTenant ? 'X-Tenant-Id: $tenantId' : 'email-first (no tenant header)'}');
       final response = await http.post(
         Uri.parse('$baseUrl/tenant/auth/login'),
         headers: {
           'Content-Type': 'application/json',
-          if (tenantId != null && tenantId.isNotEmpty) 'X-Tenant-Id': tenantId,
+          if (hasTenant) 'X-Tenant-Id': tenantId,
         },
         body: jsonEncode({
           'email': email,

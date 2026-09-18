@@ -19,7 +19,6 @@ export class TenantAuthController {
   constructor(private readonly tenantAuthService: TenantAuthService) {}
 
   @Post('login')
-  @UseGuards(TenantContextGuard)
   async login(@Body() dto: TenantLoginDto, @Request() req: { ip?: string }) {
     try {
       return await this.tenantAuthService.login(dto.email, dto.password, dto.mfaToken, {

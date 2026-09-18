@@ -22,6 +22,8 @@ import { TenantsModule } from '../tenants/tenants.module';
 import { TenantMobileAppController } from './tenant-mobile-app.controller';
 import { PublicMobileAppController } from '../tenants/public-mobile-app.controller';
 import { MobileAppDownloadService } from './mobile-app-download.service';
+import { DriverEmailIndex } from './driver-email-index.entity';
+import { DriverEmailIndexService } from './driver-email-index.service';
 
 @Module({
   imports: [
@@ -31,7 +33,15 @@ import { MobileAppDownloadService } from './mobile-app-download.service';
     AuthModule,
     EmailModule,
     WebhooksModule,
-    TypeOrmModule.forFeature([Tenant, TenantUser, DriverDocument, DriverExpiryUpdateRequest, RefreshToken, DeviceBinding]),
+    TypeOrmModule.forFeature([
+      Tenant,
+      TenantUser,
+      DriverDocument,
+      DriverExpiryUpdateRequest,
+      RefreshToken,
+      DeviceBinding,
+      DriverEmailIndex,
+    ]),
   ],
   controllers: [
     TenantUsersController,
@@ -46,8 +56,9 @@ import { MobileAppDownloadService } from './mobile-app-download.service';
     TenantAuthService,
     DriverProfileService,
     MobileAppDownloadService,
+    DriverEmailIndexService,
   ],
-  exports: [DriverProfileService, MobileAppDownloadService],
+  exports: [DriverProfileService, MobileAppDownloadService, DriverEmailIndexService],
 })
 export class TenantUsersModule {}
 

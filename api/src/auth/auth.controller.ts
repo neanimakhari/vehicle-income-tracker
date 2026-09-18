@@ -30,6 +30,7 @@ export class AuthController {
       deviceName: dto.deviceName,
       pushToken: dto.pushToken,
       tenantSlug: dto.tenantSlug?.trim() || undefined,
+      clientApp: dto.clientApp?.trim() || undefined,
     });
   }
 
