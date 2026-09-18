@@ -13,6 +13,7 @@ import '../screens/maintenance_screen.dart';
 import '../screens/audit_screen.dart';
 import '../screens/alerts_screen.dart';
 import '../screens/change_password_screen.dart';
+import '../screens/transport_screen.dart';
 
 /// Performs logout: confirmation, clear session/security/offline queue, then navigate to login.
 Future<void> _performLogout(BuildContext context) async {
@@ -159,6 +160,14 @@ class AppSidebar extends StatelessWidget {
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const MaintenanceScreen()));
+              },
+            ),
+            _ListTile(
+              icon: Icons.directions_bus_outlined,
+              label: 'Scholar & staff',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const TransportScreen()));
               },
             ),
             const SizedBox(height: 16),

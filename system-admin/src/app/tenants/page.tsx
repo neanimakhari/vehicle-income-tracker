@@ -1,5 +1,5 @@
 import { revalidatePath } from "next/cache";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, getAuthRole } from "@/lib/auth";
 import { fetchJson, getApiUrl, getAuthHeaders } from "../../lib/api";
 import { TenantsClient } from "./TenantsClient";
 
@@ -22,6 +22,7 @@ async function fetchTenants() {
       taxId?: string | null;
       website?: string | null;
       notes?: string | null;
+      allowSysEnter?: boolean;
     }>
   >("/tenants");
   return tenants ?? [];
@@ -51,6 +52,8 @@ async function fetchTenantUsage() {
 
 export default async function TenantsPage() {
   await requireAuth();
+  const role = await getAuthRole();
+  const isSys = role === "SYS";
   const [tenants, admins, usage] = await Promise.all([
     fetchTenants(),
     fetchTenantAdmins(),
@@ -65,7 +68,7 @@ export default async function TenantsPage() {
       return { success: false, error: "Name and slug are required" };
     }
     try {
-      const res = await fetch(`${getApiUrl()}/tenants`, {
+      const res = await fetch(`${getApiUrl()}/platform/tenants/from-template`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -77,9 +80,8 @@ export default async function TenantsPage() {
           contactName: (formData.get("contactName") as string) || undefined,
           contactEmail: (formData.get("contactEmail") as string) || undefined,
           contactPhone: (formData.get("contactPhone") as string) || undefined,
-          address: (formData.get("address") as string) || undefined,
-          registrationNumber: (formData.get("registrationNumber") as string) || undefined,
-          website: (formData.get("website") as string) || undefined,
+          adminEmail: (formData.get("adminEmail") as string) || undefined,
+          adminPassword: (formData.get("adminPassword") as string) || undefined,
         }),
       });
       if (!res.ok) {
@@ -152,6 +154,7 @@ export default async function TenantsPage() {
         isActive: formData.get("isActive") === "true",
         requireMfa: formData.get("requireMfa") === "true",
         requireMfaUsers: formData.get("requireMfaUsers") === "true",
+        allowSysEnter: formData.get("allowSysEnter") === "true",
         maxDrivers: maxDriversRaw === "" || maxDriversRaw === null ? null : Math.max(1, parseInt(maxDriversRaw, 10) || 0) || null,
         maxStorageMb: maxStorageMbRaw === "" || maxStorageMbRaw === null ? null : Math.max(1, parseInt(maxStorageMbRaw, 10) || 0) || null,
       };
@@ -384,6 +387,7 @@ export default async function TenantsPage() {
       loadCommercialCatalog={loadCommercialCatalog}
       loadTenantEntitlement={loadTenantEntitlement}
       saveTenantEntitlement={saveTenantEntitlement}
+      isSys={isSys}
     />
   );
 }

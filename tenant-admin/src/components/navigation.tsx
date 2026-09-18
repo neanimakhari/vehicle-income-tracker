@@ -25,6 +25,7 @@ import {
 const MODULE_NAV: Record<string, string> = {
   "/trips": "trips",
   "/scholar-payments": "scholar_payments",
+  "/transport": "scholar_payments",
   "/tracking": "tracking_live",
   "/notifications": "notifications",
   "/target-calendar": "target_calendar",
@@ -50,7 +51,7 @@ export function Navigation({
     { href: "/vehicles", icon: Car, label: "Vehicles" },
     { href: "/maintenance", icon: Wrench, label: "Maintenance" },
     { href: "/trips", icon: Route, label: "Trips" },
-    { href: "/scholar-payments", icon: GraduationCap, label: "Scholar Payments" },
+    { href: "/transport", icon: GraduationCap, label: "Scholar & staff" },
     { href: "/tracking", icon: MapPinned, label: "Live Tracking" },
     { href: "/reports", icon: BarChart3, label: "Reports" },
     { href: "/target-calendar", icon: CalendarDays, label: "Target calendar" },

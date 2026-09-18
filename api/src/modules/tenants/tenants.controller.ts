@@ -128,6 +128,10 @@ class UpdateTenantDto {
   @IsInt()
   @Min(1)
   maxStorageMb?: number | null;
+
+  @IsBoolean()
+  @IsOptional()
+  allowSysEnter?: boolean;
 }
 
 @Controller('tenants')
@@ -137,14 +141,14 @@ export class TenantsController {
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('PLATFORM_ADMIN')
+  @Roles('PLATFORM_ADMIN', 'SYS')
   findAll(): Promise<Tenant[]> {
     return this.tenantsService.findAll();
   }
 
   @Get('usage')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('PLATFORM_ADMIN')
+  @Roles('PLATFORM_ADMIN', 'SYS')
   getUsage(): Promise<
     Array<{
       id: string;

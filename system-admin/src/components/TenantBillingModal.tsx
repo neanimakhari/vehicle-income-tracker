@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect } from "react";
-import { X, Download, Users, Car, FileText, DollarSign } from "lucide-react";
+import { X, Download, Users, Car, FileText } from "lucide-react";
 
 type UsageItem = {
   id: string;
@@ -78,7 +78,6 @@ export function TenantBillingModal({
       "Drivers",
       "Vehicles",
       "Income records",
-      "Total income",
     ];
     const row = [
       escapeCsv(tenantName),
@@ -86,7 +85,6 @@ export function TenantBillingModal({
       String(usage?.drivers ?? 0),
       String(usage?.vehicles ?? 0),
       String(usage?.incomes ?? 0),
-      String(usage?.totalIncome ?? 0),
     ].join(",");
     const csv = [headers.join(","), row].join("\r\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -107,7 +105,7 @@ export function TenantBillingModal({
       <div className="relative w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mb-4 flex items-center justify-between">
           <h2 id={titleId} className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            Usage &amp; Billing
+            Tenant usage
           </h2>
           <button
             type="button"
@@ -145,15 +143,6 @@ export function TenantBillingModal({
                 <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">{usage.incomes}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-800 dark:bg-emerald-900/30">
-              <DollarSign className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-              <div>
-                <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Total income (logged)</p>
-                <p className="text-lg font-semibold text-emerald-900 dark:text-emerald-100">
-                  {Number(usage.totalIncome).toLocaleString()}
-                </p>
-              </div>
-            </div>
           </div>
         ) : (
           <p className="py-4 text-sm text-zinc-500 dark:text-zinc-400">No usage data for this tenant.</p>
@@ -173,7 +162,7 @@ export function TenantBillingModal({
               className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600"
             >
               <Download className="h-4 w-4" />
-              Export CSV (billing)
+              Export CSV
             </button>
           )}
         </div>

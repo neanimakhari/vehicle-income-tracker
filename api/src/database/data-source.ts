@@ -37,6 +37,8 @@ import { AddPlatformTenantSlaDocuments1700000000030 } from './migrations/1700000
 import { AddDailyIncomeTargets1700000000031 } from './migrations/1700000000031-add-daily-income-targets';
 import { AddReportRecipientsAndTargetRules1700000000032 } from './migrations/1700000000032-add-report-recipients-and-target-rules';
 import { AddCommercialPackagingAndSys1700000000033 } from './migrations/1700000000033-add-commercial-packaging-and-sys';
+import { AddScholarStaffTransport1700000000034 } from './migrations/1700000000034-add-scholar-staff-transport';
+import { AddPlatformSettingsAndSysEnter1700000000035 } from './migrations/1700000000035-add-platform-settings-and-sys-enter';
 
 export default new DataSource({
   type: 'postgres',
@@ -82,5 +84,7 @@ export default new DataSource({
     AddDailyIncomeTargets1700000000031,
     AddReportRecipientsAndTargetRules1700000000032,
     AddCommercialPackagingAndSys1700000000033,
+    AddScholarStaffTransport1700000000034,
+    AddPlatformSettingsAndSysEnter1700000000035,
   ],
 });

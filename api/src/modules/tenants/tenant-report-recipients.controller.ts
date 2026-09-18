@@ -50,23 +50,25 @@ class UpdateRecipientDto {
 @Controller('tenants/:slug/report-recipients')
 @ApiTags('tenants')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('PLATFORM_ADMIN')
 export class TenantReportRecipientsController {
   constructor(
     private readonly recipientsService: TenantReportRecipientsService,
   ) {}
 
   @Get()
+  @Roles('PLATFORM_ADMIN', 'SYS')
   list(@Param('slug') slug: string) {
     return this.recipientsService.listByTenantSlug(slug);
   }
 
   @Post()
+  @Roles('PLATFORM_ADMIN')
   create(@Param('slug') slug: string, @Body() dto: CreateRecipientDto) {
     return this.recipientsService.create(slug, dto);
   }
 
   @Patch(':id')
+  @Roles('PLATFORM_ADMIN')
   update(
     @Param('slug') slug: string,
     @Param('id') id: string,
@@ -76,6 +78,7 @@ export class TenantReportRecipientsController {
   }
 
   @Delete(':id')
+  @Roles('PLATFORM_ADMIN')
   remove(@Param('slug') slug: string, @Param('id') id: string) {
     return this.recipientsService.remove(slug, id);
   }

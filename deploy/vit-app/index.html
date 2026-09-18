@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VIT — Download</title>
+    <style>
+      :root {
+        --teal: #0d9488;
+        --text: #f4f4f5;
+        --muted: #a1a1aa;
+        --card: rgba(24, 24, 27, 0.92);
+        --border: #3f3f46;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: linear-gradient(165deg, #0a0a0a 0%, #134e4a 45%, #0a0a0a 100%);
+        color: var(--text);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 1.25rem;
+      }
+      main {
+        max-width: 26rem;
+        width: 100%;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 1rem;
+        padding: 1.75rem;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+      }
+      h1 { font-size: 1.5rem; margin: 0 0 0.35rem; }
+      .sub { color: var(--muted); font-size: 0.95rem; margin: 0 0 1.25rem; line-height: 1.45; }
+      label { display: block; font-size: 0.8rem; font-weight: 600; margin: 0.85rem 0 0.35rem; color: #d4d4d8; }
+      input, select {
+        width: 100%;
+        min-height: 2.75rem;
+        border-radius: 0.5rem;
+        border: 1px solid var(--border);
+        background: #18181b;
+        color: var(--text);
+        padding: 0.6rem 0.75rem;
+        font-size: 1rem;
+      }
+      button {
+        margin-top: 1.25rem;
+        width: 100%;
+        min-height: 2.75rem;
+        border: 0;
+        border-radius: 0.5rem;
+        background: var(--teal);
+        color: #fff;
+        font-weight: 700;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+      button:disabled { opacity: 0.55; cursor: not-allowed; }
+      button.secondary { background: #3f3f46; margin-top: 0.6rem; }
+      .err {
+        display: none;
+        margin-top: 0.85rem;
+        padding: 0.75rem;
+        border-radius: 0.5rem;
+        background: rgba(127, 29, 29, 0.45);
+        border: 1px solid #b91c1c;
+        color: #fecaca;
+        font-size: 0.9rem;
+      }
+      .err.show { display: block; }
+      .ok { display: none; }
+      .ok.show { display: block; }
+      .meta { margin-top: 1rem; font-size: 0.9rem; color: var(--muted); line-height: 1.5; }
+      ol { margin: 0.5rem 0 0; padding-left: 1.2rem; color: var(--muted); font-size: 0.9rem; }
+      .hidden { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>VIT for Android</h1>
+      <p class="sub">Sign in with your driver account to download the app.</p>
+
+      <div id="loginPanel">
+        <label for="tenant">Company</label>
+        <select id="tenant" required>
+          <option value="">Loading…</option>
+        </select>
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="username" required placeholder="your email" />
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" required />
+        <label for="mfa" class="hidden" id="mfaLabel">Authenticator code</label>
+        <input id="mfa" class="hidden" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" />
+        <button type="button" id="signInBtn">Sign in</button>
+        <div class="err" id="err"></div>
+      </div>
+
+      <div class="ok" id="okPanel">
+        <p class="sub" id="welcome">Signed in.</p>
+        <p class="meta">Version <strong id="ver">—</strong></p>
+        <ol>
+          <li>Tap Download.</li>
+          <li>If your phone asks, allow installs from this browser.</li>
+          <li>Open the file, then sign in to VIT with the same email and password.</li>
+        </ol>
+        <button type="button" id="dlBtn">Download</button>
+        <button type="button" class="secondary" id="outBtn">Sign out</button>
+        <div class="err" id="err2"></div>
+      </div>
+    </main>
+    <script>
+      const API = "https://vit-api.vehinc.co.za/v1";
+      const params = new URLSearchParams(location.search);
+      const invite = params.get("invite");
+      let token = null;
+      let tenantSlug = null;
+
+      const err = (el, msg) => {
+        el.textContent = msg || "";
+        el.classList.toggle("show", !!msg);
+      };
+
+      async function loadTenants() {
+        const sel = document.getElementById("tenant");
+        try {
+          const res = await fetch(API + "/public/tenants", { cache: "no-store" });
+          const list = await res.json();
+          sel.innerHTML = '<option value="">Select your company</option>';
+          (Array.isArray(list) ? list : []).forEach((t) => {
+            const o = document.createElement("option");
+            o.value = t.slug;
+            o.textContent = t.name || t.slug;
+            sel.appendChild(o);
+          });
+        } catch {
+          sel.innerHTML = '<option value="">Could not load companies</option>';
+        }
+      }
+
+      async function loadLatest() {
+        const res = await fetch(API + "/public/mobile-app/latest", { cache: "no-store" });
+        const d = await res.json();
+        document.getElementById("ver").textContent = d.versionName || "—";
+        return d;
+      }
+
+      if (invite) {
+        fetch(API + "/tenant/mobile-app/invite/" + encodeURIComponent(invite))
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.tenantId) {
+              document.getElementById("tenant").value = d.tenantId;
+              document.getElementById("email").value = d.email || "";
+            }
+          })
+          .catch(() => {});
+      }
+
+      document.getElementById("signInBtn").onclick = async () => {
+        const e1 = document.getElementById("err");
+        err(e1, "");
+        tenantSlug = document.getElementById("tenant").value.trim();
+        const email = document.getElementById("email").value.trim();
+        const password = document.getElementById("password").value;
+        const mfaToken = document.getElementById("mfa").value.trim() || undefined;
+        if (!tenantSlug || !email || !password) {
+          err(e1, "Company, email and password are required.");
+          return;
+        }
+        const btn = document.getElementById("signInBtn");
+        btn.disabled = true;
+        try {
+          const res = await fetch(API + "/tenant/auth/login", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-tenant-id": tenantSlug,
+            },
+            body: JSON.stringify({ email, password, mfaToken }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            const msg = Array.isArray(data.message) ? data.message.join(" ") : data.message || "Login failed";
+            if (String(msg).toLowerCase().includes("mfa")) {
+              document.getElementById("mfa").classList.remove("hidden");
+              document.getElementById("mfaLabel").classList.remove("hidden");
+            }
+            throw new Error(msg);
+          }
+          token = data.accessToken;
+          if (!token) throw new Error("No access token returned");
+          document.getElementById("loginPanel").classList.add("hidden");
+          document.getElementById("okPanel").classList.add("show");
+          document.getElementById("welcome").textContent = "You're signed in. Download the app below.";
+          await loadLatest();
+        } catch (ex) {
+          err(e1, ex.message || "Login failed");
+        } finally {
+          btn.disabled = false;
+        }
+      };
+
+      document.getElementById("dlBtn").onclick = async () => {
+        const e2 = document.getElementById("err2");
+        err(e2, "");
+        const btn = document.getElementById("dlBtn");
+        btn.disabled = true;
+        btn.textContent = "Preparing…";
+        try {
+          const res = await fetch(API + "/tenant/mobile-app/download-ticket", {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer " + token,
+              "x-tenant-id": tenantSlug,
+            },
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            const msg = Array.isArray(data.message) ? data.message.join(" ") : data.message;
+            throw new Error(msg || "Could not start download. Try again.");
+          }
+          btn.textContent = "Downloading…";
+          window.location.href = data.downloadUrl;
+        } catch (ex) {
+          err(e2, ex.message || "Download failed");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Download";
+        }
+      };
+
+      document.getElementById("outBtn").onclick = () => location.reload();
+
+      loadTenants();
+    </script>
+  </body>
+</html>

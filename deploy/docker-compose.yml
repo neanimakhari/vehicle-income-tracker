@@ -18,6 +18,10 @@ services:
       BOOTSTRAP_TOKEN_FILE: /run/secrets/bootstrap_token
     ports:
       - "${API_PORT:-4000}:3000"
+    volumes:
+      # Private APK store (auth-gated downloads; not served by nginx)
+      - /var/www/vit-app-private:/var/www/vit-app-private:ro
+      - /var/www/vit-app-private-staging:/var/www/vit-app-private-staging:ro
     secrets:
       - postgres_password
       - jwt_secret

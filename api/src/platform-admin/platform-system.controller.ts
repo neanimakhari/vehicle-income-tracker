@@ -1,15 +1,37 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AuditService } from '../modules/audit/audit.service';
 import { TenantsService } from '../modules/tenants/tenants.service';
-import { ConfigService } from '@nestjs/config';
 import { ApiTags } from '@nestjs/swagger';
+import {
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  Min,
+  MinLength,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { PlatformSettingsService } from '../modules/platform-settings/platform-settings.service';
+import { CommercialService } from '../modules/commercial/commercial.service';
+import { TenantAdminService } from '../tenant-admin/tenant-admin.service';
 
 const FAILED_LOGIN_SPIKE_THRESHOLD = 5;
-const FAILED_LOGIN_WINDOW_MS = 24 * 60 * 60 * 1000; // 24h
-const TENANT_LIMIT_THRESHOLD = 0.9; // alert when usage >= 90% of limit
+const FAILED_LOGIN_WINDOW_MS = 24 * 60 * 60 * 1000;
+const TENANT_LIMIT_THRESHOLD = 0.9;
 
 export type PlatformDefaultPolicyHints = {
   recommendMfa: boolean;
@@ -18,8 +40,10 @@ export type PlatformDefaultPolicyHints = {
 };
 
 export type PlatformDefaultsDto = {
+  applyScope: 'new_tenants_only';
   defaultPolicyHints: PlatformDefaultPolicyHints;
   defaultLimits: { maxDrivers: number | null; maxStorageMb: number | null };
+  defaultPlanCode: string | null;
 };
 
 export type AlertItem = {
@@ -29,54 +53,235 @@ export type AlertItem = {
   metadata?: Record<string, unknown>;
 };
 
+class PatchDefaultsDto {
+  @IsBoolean() @IsOptional() recommendMfa?: boolean;
+  @IsBoolean() @IsOptional() recommendDriverMfa?: boolean;
+  @IsBoolean() @IsOptional() recommendBiometrics?: boolean;
+  @IsOptional() @IsInt() @Min(1) @Type(() => Number) maxDrivers?: number | null;
+  @IsOptional() @IsInt() @Min(1) @Type(() => Number) maxStorageMb?: number | null;
+  @IsString() @IsOptional() defaultPlanCode?: string | null;
+}
+
+class PatchAnnouncementDto {
+  @IsBoolean() @IsOptional() enabled?: boolean;
+  @IsIn(['info', 'maintenance']) @IsOptional() severity?: 'info' | 'maintenance';
+  @IsString() @IsOptional() message?: string;
+  @IsString() @IsOptional() startsAt?: string | null;
+  @IsString() @IsOptional() endsAt?: string | null;
+  @IsBoolean() @IsOptional() blockWrites?: boolean;
+}
+
+class CreateFromTemplateDto {
+  @IsString() name: string;
+  @IsString() @Matches(/^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/) slug: string;
+  @IsString() @IsOptional() planCode?: string | null;
+  @IsString() @IsOptional() contactName?: string | null;
+  @IsEmail() @IsOptional() contactEmail?: string | null;
+  @IsString() @IsOptional() contactPhone?: string | null;
+  @IsString() @IsOptional() adminEmail?: string;
+  @IsString() @IsOptional() @MinLength(8) adminPassword?: string;
+  @IsString() @IsOptional() adminFirstName?: string;
+  @IsString() @IsOptional() adminLastName?: string;
+}
+
 @Controller('platform')
 @ApiTags('platform-system')
 export class PlatformSystemController {
   constructor(
     private readonly auditService: AuditService,
     private readonly tenantsService: TenantsService,
-    private readonly configService: ConfigService,
+    private readonly settings: PlatformSettingsService,
+    private readonly commercial: CommercialService,
+    private readonly tenantAdmins: TenantAdminService,
   ) {}
 
   @Get('defaults')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('PLATFORM_ADMIN')
-  getDefaults(): PlatformDefaultsDto {
-    const recommendMfa =
-      this.configService.get<string>('platform.defaults.recommendMfa') !== 'false';
-    const recommendDriverMfa =
-      this.configService.get<string>('platform.defaults.recommendDriverMfa') !== 'false';
-    const recommendBiometrics =
-      this.configService.get<string>('platform.defaults.recommendBiometrics') === 'true';
+  @Roles('PLATFORM_ADMIN', 'SYS')
+  async getDefaults(): Promise<PlatformDefaultsDto> {
+    const d = await this.settings.getNewTenantDefaults();
     return {
+      applyScope: 'new_tenants_only',
       defaultPolicyHints: {
-        recommendMfa: !!recommendMfa,
-        recommendDriverMfa: !!recommendDriverMfa,
-        recommendBiometrics: !!recommendBiometrics,
+        recommendMfa: d.recommendMfa,
+        recommendDriverMfa: d.recommendDriverMfa,
+        recommendBiometrics: d.recommendBiometrics,
       },
       defaultLimits: {
-        maxDrivers: this.configService.get<number>('platform.defaults.maxDrivers') ?? null,
-        maxStorageMb: this.configService.get<number>('platform.defaults.maxStorageMb') ?? null,
+        maxDrivers: d.maxDrivers,
+        maxStorageMb: d.maxStorageMb,
       },
+      defaultPlanCode: d.defaultPlanCode,
+    };
+  }
+
+  @Patch('defaults')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PLATFORM_ADMIN')
+  async patchDefaults(
+    @Body() dto: PatchDefaultsDto,
+    @Req() req: { user?: { sub?: string } },
+  ): Promise<PlatformDefaultsDto> {
+    const d = await this.settings.updateNewTenantDefaults(
+      {
+        recommendMfa: dto.recommendMfa,
+        recommendDriverMfa: dto.recommendDriverMfa,
+        recommendBiometrics: dto.recommendBiometrics,
+        maxDrivers: dto.maxDrivers,
+        maxStorageMb: dto.maxStorageMb,
+        defaultPlanCode: dto.defaultPlanCode,
+      },
+      req.user?.sub ?? null,
+    );
+    await this.auditService.log({
+      action: 'platform.defaults.update',
+      actorUserId: req.user?.sub ?? null,
+      actorRole: 'PLATFORM_ADMIN',
+      targetType: 'platform_settings',
+      targetId: 'new_tenant_defaults',
+      metadata: { applyScope: 'new_tenants_only', ...d },
+    });
+    return {
+      applyScope: 'new_tenants_only',
+      defaultPolicyHints: {
+        recommendMfa: d.recommendMfa,
+        recommendDriverMfa: d.recommendDriverMfa,
+        recommendBiometrics: d.recommendBiometrics,
+      },
+      defaultLimits: {
+        maxDrivers: d.maxDrivers,
+        maxStorageMb: d.maxStorageMb,
+      },
+      defaultPlanCode: d.defaultPlanCode,
+    };
+  }
+
+  @Get('announcement')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PLATFORM_ADMIN', 'SYS')
+  getAnnouncement() {
+    return this.settings.getAnnouncement();
+  }
+
+  @Patch('announcement')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PLATFORM_ADMIN')
+  async patchAnnouncement(
+    @Body() dto: PatchAnnouncementDto,
+    @Req() req: { user?: { sub?: string } },
+  ) {
+    const next = await this.settings.updateAnnouncement(dto, req.user?.sub ?? null);
+    await this.auditService.log({
+      action: 'platform.announcement.update',
+      actorUserId: req.user?.sub ?? null,
+      actorRole: 'PLATFORM_ADMIN',
+      targetType: 'platform_settings',
+      targetId: 'announcement',
+      metadata: { ...next },
+    });
+    return next;
+  }
+
+  /** Public active banner for tenant-admin / mobile (no auth). */
+  @Get('announcement/active')
+  getActiveAnnouncement() {
+    return this.settings.getActiveAnnouncement().then((a) => a ?? { enabled: false });
+  }
+
+  @Post('tenants/from-template')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PLATFORM_ADMIN')
+  async createFromTemplate(
+    @Body() dto: CreateFromTemplateDto,
+    @Req() req: { user?: { sub?: string; role?: string } },
+  ) {
+    const defaults = await this.settings.getNewTenantDefaults();
+    const tenant = await this.tenantsService.create(
+      {
+        name: dto.name,
+        slug: dto.slug,
+        contactName: dto.contactName ?? null,
+        contactEmail: dto.contactEmail ?? null,
+        contactPhone: dto.contactPhone ?? null,
+        address: null,
+        registrationNumber: null,
+        taxId: null,
+        website: null,
+        notes: null,
+      },
+      { userId: req.user?.sub, role: req.user?.role },
+    );
+
+    await this.tenantsService.update(tenant.id, {
+      requireMfa: defaults.recommendMfa,
+      requireMfaUsers: defaults.recommendDriverMfa,
+      requireBiometrics: defaults.recommendBiometrics,
+      maxDrivers: defaults.maxDrivers,
+      maxStorageMb: defaults.maxStorageMb,
+    });
+
+    const planCode = (dto.planCode ?? defaults.defaultPlanCode)?.trim() || null;
+    let planId: string | null = null;
+    if (planCode) {
+      const plans = await this.commercial.listPlans(true);
+      const plan = plans.find((p) => p.code === planCode && p.isActive);
+      if (plan) {
+        planId = plan.id;
+        await this.commercial.upsertTenantEntitlement(tenant.slug, {
+          planId: plan.id,
+          syncLimitsFromPlan: true,
+        });
+      }
+    }
+
+    let admin: { id: string; email: string } | null = null;
+    if (dto.adminEmail && dto.adminPassword) {
+      const created = await this.tenantAdmins.create(
+        dto.adminEmail,
+        dto.adminPassword,
+        tenant.slug,
+      );
+      admin = { id: created.id, email: created.email };
+    }
+
+    await this.auditService.log({
+      action: 'tenant.create_from_template',
+      actorUserId: req.user?.sub ?? null,
+      actorRole: 'PLATFORM_ADMIN',
+      targetType: 'tenant',
+      targetId: tenant.id,
+      metadata: {
+        slug: tenant.slug,
+        planCode,
+        planId,
+        adminCreated: Boolean(admin),
+      },
+    });
+
+    return {
+      tenant: await this.tenantsService.findBySlug(tenant.slug),
+      planId,
+      planCode,
+      admin,
+      appliedDefaults: defaults,
     };
   }
 
   @Get('alerts')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('PLATFORM_ADMIN')
+  @Roles('PLATFORM_ADMIN', 'SYS')
   async getAlerts(): Promise<{ alerts: AlertItem[] }> {
     const alerts: AlertItem[] = [];
     const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const since24h = new Date(Date.now() - FAILED_LOGIN_WINDOW_MS);
 
-    // New tenant & tenant updated (last 7 days)
     const tenantLogs = await this.auditService.findRecentByActions(
-      ['tenant.create', 'tenant.update'],
+      ['tenant.create', 'tenant.update', 'tenant.create_from_template'],
       since7d,
       100,
     );
     for (const log of tenantLogs) {
-      if (log.action === 'tenant.create') {
+      if (log.action === 'tenant.create' || log.action === 'tenant.create_from_template') {
         const slug = (log.metadata as { slug?: string })?.slug ?? log.targetId ?? '—';
         const name = (log.metadata as { name?: string })?.name ?? slug;
         alerts.push({
@@ -96,47 +301,39 @@ export class PlatformSystemController {
       }
     }
 
-    // Failed login spike (platform + tenant, last 24h)
     const failedLogins = await this.auditService.findRecentByActions(
       ['auth.login_failed', 'tenant.auth.login_failed'],
       since24h,
       500,
     );
     if (failedLogins.length >= FAILED_LOGIN_SPIKE_THRESHOLD) {
-      const byTenant: Record<string, number> = {};
-      for (const log of failedLogins) {
-        const tenant = (log.metadata as { tenant?: string })?.tenant ?? (log.action === 'auth.login_failed' ? 'platform' : '—');
-        byTenant[tenant] = (byTenant[tenant] ?? 0) + 1;
-      }
-      const top = Object.entries(byTenant).sort((a, b) => b[1] - a[1])[0];
       alerts.push({
         type: 'failed_login_spike',
         at: new Date().toISOString(),
-        message: `Failed login spike: ${failedLogins.length} failures in last 24h${top ? ` (${top[0]}: ${top[1]})` : ''}`,
-        metadata: { count: failedLogins.length, byTenant },
+        message: `${failedLogins.length} failed login attempts in the last 24h`,
+        metadata: { count: failedLogins.length },
       });
     }
 
-    // Tenant approaching limits (maxDrivers set and usage >= 90%)
-    const usageList = await this.tenantsService.getUsageForAll();
-    const tenants = await this.tenantsService.findAll();
-    const usageBySlug = new Map(usageList.map((u) => [u.slug, u]));
-    for (const t of tenants) {
-      if (t.maxDrivers == null || t.maxDrivers < 1) continue;
-      const u = usageBySlug.get(t.slug);
-      if (!u) continue;
-      const pct = u.drivers / t.maxDrivers;
-      if (pct >= TENANT_LIMIT_THRESHOLD) {
-        alerts.push({
-          type: 'tenant_near_limit',
-          at: new Date().toISOString(),
-          message: `Tenant approaching limit: ${t.name} (${t.slug}) — ${u.drivers}/${t.maxDrivers} drivers (${Math.round(pct * 100)}%)`,
-          metadata: { tenantId: t.id, slug: t.slug, drivers: u.drivers, maxDrivers: t.maxDrivers },
-        });
+    try {
+      const usage = await this.tenantsService.getUsageForAll();
+      for (const u of usage) {
+        const tenant = await this.tenantsService.findBySlug(u.slug).catch(() => null);
+        const max = tenant?.maxDrivers;
+        if (max != null && max > 0 && u.drivers / max >= TENANT_LIMIT_THRESHOLD) {
+          alerts.push({
+            type: 'tenant_near_limit',
+            at: new Date().toISOString(),
+            message: `${u.name} near driver limit (${u.drivers}/${max})`,
+            metadata: { slug: u.slug, drivers: u.drivers, maxDrivers: max },
+          });
+        }
       }
+    } catch {
+      // ignore usage errors
     }
 
-    alerts.sort((a, b) => (b.at > a.at ? 1 : -1));
-    return { alerts: alerts.slice(0, 50) };
+    alerts.sort((a, b) => b.at.localeCompare(a.at));
+    return { alerts };
   }
 }

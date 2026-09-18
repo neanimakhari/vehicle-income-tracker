@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { FeatureModuleEntity } from './feature-module.entity';
@@ -28,9 +28,9 @@ export class CommercialService {
     });
   }
 
-  async listPlans() {
+  async listPlans(includeInactive = false) {
     const plans = await this.plansRepo.find({
-      where: { isActive: true },
+      where: includeInactive ? {} : { isActive: true },
       order: { code: 'ASC' },
     });
     const links = await this.planModulesRepo.find();
@@ -40,10 +40,80 @@ export class CommercialService {
       arr.push(link.moduleKey);
       byPlan.set(link.planId, arr);
     }
+    const entitlementCounts = await this.entitlementsRepo
+      .createQueryBuilder('e')
+      .select('e.plan_id', 'planId')
+      .addSelect('COUNT(*)', 'cnt')
+      .where('e.plan_id IS NOT NULL')
+      .groupBy('e.plan_id')
+      .getRawMany<{ planId: string; cnt: string }>();
+    const countByPlan = new Map(
+      entitlementCounts.map((r) => [r.planId, Number(r.cnt)]),
+    );
     return plans.map((p) => ({
       ...p,
       moduleKeys: byPlan.get(p.id) ?? [],
+      tenantCount: countByPlan.get(p.id) ?? 0,
     }));
+  }
+
+  async createPlan(data: {
+    code: string;
+    name: string;
+    description?: string | null;
+    maxDriversDefault?: number | null;
+    maxStorageMbDefault?: number | null;
+    isActive?: boolean;
+    moduleKeys?: string[];
+  }) {
+    const code = data.code.trim().toLowerCase();
+    const existing = await this.plansRepo.findOne({ where: { code } });
+    if (existing) {
+      throw new ConflictException('Plan code already exists');
+    }
+    const plan = await this.plansRepo.save(
+      this.plansRepo.create({
+        code,
+        name: data.name.trim(),
+        description: data.description ?? null,
+        maxDriversDefault: data.maxDriversDefault ?? null,
+        maxStorageMbDefault: data.maxStorageMbDefault ?? null,
+        isActive: data.isActive ?? true,
+      }),
+    );
+    if (data.moduleKeys?.length) {
+      await this.updatePlanModules(plan.id, data.moduleKeys);
+    }
+    const plans = await this.listPlans(true);
+    return plans.find((p) => p.id === plan.id);
+  }
+
+  async updatePlan(
+    id: string,
+    data: {
+      name?: string;
+      description?: string | null;
+      maxDriversDefault?: number | null;
+      maxStorageMbDefault?: number | null;
+      isActive?: boolean;
+      moduleKeys?: string[];
+    },
+  ) {
+    const plan = await this.plansRepo.findOne({ where: { id } });
+    if (!plan) throw new NotFoundException('Plan not found');
+    if (data.name !== undefined) plan.name = data.name.trim();
+    if (data.description !== undefined) plan.description = data.description;
+    if (data.maxDriversDefault !== undefined)
+      plan.maxDriversDefault = data.maxDriversDefault;
+    if (data.maxStorageMbDefault !== undefined)
+      plan.maxStorageMbDefault = data.maxStorageMbDefault;
+    if (data.isActive !== undefined) plan.isActive = data.isActive;
+    await this.plansRepo.save(plan);
+    if (data.moduleKeys !== undefined) {
+      await this.updatePlanModules(id, data.moduleKeys);
+    }
+    const plans = await this.listPlans(true);
+    return plans.find((p) => p.id === id);
   }
 
   async getTenantEntitlement(tenantSlug: string) {
@@ -182,7 +252,7 @@ export class CommercialService {
       this.planModulesRepo.create({ planId, moduleKey }),
     );
     if (rows.length) await this.planModulesRepo.save(rows);
-    return this.listPlans().then((plans) =>
+    return this.listPlans(true).then((plans) =>
       plans.find((p) => p.id === planId),
     );
   }

@@ -76,6 +76,9 @@ export class TenantVehicle {
   @Column({ name: 'notes', type: 'text', nullable: true })
   notes: string | null;
 
+  @Column({ name: 'seat_capacity', type: 'int', nullable: true, default: null })
+  seatCapacity: number | null;
+
   @Column({ default: true, name: 'is_active' })
   isActive: boolean;
 

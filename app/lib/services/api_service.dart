@@ -170,11 +170,51 @@ class ApiService {
 
   Future<List<Map<String, dynamic>>> fetchScholarPayments() async {
     final response = await http.get(
-      Uri.parse('$baseUrl/tenant/scholar-payments'),
+      Uri.parse('$baseUrl/tenant/transport/driver/payments'),
       headers: _authHeaders(),
     );
-    final data = await _decodeList(response, errorPrefix: 'Failed to fetch scholar payments');
+    final data = await _decodeList(response, errorPrefix: 'Failed to fetch transport payments');
     return data.cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> fetchTransportPassengers() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/tenant/transport/driver/passengers'),
+      headers: _authHeaders(),
+    );
+    final data = await _decodeList(response, errorPrefix: 'Failed to fetch passengers');
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> fetchTransportClaims({String? status}) async {
+    final q = status != null && status.isNotEmpty ? '?status=$status' : '';
+    final response = await http.get(
+      Uri.parse('$baseUrl/tenant/transport/driver/payments$q'),
+      headers: _authHeaders(),
+    );
+    final data = await _decodeList(response, errorPrefix: 'Failed to fetch payment claims');
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> submitTransportClaim({
+    required String passengerId,
+    required num amount,
+    String method = 'cash',
+    String? notes,
+    String? paidAt,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/tenant/transport/driver/payments'),
+      headers: _authHeaders(contentType: true),
+      body: jsonEncode({
+        'passengerId': passengerId,
+        'amount': amount,
+        'method': method,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+        if (paidAt != null) 'paidAt': paidAt,
+      }),
+    );
+    return _decodeObject(response, errorPrefix: 'Failed to submit payment');
   }
 
   Future<List<Map<String, dynamic>>> fetchVehicleStats() async {

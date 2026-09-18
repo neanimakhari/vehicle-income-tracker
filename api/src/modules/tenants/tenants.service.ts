@@ -262,6 +262,7 @@ export class TenantsService {
       missingIncomeEscalationEnabled?: boolean;
       missingIncomeEscalationHour?: number;
       defaultDailyTargetAmount?: number | null;
+      allowSysEnter?: boolean;
     },
   ): Promise<Tenant> {
     const tenant = await this.tenantRepository.findOne({ where: { id } });
@@ -343,6 +344,9 @@ export class TenantsService {
     }
     if (data.defaultDailyTargetAmount !== undefined) {
       tenant.defaultDailyTargetAmount = data.defaultDailyTargetAmount;
+    }
+    if (data.allowSysEnter !== undefined) {
+      tenant.allowSysEnter = data.allowSysEnter;
     }
     const saved = await this.tenantRepository.save(tenant);
     await this.auditService.log({

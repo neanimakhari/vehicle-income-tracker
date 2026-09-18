@@ -5,6 +5,7 @@ import Link from "next/link";
 import { clearTenantAdminCache } from "./actions/clear-cache";
 import { OnboardingBanner } from "@/components/onboarding-banner";
 import { DailyTargetsPanel } from "@/components/daily-targets-panel";
+import { DashboardStreamToggle } from "@/components/dashboard-stream-toggle";
 
 async function fetchPolicy() {
   const policy = await fetchJson<{ requireMfaUsers?: boolean; requireMfa?: boolean }>("/tenant/policy");
@@ -157,6 +158,11 @@ export default async function Home() {
           Overview of your tenant operations and security status
         </p>
       </div>
+
+      <DashboardStreamToggle
+        operationsIncome={Number(summary?.totalIncome ?? 0)}
+        operationsNet={Number(summary?.netIncome ?? 0)}
+      />
 
       {/* Stats Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">

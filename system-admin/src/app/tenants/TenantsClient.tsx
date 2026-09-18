@@ -26,6 +26,7 @@ type Tenant = {
   taxId?: string | null;
   website?: string | null;
   notes?: string | null;
+  allowSysEnter?: boolean;
 };
 
 type TenantAdmin = { id: string; email: string; tenantId: string };
@@ -95,6 +96,7 @@ type TenantsClientProps = {
       syncLimitsFromPlan?: boolean;
     },
   ) => Promise<{ success: boolean; error?: string }>;
+  isSys?: boolean;
 };
 
 function escapeCsv(s: string): string {
@@ -119,6 +121,7 @@ export function TenantsClient({
   loadCommercialCatalog,
   loadTenantEntitlement,
   saveTenantEntitlement,
+  isSys = false,
 }: TenantsClientProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editTenant, setEditTenant] = useState<Tenant | null>(null);
@@ -163,7 +166,6 @@ export function TenantsClient({
       "Drivers",
       "Vehicles",
       "Income records",
-      "Total income",
     ];
     const rows = filteredTenants.map((t) => {
       const u = usageBySlug[t.slug];
@@ -178,7 +180,6 @@ export function TenantsClient({
         String(u?.drivers ?? ""),
         String(u?.vehicles ?? ""),
         String(u?.incomes ?? ""),
-        String(u?.totalIncome ?? ""),
       ].join(",");
     });
     const csv = [headers.join(","), ...rows].join("\r\n");
@@ -208,14 +209,16 @@ export function TenantsClient({
             <Download className="h-4 w-4" />
             Export CSV (billing)
           </button>
-          <button
-            type="button"
-            onClick={() => setModalOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600"
-          >
-            <Plus className="h-4 w-4" />
-            Add tenant
-          </button>
+          {!isSys && (
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600"
+            >
+              <Plus className="h-4 w-4" />
+              Add tenant
+            </button>
+          )}
         </div>
       </div>
 
@@ -379,12 +382,11 @@ export function TenantsClient({
                       <td className="hidden md:table-cell px-3 py-3 text-zinc-500 dark:text-zinc-400">
                         {u ? (
                           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span title={`Vehicles: ${u.vehicles}. Total income (logged): ${u.totalIncome}`}>
+                            <span title={`Vehicles: ${u.vehicles}. Income entries: ${u.incomes}`}>
                               {tenant.maxDrivers != null
                                 ? `${u.drivers} / ${tenant.maxDrivers} drivers`
                                 : `${u.drivers} drivers`}
                               , {u.vehicles} vehicles, {u.incomes} income records
-                              {u.totalIncome > 0 && ` · ${Number(u.totalIncome).toLocaleString()} total`}
                             </span>
                             <button
                               type="button"
@@ -426,6 +428,8 @@ export function TenantsClient({
                           >
                             <LogIn className="h-4 w-4" aria-hidden />
                           </button>
+                          {!isSys && (
+                            <>
                           <button
                             type="button"
                             onClick={() => setEntitlementsTenant(tenant)}
@@ -474,6 +478,19 @@ export function TenantsClient({
                               {tenant.requireMfaUsers ? "Disable Driver MFA" : "Require Driver MFA"}
                             </button>
                           </form>
+                            </>
+                          )}
+                          {isSys && (
+                            <button
+                              type="button"
+                              onClick={() => setEntitlementsTenant(tenant)}
+                              className="text-teal-600 hover:text-teal-700 dark:text-teal-400"
+                              title="View plan & modules"
+                              aria-label="View plan and modules"
+                            >
+                              <Package className="h-4 w-4" aria-hidden />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -524,7 +541,8 @@ export function TenantsClient({
           onClose={() => setEntitlementsTenant(null)}
           loadCatalog={loadCommercialCatalog}
           loadEntitlement={loadTenantEntitlement}
-          saveEntitlement={saveTenantEntitlement}
+          saveEntitlement={isSys ? undefined : saveTenantEntitlement}
+          readOnly={isSys}
         />
       )}
     </div>

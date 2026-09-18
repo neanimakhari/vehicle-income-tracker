@@ -14,6 +14,7 @@ import 'alerts_screen.dart';
 import 'vehicle_insights_screen.dart';
 import 'maintenance_screen.dart';
 import 'driver_profile_screen.dart';
+import 'transport_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, this.openDrawer});
@@ -482,6 +483,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildQuickActions(BuildContext context, bool isDarkMode) {
+    final ents = _tenantPolicy?['entitlements'] ?? _tenantPolicy?['featureFlags'];
+    final hasTransport = ents is List && ents.map((e) => e.toString()).contains('scholar_payments');
     final actions = <Widget>[
       _buildActionCard(
         context,
@@ -535,6 +538,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
         isDarkMode: isDarkMode,
         expand: true,
       ),
+      if (hasTransport)
+        _buildActionCard(
+          context,
+          icon: Icons.directions_bus_outlined,
+          title: 'Scholar & staff',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TransportScreen()),
+            );
+          },
+          isDarkMode: isDarkMode,
+          expand: true,
+        ),
       if (Session.role == 'TENANT_ADMIN')
         _buildActionCard(
           context,
@@ -788,6 +805,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final actual = me?['actual'];
     final variance = me?['variance'];
     final percentHit = me?['percentHit'];
+    final varianceNum = variance is num
+        ? variance
+        : (num.tryParse('$variance') ?? 0);
+    final varianceLabel = variance == null
+        ? ''
+        : (varianceNum >= 0
+            ? ' · +R $variance'
+            : ' · short R ${(-varianceNum).toString()}');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -805,7 +830,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'Today vs target',
             'R ${actual ?? 0} / R $target'
                 '${percentHit != null ? ' (${percentHit}%)' : ''}'
-                '${variance != null ? (Number(variance) >= 0 ? ' · +R $variance' : ' · short R ${(-Number(variance)).toString()}') : ''}',
+                '$varianceLabel',
             Icons.flag,
             (variance is num && variance < 0) ? AppTheme.danger : AppTheme.success,
             isDarkMode,

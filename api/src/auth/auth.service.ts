@@ -242,6 +242,9 @@ export class AuthService {
     if (!tenant || !tenant.isActive) {
       throw new UnauthorizedException('Tenant not found or inactive');
     }
+    if (actor.role === 'SYS' && tenant.allowSysEnter === false) {
+      throw new UnauthorizedException('SYS enter is disabled for this tenant');
+    }
 
     const payload = {
       sub: actor.sub,

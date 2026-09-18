@@ -95,13 +95,12 @@ export class Tenant {
   missingIncomeEscalationHour: number;
 
   /** Default daily income target (ZAR) applied when a driver has no personal target */
-  @Column({
-    name: 'default_daily_target_amount',
-    type: 'numeric',
-    nullable: true,
-    default: null,
-  })
+  @Column({ name: 'default_daily_target_amount', type: 'numeric', nullable: true, default: null })
   defaultDailyTargetAmount: number | null;
+
+  /** When false, SYS accounts cannot Enter this tenant (PLATFORM_ADMIN still can). */
+  @Column({ name: 'allow_sys_enter', default: true })
+  allowSysEnter: boolean;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

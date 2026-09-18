@@ -134,6 +134,69 @@ export class EmailService {
     }
   }
 
+  async sendAppInstallInvite(
+    to: string,
+    tenantName: string,
+    inviteUrl: string,
+  ): Promise<{ sent: boolean }> {
+    const subject = `Install the VIT app — ${tenantName}`;
+    const text = `Your fleet admin invited you to install the VIT driver app for ${tenantName}.
+
+Open this link on your Android phone, sign in with your driver email and password, then download the app:
+
+${inviteUrl}
+
+This invite expires in 48 hours. Do not share the link.`;
+    const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;line-height:1.5">
+      <h2>Install VIT</h2>
+      <p>Your fleet admin invited you to install the <strong>VIT</strong> driver app for <strong>${tenantName}</strong>.</p>
+      <p><a href="${inviteUrl}" style="display:inline-block;background:#0d9488;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:600">Open install page</a></p>
+      <p style="color:#666;font-size:14px">You will sign in with your driver email and password, then download the APK. Invite expires in 48 hours.</p>
+    </body></html>`;
+    return this.send({ to, subject, text, html });
+  }
+
+  /** Ops / 5xx alerts to ERROR_ALERT_TO (default dev@vehinc.co.za). */
+  async sendOpsAlert(payload: {
+    method: string;
+    path: string;
+    status: number;
+    message: string;
+    stack?: string;
+  }): Promise<{ sent: boolean }> {
+    const to =
+      this.configService.get<string>('ops.errorAlertTo') ??
+      process.env.ERROR_ALERT_TO ??
+      'dev@vehinc.co.za';
+    const when = new Date().toISOString();
+    const subject = `[VIT API ${payload.status}] ${payload.method} ${payload.path}`;
+    const text = [
+      `Time: ${when}`,
+      `Status: ${payload.status}`,
+      `Request: ${payload.method} ${payload.path}`,
+      `Message: ${payload.message}`,
+      '',
+      payload.stack ? `Stack:\n${payload.stack}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const html = `<!DOCTYPE html><html><body style="font-family:sans-serif">
+      <h2>VIT API error</h2>
+      <p><strong>Time:</strong> ${when}</p>
+      <p><strong>Status:</strong> ${payload.status}</p>
+      <p><strong>Request:</strong> ${payload.method} ${payload.path}</p>
+      <p><strong>Message:</strong> ${payload.message.replace(/</g, '&lt;')}</p>
+      ${
+        payload.stack
+          ? `<pre style="background:#111;color:#eee;padding:12px;overflow:auto;font-size:12px">${payload.stack
+              .replace(/</g, '&lt;')
+              .slice(0, 4000)}</pre>`
+          : ''
+      }
+    </body></html>`;
+    return this.send({ to, subject, text, html });
+  }
+
   /** Send a simple test email (used by POST /email/test). */
   async sendTestEmail(to: string): Promise<{ sent: boolean }> {
     const subject = 'VIT – Email test';

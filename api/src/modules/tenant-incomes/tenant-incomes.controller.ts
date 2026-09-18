@@ -64,6 +64,18 @@ class CreateTenantIncomeDto {
   @IsOptional()
   driverId?: string;
 
+  @IsString()
+  @IsOptional()
+  incomeStream?: string;
+
+  @IsUUID()
+  @IsOptional()
+  tripId?: string;
+
+  @IsUUID()
+  @IsOptional()
+  scholarPaymentId?: string;
+
   @IsDateString()
   loggedOn: string;
 }

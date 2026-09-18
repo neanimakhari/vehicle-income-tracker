@@ -5,6 +5,16 @@ All notable changes to Vehicle Income Tracker (VIT) are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- Tenant-admin **1.1.0**: Scholar & staff transport passengers/groups/payments UI — sectioned forms, clearer CSV import, mobile-first grid.
+- System-admin / tenant-admin: logout clears cookies with matching path/secure; Log out in mobile drawer; larger logout hit targets.
+- API **1.1.0**: 5xx / unhandled errors email `ERROR_ALERT_TO` (default `dev@vehinc.co.za`) with throttle.
+- API: `GET /v1/public/mobile-app/latest` for private app-store / in-app updates.
+- Mobile **1.0.1+2**: in-app APK update check + download/install prompt; private store assets under `deploy/vit-app/`.
+
 ## [Unreleased] — feature/p0-sa-taxi-ops
 
 ### Added

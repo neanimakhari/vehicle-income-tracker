@@ -60,7 +60,7 @@ export class TenantAdminController {
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('PLATFORM_ADMIN')
+  @Roles('PLATFORM_ADMIN', 'SYS')
   findAll() {
     return this.tenantAdminService.findAll();
   }

@@ -130,6 +130,97 @@ export class TenantSchemasService {
       )`,
     );
     await this.dataSource.query(
+      `ALTER TABLE "${schemaName}"."vehicles" ADD COLUMN IF NOT EXISTS "seat_capacity" int NULL`,
+    );
+    await this.dataSource.query(
+      `CREATE TABLE IF NOT EXISTS "${schemaName}"."transport_groups" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "name" varchar NOT NULL,
+        "kind" varchar NOT NULL DEFAULT 'school',
+        "default_amount" numeric NOT NULL DEFAULT 0,
+        "cadence" varchar NOT NULL DEFAULT 'monthly',
+        "due_day" int NULL,
+        "grace_days" int NOT NULL DEFAULT 7,
+        "notes" text NULL,
+        "is_active" boolean NOT NULL DEFAULT true,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "updated_at" timestamptz NOT NULL DEFAULT now()
+      )`,
+    );
+    await this.dataSource.query(
+      `CREATE TABLE IF NOT EXISTS "${schemaName}"."transport_passengers" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "type" varchar NOT NULL DEFAULT 'scholar',
+        "name" varchar NOT NULL,
+        "contact_name" varchar NULL,
+        "phone" varchar NULL,
+        "notes" text NULL,
+        "household_id" uuid NULL,
+        "group_id" uuid NULL,
+        "vehicle_id" uuid NULL,
+        "driver_user_id" uuid NULL,
+        "fee_amount" numeric NULL,
+        "fee_cadence" varchar NULL,
+        "is_active" boolean NOT NULL DEFAULT true,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "updated_at" timestamptz NOT NULL DEFAULT now()
+      )`,
+    );
+    await this.dataSource.query(
+      `CREATE TABLE IF NOT EXISTS "${schemaName}"."transport_assignments" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "passenger_id" uuid NOT NULL,
+        "vehicle_id" uuid NOT NULL,
+        "driver_user_id" uuid NULL,
+        "effective_from" date NOT NULL DEFAULT CURRENT_DATE,
+        "effective_to" date NULL,
+        "notes" text NULL,
+        "created_at" timestamptz NOT NULL DEFAULT now()
+      )`,
+    );
+    await this.dataSource.query(
+      `CREATE TABLE IF NOT EXISTS "${schemaName}"."transport_fee_pauses" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "label" varchar NOT NULL,
+        "start_date" date NOT NULL,
+        "end_date" date NOT NULL,
+        "created_at" timestamptz NOT NULL DEFAULT now()
+      )`,
+    );
+    await this.dataSource.query(
+      `CREATE TABLE IF NOT EXISTS "${schemaName}"."transport_billing_periods" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "passenger_id" uuid NOT NULL,
+        "period_start" date NOT NULL,
+        "period_end" date NOT NULL,
+        "cadence" varchar NOT NULL DEFAULT 'monthly',
+        "expected_amount" numeric NOT NULL DEFAULT 0,
+        "due_date" date NULL,
+        "created_at" timestamptz NOT NULL DEFAULT now()
+      )`,
+    );
+    await this.dataSource.query(
+      `CREATE TABLE IF NOT EXISTS "${schemaName}"."transport_payment_claims" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "passenger_id" uuid NOT NULL,
+        "billing_period_id" uuid NULL,
+        "vehicle_id" uuid NULL,
+        "amount" numeric NOT NULL DEFAULT 0,
+        "method" varchar NOT NULL DEFAULT 'cash',
+        "paid_at" timestamptz NOT NULL DEFAULT now(),
+        "status" varchar NOT NULL DEFAULT 'pending',
+        "notes" text NULL,
+        "reject_reason" text NULL,
+        "submitted_by_user_id" uuid NULL,
+        "collected_by_driver_id" uuid NULL,
+        "approved_by_user_id" uuid NULL,
+        "approved_at" timestamptz NULL,
+        "income_id" uuid NULL,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "updated_at" timestamptz NOT NULL DEFAULT now()
+      )`,
+    );
+    await this.dataSource.query(
       `CREATE TABLE IF NOT EXISTS "${schemaName}"."gps_tracking_points" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "vehicle_id" uuid NULL DEFAULT NULL,

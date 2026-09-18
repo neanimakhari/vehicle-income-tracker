@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Eye, EyeOff, Lock, Mail, Shield, ArrowRight, BookmarkCheck } from "lucide-react";
 import { loginAction } from "@/lib/auth-actions";
-import { getApiUrl } from "@/lib/api-url";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -17,8 +16,6 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
   const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<{ error: string; message?: string } | null>(null);
-  const [tenants, setTenants] = useState<Array<{ slug: string; name?: string }>>([]);
-  const [tenantSlug, setTenantSlug] = useState<string>("");
 
   const urlError = searchParams?.error;
   const message =
@@ -31,32 +28,18 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
           : urlError === "expired"
             ? "Your session expired. Please sign in again."
             : urlError === "forbidden"
-              ? "Platform administrator access required."
+              ? "You do not have access to this page."
     : urlError === "invalid-credentials"
       ? "Incorrect email or password."
     : urlError === "wrong-tenant"
       ? "This account is not for the selected tenant."
+    : urlError === "wrong-app"
+      ? "Use the tenant admin app for tenant accounts."
+    : urlError === "idle-expired"
+      ? "You were signed out after being idle."
               : urlError
                 ? "Login failed. Check your credentials."
                 : null;
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadTenants() {
-      try {
-        const res = await fetch(`${getApiUrl()}/public/tenants`, { cache: "no-store" });
-        if (!res.ok) return;
-        const data = (await res.json()) as Array<{ slug: string; name?: string }>;
-        if (!cancelled && Array.isArray(data)) setTenants(data);
-      } catch {
-        // ignore - tenant dropdown remains optional
-      }
-    }
-    loadTenants();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -65,10 +48,20 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
     setError(null);
     setIsSubmitting(true);
     try {
-      await loginAction(formData);
+      const result = await loginAction(formData);
+      if (result?.error) {
+        if (result.error === "mfa-required" || result.error === "mfa-setup") {
+          setShowMfa(true);
+        }
+        setError(result);
+      }
     } catch (e) {
-      const err = e as { digest?: string };
-      if (typeof err?.digest === "string" && err.digest.startsWith("NEXT_REDIRECT")) throw e;
+      // Server Action redirect() throws; let Next.js navigate
+      const err = e as { digest?: string; message?: string };
+      const digest = typeof err?.digest === "string" ? err.digest : "";
+      if (digest.startsWith("NEXT_REDIRECT") || String(err?.message ?? "").includes("NEXT_REDIRECT")) {
+        throw e;
+      }
       setError({ error: "invalid", message: "Something went wrong. Please try again." });
     } finally {
       setIsSubmitting(false);
@@ -98,7 +91,7 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
             />
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">Welcome Back</h1>
-          <p className="text-teal-200/90">Sign in to the platform admin</p>
+          <p className="text-teal-200/90">Sign in as platform admin or SYS support</p>
         </div>
 
         <div className="bg-zinc-900/95 backdrop-blur rounded-2xl shadow-xl border border-zinc-700 p-8 text-white">
@@ -109,26 +102,6 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">Tenant (optional)</label>
-              <select
-                name="tenantSlug"
-                value={tenantSlug}
-                onChange={(e) => setTenantSlug(e.target.value)}
-                className="block w-full px-3 py-3 border border-zinc-600 rounded-lg bg-zinc-800/80 text-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              >
-                <option value="">Platform admin (no tenant)</option>
-                {tenants.map((t) => (
-                  <option key={t.slug} value={t.slug}>
-                    {t.name ? `${t.name} (${t.slug})` : t.slug}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-xs text-zinc-400">
-                Leave blank for platform admins. Select a tenant only if you are a tenant admin.
-              </p>
-            </div>
-
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-2">Email Address</label>
               <div className="relative">

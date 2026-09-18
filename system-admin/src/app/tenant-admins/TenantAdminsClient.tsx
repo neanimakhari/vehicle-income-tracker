@@ -92,7 +92,7 @@ export function TenantAdminsClient({
               setSearch(e.target.value);
               setPage(1);
             }}
-            className="input w-64 pl-9 py-2 text-sm"
+            className="input w-full sm:w-64 pl-9 py-2 text-sm"
             aria-label="Search tenant admins"
           />
         </div>

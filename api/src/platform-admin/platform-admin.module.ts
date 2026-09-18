@@ -11,9 +11,20 @@ import { SysAccountsService } from './sys-accounts.service';
 import { ConfigModule } from '@nestjs/config';
 import { AuditModule } from '../modules/audit/audit.module';
 import { TenantsModule } from '../modules/tenants/tenants.module';
+import { PlatformSettingsModule } from '../modules/platform-settings/platform-settings.module';
+import { CommercialModule } from '../modules/commercial/commercial.module';
+import { TenantAdminModule } from '../tenant-admin/tenant-admin.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([AuthUser]), ConfigModule, AuditModule, TenantsModule],
+  imports: [
+    TypeOrmModule.forFeature([AuthUser]),
+    ConfigModule,
+    AuditModule,
+    TenantsModule,
+    PlatformSettingsModule,
+    CommercialModule,
+    TenantAdminModule,
+  ],
   controllers: [
     PlatformAdminController,
     PlatformBootstrapController,
@@ -23,4 +34,3 @@ import { TenantsModule } from '../modules/tenants/tenants.module';
   providers: [PlatformAdminService, PlatformBootstrapService, SysAccountsService],
 })
 export class PlatformAdminModule {}
-

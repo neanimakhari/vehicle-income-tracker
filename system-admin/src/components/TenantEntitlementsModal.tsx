@@ -30,7 +30,7 @@ type Props = {
   onClose: () => void;
   loadCatalog: () => Promise<{ modules: ModuleRow[]; plans: Plan[] }>;
   loadEntitlement: (slug: string) => Promise<Entitlement | null>;
-  saveEntitlement: (
+  saveEntitlement?: (
     slug: string,
     data: {
       planId: string | null;
@@ -39,6 +39,7 @@ type Props = {
       syncLimitsFromPlan?: boolean;
     },
   ) => Promise<{ success: boolean; error?: string }>;
+  readOnly?: boolean;
 };
 
 export function TenantEntitlementsModal({
@@ -49,6 +50,7 @@ export function TenantEntitlementsModal({
   loadCatalog,
   loadEntitlement,
   saveEntitlement,
+  readOnly = false,
 }: Props) {
   const [modules, setModules] = useState<ModuleRow[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -80,6 +82,7 @@ export function TenantEntitlementsModal({
   if (!open) return null;
 
   async function save() {
+    if (!saveEntitlement || readOnly) return;
     setBusy(true);
     setMessage(null);
     const result = await saveEntitlement(tenantSlug, {
@@ -199,14 +202,19 @@ export function TenantEntitlementsModal({
             />
           </label>
           {message && <p className="text-sm text-teal-700">{message}</p>}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={save}
-            className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
-          >
-            {busy ? "Saving…" : "Save entitlements"}
-          </button>
+          {!readOnly && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={save}
+              className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+            >
+              {busy ? "Saving…" : "Save entitlements"}
+            </button>
+          )}
+          {readOnly ? (
+            <p className="text-xs text-zinc-500">View only (SYS).</p>
+          ) : null}
         </div>
       </div>
     </div>

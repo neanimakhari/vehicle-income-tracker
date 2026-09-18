@@ -11,6 +11,7 @@ type Tenant = {
   isActive: boolean;
   requireMfa?: boolean;
   requireMfaUsers?: boolean;
+  allowSysEnter?: boolean;
   maxDrivers?: number | null;
   maxStorageMb?: number | null;
   contactName?: string | null;
@@ -250,6 +251,16 @@ export function EditTenantModal({ tenant, onClose, updateTenant }: EditTenantMod
                 className="h-4 w-4 rounded border-zinc-300 text-teal-600 focus:ring-teal-500 dark:border-zinc-600 dark:bg-zinc-800"
               />
               <span className="text-sm text-zinc-700 dark:text-zinc-300">Require driver MFA</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                name="allowSysEnter"
+                value="true"
+                defaultChecked={tenant.allowSysEnter !== false}
+                className="h-4 w-4 rounded border-zinc-300 text-teal-600 focus:ring-teal-500 dark:border-zinc-600 dark:bg-zinc-800"
+              />
+              <span className="text-sm text-zinc-700 dark:text-zinc-300">Allow SYS enter</span>
             </label>
           </div>
           <div className="flex justify-end gap-2 pt-2">

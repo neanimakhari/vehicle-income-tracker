@@ -19,6 +19,9 @@ import { DriverProfileService } from './driver-profile.service';
 import { EmailModule } from '../email/email.module';
 import { WebhooksModule } from '../webhooks/webhooks.module';
 import { TenantsModule } from '../tenants/tenants.module';
+import { TenantMobileAppController } from './tenant-mobile-app.controller';
+import { PublicMobileAppController } from '../tenants/public-mobile-app.controller';
+import { MobileAppDownloadService } from './mobile-app-download.service';
 
 @Module({
   imports: [
@@ -35,9 +38,16 @@ import { TenantsModule } from '../tenants/tenants.module';
     TenantAuthController,
     TenantDevicesController,
     DriverProfileController,
+    TenantMobileAppController,
+    PublicMobileAppController,
   ],
-  providers: [TenantUsersService, TenantAuthService, DriverProfileService],
-  exports: [DriverProfileService],
+  providers: [
+    TenantUsersService,
+    TenantAuthService,
+    DriverProfileService,
+    MobileAppDownloadService,
+  ],
+  exports: [DriverProfileService, MobileAppDownloadService],
 })
 export class TenantUsersModule {}
 
