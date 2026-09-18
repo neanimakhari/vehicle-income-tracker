@@ -53,6 +53,15 @@ export class TenantIncome {
   @Column({ name: 'approved_by', type: 'uuid', nullable: true, default: null })
   approvedBy: string | null;
 
+  @Column({ name: 'income_stream', type: 'varchar', default: 'general' })
+  incomeStream: string;
+
+  @Column({ name: 'trip_id', type: 'uuid', nullable: true, default: null })
+  tripId: string | null;
+
+  @Column({ name: 'scholar_payment_id', type: 'uuid', nullable: true, default: null })
+  scholarPaymentId: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

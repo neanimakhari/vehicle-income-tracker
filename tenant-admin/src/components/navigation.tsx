@@ -19,10 +19,28 @@ import {
   Route,
   GraduationCap,
   MapPinned,
+  CalendarDays,
 } from "lucide-react";
 
-export function Navigation({ onLinkClick }: { onLinkClick?: () => void }) {
+const MODULE_NAV: Record<string, string> = {
+  "/trips": "trips",
+  "/scholar-payments": "scholar_payments",
+  "/transport": "scholar_payments",
+  "/tracking": "tracking_live",
+  "/notifications": "notifications",
+  "/target-calendar": "target_calendar",
+};
+
+export function Navigation({
+  onLinkClick,
+  entitlements,
+}: {
+  onLinkClick?: () => void;
+  entitlements?: string[] | null;
+}) {
   const pathname = usePathname();
+  // null entitlements = unknown/legacy unrestricted (show all)
+  const allowed = entitlements == null ? null : new Set(entitlements);
 
   const navItems = [
     { href: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -33,22 +51,30 @@ export function Navigation({ onLinkClick }: { onLinkClick?: () => void }) {
     { href: "/vehicles", icon: Car, label: "Vehicles" },
     { href: "/maintenance", icon: Wrench, label: "Maintenance" },
     { href: "/trips", icon: Route, label: "Trips" },
-    { href: "/scholar-payments", icon: GraduationCap, label: "Scholar Payments" },
+    { href: "/transport", icon: GraduationCap, label: "Scholar & staff" },
     { href: "/tracking", icon: MapPinned, label: "Live Tracking" },
     { href: "/reports", icon: BarChart3, label: "Reports" },
+    { href: "/target-calendar", icon: CalendarDays, label: "Target calendar" },
     { href: "/audit", icon: FileText, label: "Audit Trail" },
     { href: "/mfa", icon: Shield, label: "Security (MFA)" },
     { href: "/sessions", icon: Smartphone, label: "Sessions" },
     { href: "/notifications", icon: Bell, label: "Notifications" },
     { href: "/tenant-security", icon: Settings, label: "Tenant Security" },
-  ];
+  ].filter((item) => {
+    const moduleKey = MODULE_NAV[item.href];
+    if (!moduleKey) return true;
+    if (allowed == null) return true;
+    return allowed.has(moduleKey);
+  });
 
   return (
     <nav className="mt-6 px-4 space-y-1">
       {navItems.map((item) => {
         const Icon = item.icon;
-        const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
-        
+        const isActive =
+          pathname === item.href ||
+          (item.href !== "/" && pathname.startsWith(item.href));
+
         return (
           <Link
             key={item.href}
@@ -66,4 +92,3 @@ export function Navigation({ onLinkClick }: { onLinkClick?: () => void }) {
     </nav>
   );
 }
-

@@ -4,12 +4,19 @@ import * as nodemailer from 'nodemailer';
 import Mailgun from 'mailgun.js';
 import FormData from 'form-data';
 
+type MailAttachment = {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+};
+
 type MailOptions = {
   to: string | string[];
   subject: string;
   text?: string;
   html?: string;
   from?: string;
+  attachments?: MailAttachment[];
 };
 
 @Injectable()
@@ -69,14 +76,24 @@ export class EmailService {
       this.configService.get<string>('email.mailgunDomain') ?? process.env.MAILGUN_DOMAIN!;
     const from = mailOptions.from ?? this.getDefaultFrom();
     const toList = Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to];
-    const payload = {
+    const payload: Record<string, unknown> = {
       from,
       to: toList,
       subject: mailOptions.subject,
       text: mailOptions.text ?? '',
       html: mailOptions.html ?? '',
     };
-    await this.mailgunClient.messages.create(domain, payload as Parameters<typeof this.mailgunClient.messages.create>[1]);
+    if (mailOptions.attachments?.length) {
+      payload.attachment = mailOptions.attachments.map((a) => ({
+        filename: a.filename,
+        data: a.content,
+        contentType: a.contentType ?? 'application/octet-stream',
+      }));
+    }
+    await this.mailgunClient.messages.create(
+      domain,
+      payload as Parameters<typeof this.mailgunClient.messages.create>[1],
+    );
     return { sent: true };
   }
 
@@ -87,8 +104,16 @@ export class EmailService {
     }
     const from = mailOptions.from ?? this.getDefaultFrom();
     await this.transporter.sendMail({
-      ...mailOptions,
+      to: mailOptions.to,
+      subject: mailOptions.subject,
+      text: mailOptions.text,
+      html: mailOptions.html,
       from,
+      attachments: mailOptions.attachments?.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+      })),
     });
     return { sent: true };
   }
@@ -109,6 +134,69 @@ export class EmailService {
     }
   }
 
+  async sendAppInstallInvite(
+    to: string,
+    tenantName: string,
+    inviteUrl: string,
+  ): Promise<{ sent: boolean }> {
+    const subject = `Install the VIT app — ${tenantName}`;
+    const text = `Your fleet admin invited you to install the VIT driver app for ${tenantName}.
+
+Open this link on your Android phone, sign in with your driver email and password, then download the app:
+
+${inviteUrl}
+
+This invite expires in 48 hours. Do not share the link.`;
+    const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;line-height:1.5">
+      <h2>Install VIT</h2>
+      <p>Your fleet admin invited you to install the <strong>VIT</strong> driver app for <strong>${tenantName}</strong>.</p>
+      <p><a href="${inviteUrl}" style="display:inline-block;background:#0d9488;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:600">Open install page</a></p>
+      <p style="color:#666;font-size:14px">You will sign in with your driver email and password, then download the APK. Invite expires in 48 hours.</p>
+    </body></html>`;
+    return this.send({ to, subject, text, html });
+  }
+
+  /** Ops / 5xx alerts to ERROR_ALERT_TO (default dev@vehinc.co.za). */
+  async sendOpsAlert(payload: {
+    method: string;
+    path: string;
+    status: number;
+    message: string;
+    stack?: string;
+  }): Promise<{ sent: boolean }> {
+    const to =
+      this.configService.get<string>('ops.errorAlertTo') ??
+      process.env.ERROR_ALERT_TO ??
+      'dev@vehinc.co.za';
+    const when = new Date().toISOString();
+    const subject = `[VIT API ${payload.status}] ${payload.method} ${payload.path}`;
+    const text = [
+      `Time: ${when}`,
+      `Status: ${payload.status}`,
+      `Request: ${payload.method} ${payload.path}`,
+      `Message: ${payload.message}`,
+      '',
+      payload.stack ? `Stack:\n${payload.stack}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const html = `<!DOCTYPE html><html><body style="font-family:sans-serif">
+      <h2>VIT API error</h2>
+      <p><strong>Time:</strong> ${when}</p>
+      <p><strong>Status:</strong> ${payload.status}</p>
+      <p><strong>Request:</strong> ${payload.method} ${payload.path}</p>
+      <p><strong>Message:</strong> ${payload.message.replace(/</g, '&lt;')}</p>
+      ${
+        payload.stack
+          ? `<pre style="background:#111;color:#eee;padding:12px;overflow:auto;font-size:12px">${payload.stack
+              .replace(/</g, '&lt;')
+              .slice(0, 4000)}</pre>`
+          : ''
+      }
+    </body></html>`;
+    return this.send({ to, subject, text, html });
+  }
+
   /** Send a simple test email (used by POST /email/test). */
   async sendTestEmail(to: string): Promise<{ sent: boolean }> {
     const subject = 'VIT – Email test';
@@ -118,7 +206,7 @@ export class EmailService {
   }
 
   async sendMonthlyReport(
-    to: string,
+    to: string | string[],
     tenantName: string,
     reportData: {
       period: { startDate: Date; endDate: Date };
@@ -132,7 +220,20 @@ export class EmailService {
       topVehicles: Array<{ vehicle: string; totalIncome: number; trips: number }>;
       topDrivers: Array<{ driverName: string; totalIncome: number; trips: number }>;
       fuelEfficiency: Array<{ vehicle: string; kmPerLitre: number }>;
+      priorMonth?: {
+        totalIncome: number;
+        netIncome: number;
+        trips: number;
+      } | null;
+      targetHitRate?: {
+        driversWithTargetDays: number;
+        hitDays: number;
+        missDays: number;
+        hitPercent: number | null;
+      } | null;
+      maintenanceSpend?: number | null;
     },
+    pdfAttachment?: { filename: string; content: Buffer } | null,
   ) {
     const formatCurrency = (amount: number) => `R ${amount.toFixed(2)}`;
     const formatDate = (date: Date) => date.toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -262,8 +363,47 @@ export class EmailService {
             </div>
             ` : ''}
 
+            ${
+              reportData.priorMonth
+                ? `
+            <div class="summary-box">
+              <h2>Vs Prior Month</h2>
+              <div class="summary-grid">
+                <div class="summary-item">
+                  <div class="summary-label">Prior Income</div>
+                  <div class="summary-value">${formatCurrency(reportData.priorMonth.totalIncome)}</div>
+                </div>
+                <div class="summary-item">
+                  <div class="summary-label">Prior Net</div>
+                  <div class="summary-value">${formatCurrency(reportData.priorMonth.netIncome)}</div>
+                </div>
+                <div class="summary-item">
+                  <div class="summary-label">Prior Trips</div>
+                  <div class="summary-value">${reportData.priorMonth.trips}</div>
+                </div>
+              </div>
+            </div>`
+                : ''
+            }
+
+            ${
+              reportData.targetHitRate
+                ? `
+            <div class="summary-box">
+              <h2>Daily Target Hit Rate</h2>
+              <p>${reportData.targetHitRate.hitDays} hit / ${reportData.targetHitRate.missDays} miss
+              ${
+                reportData.targetHitRate.hitPercent != null
+                  ? ` (${reportData.targetHitRate.hitPercent}%)`
+                  : ''
+              }</p>
+            </div>`
+                : ''
+            }
+
             <div class="footer">
               <p>This is an automated monthly report from VIT (Vehicle Income Tracker)</p>
+              <p>A detailed PDF with charts is attached.</p>
               <p>Generated on ${new Date().toLocaleDateString('en-ZA')}</p>
             </div>
           </div>
@@ -272,12 +412,25 @@ export class EmailService {
       </html>
     `;
 
-    const result = await this.send({
-      to,
-      subject: `Monthly Financial Report - ${tenantName} - ${formatDate(reportData.period.startDate)}`,
-      html,
-    });
-    return result;
+    const recipients = Array.isArray(to) ? to : [to];
+    let lastResult = { sent: false };
+    for (const recipient of recipients) {
+      lastResult = await this.send({
+        to: recipient,
+        subject: `Monthly Financial Report - ${tenantName} - ${formatDate(reportData.period.startDate)}`,
+        html,
+        attachments: pdfAttachment
+          ? [
+              {
+                filename: pdfAttachment.filename,
+                content: pdfAttachment.content,
+                contentType: 'application/pdf',
+              },
+            ]
+          : undefined,
+      });
+    }
+    return lastResult;
   }
 
   async sendPasswordResetEmail(

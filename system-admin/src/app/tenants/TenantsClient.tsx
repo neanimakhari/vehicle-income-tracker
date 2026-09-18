@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { AlertCircle, Pencil, Plus, Download, Search } from "lucide-react";
+import { AlertCircle, Pencil, Plus, Download, Search, Mail, LogIn, Package } from "lucide-react";
 import { CreateTenantModal } from "@/components/CreateTenantModal";
 import { EditTenantModal } from "@/components/EditTenantModal";
 import { TenantBillingModal } from "@/components/TenantBillingModal";
+import { ReportRecipientsModal } from "@/components/ReportRecipientsModal";
+import { TenantEntitlementsModal } from "@/components/TenantEntitlementsModal";
 import Link from "next/link";
 
 type Tenant = {
@@ -24,6 +26,7 @@ type Tenant = {
   taxId?: string | null;
   website?: string | null;
   notes?: string | null;
+  allowSysEnter?: boolean;
 };
 
 type TenantAdmin = { id: string; email: string; tenantId: string };
@@ -46,6 +49,54 @@ type TenantsClientProps = {
   toggleTenant: (formData: FormData) => void;
   toggleMfa: (formData: FormData) => void;
   toggleUserMfa: (formData: FormData) => void;
+  listReportRecipients: (slug: string) => Promise<
+    Array<{ id: string; email: string; label: string | null; isActive: boolean }>
+  >;
+  addReportRecipient: (
+    slug: string,
+    data: { email: string; label?: string },
+  ) => Promise<{ success: boolean; error?: string }>;
+  updateReportRecipient: (
+    slug: string,
+    id: string,
+    data: { isActive?: boolean },
+  ) => Promise<{ success: boolean; error?: string }>;
+  deleteReportRecipient: (
+    slug: string,
+    id: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  enterTenant: (
+    slug: string,
+  ) => Promise<{ success: boolean; error?: string; url?: string }>;
+  loadCommercialCatalog: () => Promise<{
+    modules: Array<{ key: string; name: string; description: string | null }>;
+    plans: Array<{
+      id: string;
+      code: string;
+      name: string;
+      moduleKeys: string[];
+      maxDriversDefault: number | null;
+    }>;
+  }>;
+  loadTenantEntitlement: (slug: string) => Promise<{
+    tenantId: string;
+    planId: string | null;
+    moduleOverrides: Record<string, boolean>;
+    entitlements: string[];
+    legacyUnrestricted: boolean;
+    notes: string | null;
+    trialEndsAt: string | null;
+  } | null>;
+  saveTenantEntitlement: (
+    slug: string,
+    data: {
+      planId: string | null;
+      moduleOverrides: Record<string, boolean>;
+      notes?: string | null;
+      syncLimitsFromPlan?: boolean;
+    },
+  ) => Promise<{ success: boolean; error?: string }>;
+  isSys?: boolean;
 };
 
 function escapeCsv(s: string): string {
@@ -62,12 +113,24 @@ export function TenantsClient({
   toggleTenant,
   toggleMfa,
   toggleUserMfa,
+  listReportRecipients,
+  addReportRecipient,
+  updateReportRecipient,
+  deleteReportRecipient,
+  enterTenant,
+  loadCommercialCatalog,
+  loadTenantEntitlement,
+  saveTenantEntitlement,
+  isSys = false,
 }: TenantsClientProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editTenant, setEditTenant] = useState<Tenant | null>(null);
   const [billingTenant, setBillingTenant] = useState<{ tenant: Tenant; usage: UsageItem | null } | null>(null);
+  const [recipientsTenant, setRecipientsTenant] = useState<Tenant | null>(null);
+  const [entitlementsTenant, setEntitlementsTenant] = useState<Tenant | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [search, setSearch] = useState("");
+  const [enterError, setEnterError] = useState<string | null>(null);
   const tenantSlugsWithAdmin = new Set(admins.map((a) => a.tenantId));
   const usageBySlug = useMemo(() => {
     const m: Record<string, UsageItem> = {};
@@ -103,7 +166,6 @@ export function TenantsClient({
       "Drivers",
       "Vehicles",
       "Income records",
-      "Total income",
     ];
     const rows = filteredTenants.map((t) => {
       const u = usageBySlug[t.slug];
@@ -118,7 +180,6 @@ export function TenantsClient({
         String(u?.drivers ?? ""),
         String(u?.vehicles ?? ""),
         String(u?.incomes ?? ""),
-        String(u?.totalIncome ?? ""),
       ].join(",");
     });
     const csv = [headers.join(","), ...rows].join("\r\n");
@@ -148,14 +209,16 @@ export function TenantsClient({
             <Download className="h-4 w-4" />
             Export CSV (billing)
           </button>
-          <button
-            type="button"
-            onClick={() => setModalOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600"
-          >
-            <Plus className="h-4 w-4" />
-            Add tenant
-          </button>
+          {!isSys && (
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600"
+            >
+              <Plus className="h-4 w-4" />
+              Add tenant
+            </button>
+          )}
         </div>
       </div>
 
@@ -183,6 +246,12 @@ export function TenantsClient({
           </select>
         </div>
       </div>
+
+      {enterError && (
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">
+          {enterError}
+        </div>
+      )}
 
       {tenantsWithNoAdmin.length > 0 && (
         <div className="mt-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
@@ -313,12 +382,11 @@ export function TenantsClient({
                       <td className="hidden md:table-cell px-3 py-3 text-zinc-500 dark:text-zinc-400">
                         {u ? (
                           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span title={`Vehicles: ${u.vehicles}. Total income (logged): ${u.totalIncome}`}>
+                            <span title={`Vehicles: ${u.vehicles}. Income entries: ${u.incomes}`}>
                               {tenant.maxDrivers != null
                                 ? `${u.drivers} / ${tenant.maxDrivers} drivers`
                                 : `${u.drivers} drivers`}
                               , {u.vehicles} vehicles, {u.incomes} income records
-                              {u.totalIncome > 0 && ` · ${Number(u.totalIncome).toLocaleString()} total`}
                             </span>
                             <button
                               type="button"
@@ -343,6 +411,43 @@ export function TenantsClient({
                       </td>
                       <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                         <div className="flex items-center justify-end gap-3">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setEnterError(null);
+                              const result = await enterTenant(tenant.slug);
+                              if (!result.success) {
+                                setEnterError(result.error ?? "Enter failed");
+                                return;
+                              }
+                              if (result.url) window.location.href = result.url;
+                            }}
+                            className="text-teal-600 hover:text-teal-700 dark:text-teal-400"
+                            title="Enter tenant"
+                            aria-label="Enter tenant"
+                          >
+                            <LogIn className="h-4 w-4" aria-hidden />
+                          </button>
+                          {!isSys && (
+                            <>
+                          <button
+                            type="button"
+                            onClick={() => setEntitlementsTenant(tenant)}
+                            className="text-teal-600 hover:text-teal-700 dark:text-teal-400"
+                            title="Plan & modules"
+                            aria-label="Plan and modules"
+                          >
+                            <Package className="h-4 w-4" aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRecipientsTenant(tenant)}
+                            className="text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300"
+                            title="Report recipients"
+                            aria-label="Report recipients"
+                          >
+                            <Mail className="h-4 w-4" aria-hidden />
+                          </button>
                           <button
                             type="button"
                             onClick={() => setEditTenant(tenant)}
@@ -373,6 +478,19 @@ export function TenantsClient({
                               {tenant.requireMfaUsers ? "Disable Driver MFA" : "Require Driver MFA"}
                             </button>
                           </form>
+                            </>
+                          )}
+                          {isSys && (
+                            <button
+                              type="button"
+                              onClick={() => setEntitlementsTenant(tenant)}
+                              className="text-teal-600 hover:text-teal-700 dark:text-teal-400"
+                              title="View plan & modules"
+                              aria-label="View plan and modules"
+                            >
+                              <Package className="h-4 w-4" aria-hidden />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -401,6 +519,30 @@ export function TenantsClient({
           tenantSlug={billingTenant.tenant.slug}
           usage={billingTenant.usage}
           onClose={() => setBillingTenant(null)}
+        />
+      )}
+      {recipientsTenant && (
+        <ReportRecipientsModal
+          open={Boolean(recipientsTenant)}
+          tenantSlug={recipientsTenant.slug}
+          tenantName={recipientsTenant.name}
+          onClose={() => setRecipientsTenant(null)}
+          listRecipients={listReportRecipients}
+          addRecipient={addReportRecipient}
+          updateRecipient={updateReportRecipient}
+          deleteRecipient={deleteReportRecipient}
+        />
+      )}
+      {entitlementsTenant && (
+        <TenantEntitlementsModal
+          open={Boolean(entitlementsTenant)}
+          tenantSlug={entitlementsTenant.slug}
+          tenantName={entitlementsTenant.name}
+          onClose={() => setEntitlementsTenant(null)}
+          loadCatalog={loadCommercialCatalog}
+          loadEntitlement={loadTenantEntitlement}
+          saveEntitlement={isSys ? undefined : saveTenantEntitlement}
+          readOnly={isSys}
         />
       )}
     </div>

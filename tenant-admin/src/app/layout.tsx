@@ -13,6 +13,8 @@ import { Navigation } from "@/components/navigation";
 import { AuthChecker } from "@/components/auth-checker";
 import { MobileSidebarWrapper } from "@/components/mobile-sidebar-wrapper";
 import { ToastFromUrl } from "@/components/toast-from-url";
+import { SysImpersonationBanner } from "@/components/sys-impersonation-banner";
+import { PlatformAnnouncementBanner } from "@/components/PlatformAnnouncementBanner";
 import {
   LogOut,
   Bell,
@@ -38,16 +40,36 @@ export default async function RootLayout({
   const isAuthenticated = Boolean(token);
   let pendingMfaUsers: number | null = null;
   let tenantName: string | null = null;
+  let entitlements: string[] | null = null;
+  let platformAnnouncement: {
+    enabled?: boolean;
+    severity?: string;
+    message?: string;
+    blockWrites?: boolean;
+  } | null = null;
   if (isAuthenticated) {
     try {
-      const [policy, drivers] = await Promise.all([
-        fetchJson<{ requireMfaUsers?: boolean; tenantName?: string }>("/tenant/policy", { tolerate401: true }),
+      const [policy, drivers, announcement] = await Promise.all([
+        fetchJson<{
+          requireMfaUsers?: boolean;
+          tenantName?: string;
+          entitlements?: string[];
+          featureFlags?: string[];
+        }>("/tenant/policy", { tolerate401: true }),
         fetchJson<Array<{ mfaEnabled?: boolean }>>("/tenant/users", { tolerate401: true }),
+        fetchJson<{
+          enabled?: boolean;
+          severity?: string;
+          message?: string;
+          blockWrites?: boolean;
+        }>("/platform/announcement/active", { tolerate401: true }).catch(() => null),
       ]);
       if (policy?.requireMfaUsers) {
         pendingMfaUsers = (drivers ?? []).filter(driver => !driver.mfaEnabled).length;
       }
       tenantName = policy?.tenantName ?? null;
+      entitlements = policy?.entitlements ?? policy?.featureFlags ?? null;
+      platformAnnouncement = announcement;
     } catch (err) {
       pendingMfaUsers = null;
       tenantName = null;
@@ -81,8 +103,10 @@ export default async function RootLayout({
         <ThemeProvider>
           {isAuthenticated ? (
             <>
+              <PlatformAnnouncementBanner announcement={platformAnnouncement} />
+              <SysImpersonationBanner />
               <AuthChecker />
-              <MobileSidebarWrapper tenantName={tenantName} />
+              <MobileSidebarWrapper tenantName={tenantName} entitlements={entitlements} />
               <div className="min-h-screen">
                 {/* Desktop Sidebar */}
                 <aside className="hidden lg:flex lg:flex-col fixed inset-y-0 left-0 z-40 w-72 bg-gradient-to-b from-zinc-900 via-zinc-900 to-zinc-950 border-r border-zinc-800 shadow-2xl">
@@ -107,7 +131,7 @@ export default async function RootLayout({
                     </Link>
                   </div>
                   <div className="flex-1 overflow-y-auto">
-                    <Navigation />
+                    <Navigation entitlements={entitlements} />
                   </div>
                   <div className="shrink-0 p-4 border-t border-zinc-800 space-y-2">
                     <div className="flex items-center justify-between">
@@ -152,9 +176,9 @@ export default async function RootLayout({
                           <button
                             type="submit"
                             aria-label="Log out"
-                            className="flex items-center gap-1.5 lg:gap-2 rounded-lg border border-zinc-200 bg-white px-3 lg:px-4 py-1.5 lg:py-2 text-xs lg:text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-50 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                            className="flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-50 hover:shadow-md lg:gap-2 lg:px-4 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
                           >
-                            <LogOut className="h-3.5 w-3.5 lg:h-4 lg:w-4" aria-hidden />
+                            <LogOut className="h-4 w-4" aria-hidden />
                             <span className="hidden sm:inline">Logout</span>
                           </button>
                         </form>

@@ -15,6 +15,8 @@ import { TenantAccessGuard } from '../../tenancy/guards/tenant-access.guard';
 import { TenantReportsService } from './tenant-reports.service';
 import { ApiTags } from '@nestjs/swagger';
 import { CustomReportDto } from './dto/custom-report.dto';
+import { ModuleEntitlementGuard } from '../commercial/module-entitlement.guard';
+import { RequiresModule } from '../commercial/requires-module.decorator';
 
 @Controller('tenant/reports')
 @ApiTags('tenant-reports')
@@ -83,8 +85,15 @@ export class TenantReportsController {
   }
 
   @Get('advanced-insights')
-  @UseGuards(JwtAuthGuard, RolesGuard, TenantContextGuard, TenantAccessGuard)
+  @UseGuards(
+    JwtAuthGuard,
+    RolesGuard,
+    TenantContextGuard,
+    TenantAccessGuard,
+    ModuleEntitlementGuard,
+  )
   @Roles('TENANT_ADMIN', 'TENANT_USER')
+  @RequiresModule('reports_advanced')
   advancedInsights(@Req() req: { user?: { sub?: string; role?: string } }) {
     return this.tenantReportsService.getAdvancedInsights(req.user);
   }
@@ -159,8 +168,15 @@ export class TenantReportsController {
   }
 
   @Post('custom')
-  @UseGuards(JwtAuthGuard, RolesGuard, TenantContextGuard, TenantAccessGuard)
+  @UseGuards(
+    JwtAuthGuard,
+    RolesGuard,
+    TenantContextGuard,
+    TenantAccessGuard,
+    ModuleEntitlementGuard,
+  )
   @Roles('TENANT_ADMIN', 'TENANT_USER')
+  @RequiresModule('reports_advanced')
   async customReport(
     @Body() dto: CustomReportDto,
     @Req() req: { user?: { sub?: string; role?: string } },

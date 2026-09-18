@@ -18,6 +18,7 @@ import 'screens/verify_email_link_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/change_password_screen.dart';
 import 'theme.dart';
+import 'widgets/app_update_prompt.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -196,6 +197,14 @@ class _HomeGateState extends State<HomeGate> with WidgetsBindingObserver {
     } finally {
       if (mounted) {
         setState(() => _loading = false);
+        if (Session.accessToken != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              // ignore: unawaited_futures
+              maybePromptAppUpdate(context);
+            }
+          });
+        }
       }
     }
   }

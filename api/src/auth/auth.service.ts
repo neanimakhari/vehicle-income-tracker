@@ -95,11 +95,11 @@ export class AuthService {
     if (isTenantAdminLogin) {
       if (user.role !== 'TENANT_ADMIN') {
         throw new UnauthorizedException(
-          'This account is for platform admin. Sign in at the system admin app.',
+          'This account is for platform/sys admin. Sign in at the system admin app.',
         );
       }
     } else {
-      if (user.role !== 'PLATFORM_ADMIN') {
+      if (user.role !== 'PLATFORM_ADMIN' && user.role !== 'SYS') {
         throw new UnauthorizedException(
           'This account is for tenant admin. Sign in at the tenant admin app with your tenant.',
         );
@@ -116,7 +116,9 @@ export class AuthService {
     if (!user.mfaEnabled) {
       if (
         forceMfaForAdmins &&
-        (user.role === 'PLATFORM_ADMIN' || user.role === 'TENANT_ADMIN')
+        (user.role === 'PLATFORM_ADMIN' ||
+          user.role === 'TENANT_ADMIN' ||
+          user.role === 'SYS')
       ) {
         throw new UnauthorizedException('MFA setup required');
       }
@@ -221,6 +223,71 @@ export class AuthService {
     };
   }
 
+  /**
+   * PLATFORM_ADMIN or SYS enters a tenant as a short-lived TENANT_ADMIN session.
+   */
+  async impersonateTenant(
+    actor: { sub: string; email: string; role: string },
+    tenantSlug: string,
+    context?: { ip?: string },
+  ) {
+    if (actor.role !== 'PLATFORM_ADMIN' && actor.role !== 'SYS') {
+      throw new UnauthorizedException('Not allowed to enter tenants');
+    }
+    const slug = tenantSlug.trim();
+    if (!slug) {
+      throw new UnauthorizedException('Tenant slug required');
+    }
+    const tenant = await this.tenantRepository.findOne({ where: { slug } });
+    if (!tenant || !tenant.isActive) {
+      throw new UnauthorizedException('Tenant not found or inactive');
+    }
+    if (actor.role === 'SYS' && tenant.allowSysEnter === false) {
+      throw new UnauthorizedException('SYS enter is disabled for this tenant');
+    }
+
+    const payload = {
+      sub: actor.sub,
+      email: actor.email,
+      role: 'TENANT_ADMIN' as const,
+      tenantId: slug,
+      impersonation: true,
+      impersonatorId: actor.sub,
+      impersonatorRole: actor.role,
+    };
+
+    const accessToken = await this.jwtService.signAsync(payload, {
+      expiresIn: '2h',
+    });
+
+    await this.auditService.log({
+      action: 'auth.impersonate_start',
+      actorUserId: actor.sub,
+      actorRole: actor.role,
+      targetType: 'tenant',
+      targetId: tenant.id,
+      metadata: {
+        ip: context?.ip ?? null,
+        impersonatorEmail: actor.email,
+        tenantSlug: slug,
+      },
+    });
+
+    return {
+      accessToken,
+      expiresInSeconds: 2 * 60 * 60,
+      tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name },
+      user: {
+        id: actor.sub,
+        email: actor.email,
+        role: 'TENANT_ADMIN',
+        tenantId: slug,
+        impersonation: true,
+        impersonatorRole: actor.role,
+      },
+    };
+  }
+
   async setupMfa(userId: string) {
     const user = await this.authUserRepository.findOne({ where: { id: userId } });
     if (!user) {
@@ -305,7 +372,15 @@ export class AuthService {
   }
 
   private async issueTokens(
-    payload: { sub: string; email: string; role: string; tenantId: string | null },
+    payload: {
+      sub: string;
+      email: string;
+      role: string;
+      tenantId: string | null;
+      impersonation?: boolean;
+      impersonatorId?: string;
+      impersonatorRole?: string;
+    },
     refreshExpiresIn: StringValue,
   ) {
     const refreshTokenId = randomUUID();

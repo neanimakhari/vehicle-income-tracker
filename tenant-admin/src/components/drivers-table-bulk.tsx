@@ -496,6 +496,31 @@ export function DriversTableBulk({
                             driverName={`${driver.firstName} ${driver.lastName}`}
                             onReset={onResetPassword}
                           />
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center rounded-md p-2 text-teal-600 hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-teal-900/20 transition-colors"
+                            title="Email app install link"
+                            aria-label="Email app install link"
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(
+                                  `/api/proxy/tenant/mobile-app/install-invite/${driver.id}`,
+                                  { method: "POST" },
+                                );
+                                if (!res.ok) {
+                                  const t = await res.text();
+                                  alert(t || "Failed to send install invite");
+                                  return;
+                                }
+                                alert(`Install invite emailed to ${driver.email}`);
+                              } catch {
+                                alert("Failed to send install invite");
+                              }
+                            }}
+                          >
+                            <Download className="h-4 w-4" />
+                            <span className="hidden lg:inline ml-1.5">App link</span>
+                          </button>
                           {!driver.mfaEnabled && (
                             <form action={onRemindMfa} className="inline">
                               <input type="hidden" name="id" value={driver.id} />

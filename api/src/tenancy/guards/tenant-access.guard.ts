@@ -12,7 +12,10 @@ export class TenantAccessGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    const user = request.user as { tenantId?: string | null };
+    const user = request.user as {
+      tenantId?: string | null;
+      impersonation?: boolean;
+    };
     const tenantFromContext = this.tenantContext.getTenantId();
 
     if (!tenantFromContext) {
@@ -28,7 +31,12 @@ export class TenantAccessGuard implements CanActivate {
       throw new ForbiddenException('Tenant access denied');
     }
     const tenant = await tenantsService.findBySlug(tenantFromContext);
-    if (tenant.enforceIpAllowlist && tenant.allowedIps?.length) {
+    // SYS/platform impersonation may skip tenant IP allowlists.
+    if (
+      !user.impersonation &&
+      tenant.enforceIpAllowlist &&
+      tenant.allowedIps?.length
+    ) {
       const ip = request.ip ?? request.connection?.remoteAddress;
       if (!ip || !tenant.allowedIps.includes(ip)) {
         throw new ForbiddenException('IP not allowed');

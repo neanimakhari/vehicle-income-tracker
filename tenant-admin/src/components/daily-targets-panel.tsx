@@ -100,6 +100,13 @@ export function DailyTargetsPanel({
                 ? `For ${data.date} · approved + auto income only`
                 : "Set a default target to start tracking shortfalls"}
             </p>
+            <Link
+              href="/target-calendar"
+              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-teal-700 hover:underline dark:text-teal-300"
+            >
+              Configure calendar rules
+              <ArrowRight className="h-3 w-3" />
+            </Link>
           </div>
         </div>
         <form onSubmit={saveDefault} className="flex flex-wrap items-end gap-2">

@@ -82,6 +82,7 @@ export function IncomesClient({
 }: Props) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [streamFilter, setStreamFilter] = useState<"all" | "operations" | "transport">("all");
   const [sortKey, setSortKey] = useState<SortKey>("loggedOn");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [pageSize, setPageSize] = useState(10);
@@ -96,14 +97,20 @@ export function IncomesClient({
     [missingVehicleLabels],
   );
   const statusFiltered = useMemo(() => {
+    let list = safeIncomes;
+    if (streamFilter === "operations") {
+      list = list.filter((i) => (i.incomeStream ?? "general") !== "scholar");
+    } else if (streamFilter === "transport") {
+      list = list.filter((i) => (i.incomeStream ?? "general") === "scholar");
+    }
     if (statusFilter === "pending") {
-      return safeIncomes.filter((i) => (i.approvalStatus ?? "auto") === "pending");
+      return list.filter((i) => (i.approvalStatus ?? "auto") === "pending");
     }
     if (statusFilter === "missing") {
-      return safeIncomes.filter((i) => missingSet.has(String(i.vehicle ?? "").toLowerCase()));
+      return list.filter((i) => missingSet.has(String(i.vehicle ?? "").toLowerCase()));
     }
-    return safeIncomes;
-  }, [safeIncomes, statusFilter, missingSet]);
+    return list;
+  }, [safeIncomes, statusFilter, missingSet, streamFilter]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -196,6 +203,31 @@ export function IncomesClient({
       </div>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex w-full sm:w-auto flex-col rounded-lg border border-zinc-200 dark:border-zinc-700 p-0.5 bg-zinc-50 dark:bg-zinc-900/50 sm:flex-row">
+          {(
+            [
+              ["all", "Both"],
+              ["operations", "Day-to-day"],
+              ["transport", "Scholar / staff"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => {
+                setStreamFilter(id);
+                setPageIndex(0);
+              }}
+              className={`rounded-md px-3 py-1.5 text-sm ${
+                streamFilter === id
+                  ? "bg-white shadow text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
+                  : "text-zinc-600 dark:text-zinc-300"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="flex w-full sm:w-auto flex-col rounded-lg border border-zinc-200 dark:border-zinc-700 p-0.5 bg-zinc-50 dark:bg-zinc-900/50 sm:flex-row">
           <button
             type="button"

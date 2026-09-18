@@ -74,5 +74,26 @@ export default () => ({
     sendNewTenantCreatedEmail: process.env.SEND_NEW_TENANT_EMAIL !== 'false',
     sendTenantAdminWelcomeEmail: process.env.SEND_TENANT_ADMIN_WELCOME_EMAIL !== 'false',
   },
+  ops: {
+    errorAlertTo: process.env.ERROR_ALERT_TO ?? 'dev@vehinc.co.za',
+    errorAlertEnabled: process.env.ERROR_ALERT_ENABLED !== 'false',
+    errorAlertThrottleMs: Number(process.env.ERROR_ALERT_THROTTLE_MS ?? 10 * 60 * 1000),
+    mobileAppLatestUrl: process.env.MOBILE_APP_LATEST_URL ?? '',
+    mobileAppVersionName: process.env.MOBILE_APP_VERSION_NAME ?? '1.0.1',
+    mobileAppVersionCode: Number(process.env.MOBILE_APP_VERSION_CODE ?? 2),
+    mobileAppMinVersionCode: Number(process.env.MOBILE_APP_MIN_VERSION_CODE ?? 1),
+    mobileAppSha256: process.env.MOBILE_APP_APK_SHA256 ?? '',
+    mobileAppApkPath:
+      process.env.MOBILE_APP_APK_PATH ?? '/var/www/vit-app-private/releases/vit-latest.apk',
+    mobileAppStagingVersionName: process.env.MOBILE_APP_STAGING_VERSION_NAME ?? '1.0.1-staging',
+    mobileAppStagingVersionCode: Number(process.env.MOBILE_APP_STAGING_VERSION_CODE ?? 2),
+    mobileAppStagingSha256: process.env.MOBILE_APP_STAGING_APK_SHA256 ?? '',
+    mobileAppStagingApkPath:
+      process.env.MOBILE_APP_STAGING_APK_PATH ??
+      '/var/www/vit-app-private-staging/releases/vit-latest.apk',
+    mobileAppDownloadSecret: process.env.MOBILE_APP_DOWNLOAD_SECRET ?? '',
+    apiPublicUrl: process.env.API_PUBLIC_URL ?? 'https://vit-api.vehinc.co.za/v1',
+    vitAppUrl: process.env.VIT_APP_URL ?? 'https://vit-app.vehinc.co.za',
+  },
 });
 

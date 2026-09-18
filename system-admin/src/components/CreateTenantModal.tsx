@@ -73,7 +73,9 @@ export function CreateTenantModal({ isOpen, onClose, createTenant }: CreateTenan
       <div className="absolute inset-0 bg-zinc-900/60 dark:bg-zinc-950/70" onClick={handleClose} aria-hidden />
       <div className="relative w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mb-4 flex items-center justify-between">
-          <h2 id={titleId} className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Add tenant</h2>
+          <h2 id={titleId} className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+            Create from template
+          </h2>
           <button
             type="button"
             onClick={handleClose}
@@ -83,6 +85,9 @@ export function CreateTenantModal({ isOpen, onClose, createTenant }: CreateTenan
             <X className="h-5 w-5" aria-hidden />
           </button>
         </div>
+        <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
+          Applies platform new-tenant defaults (MFA hints, limits, default plan) automatically.
+        </p>
         <form action={handleSubmit} className="space-y-4">
           {error && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">
@@ -120,16 +125,16 @@ export function CreateTenantModal({ isOpen, onClose, createTenant }: CreateTenan
             <input name="contactPhone" className="input w-full px-3 py-2 text-sm" placeholder="Optional" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Address</label>
-            <textarea name="address" rows={2} className="input w-full px-3 py-2 text-sm" placeholder="Optional" />
+            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              First admin email (optional)
+            </label>
+            <input name="adminEmail" type="email" className="input w-full px-3 py-2 text-sm" placeholder="admin@fleet.co.za" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Registration / Tax ID</label>
-            <input name="registrationNumber" className="input w-full px-3 py-2 text-sm" placeholder="Optional" />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Website</label>
-            <input name="website" type="url" className="input w-full px-3 py-2 text-sm" placeholder="Optional" />
+            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              First admin password (optional)
+            </label>
+            <input name="adminPassword" type="password" className="input w-full px-3 py-2 text-sm" placeholder="Min 8 chars, upper/lower/symbol" />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={handleClose} className="btn-secondary px-4 py-2 text-sm">

@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { ModuleRef } from '@nestjs/core';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
@@ -16,6 +17,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { CommercialService } from '../commercial/commercial.service';
 
 class UpdateTenantReminderPolicyDto {
   @IsBoolean()
@@ -54,7 +56,23 @@ export class TenantPolicyController {
   constructor(
     private readonly tenantsService: TenantsService,
     private readonly tenantContext: TenantContextService,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  private async resolveEntitlements(slug: string): Promise<string[]> {
+    try {
+      const commercial = this.moduleRef.get(CommercialService, {
+        strict: false,
+      });
+      if (commercial) {
+        return commercial.resolveEntitlements(slug);
+      }
+    } catch {
+      /* commercial module not ready */
+    }
+    const tenant = await this.tenantsService.findBySlug(slug);
+    return tenant.featureFlags ?? [];
+  }
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard, TenantContextGuard, TenantAccessGuard)
@@ -65,6 +83,7 @@ export class TenantPolicyController {
       return { requireMfa: false, requireMfaUsers: false };
     }
     const tenant = await this.tenantsService.findBySlug(slug);
+    const entitlements = await this.resolveEntitlements(slug);
     return {
       requireMfa: tenant.requireMfa,
       requireMfaUsers: tenant.requireMfaUsers,
@@ -72,7 +91,10 @@ export class TenantPolicyController {
       sessionTimeoutMinutes: tenant.sessionTimeoutMinutes,
       enforceIpAllowlist: tenant.enforceIpAllowlist,
       enforceDeviceAllowlist: tenant.enforceDeviceAllowlist,
-      featureFlags: tenant.featureFlags ?? [],
+      featureFlags: entitlements,
+      entitlements,
+      maxDrivers: tenant.maxDrivers,
+      maxStorageMb: tenant.maxStorageMb,
       missingIncomeReminderEnabled: tenant.missingIncomeReminderEnabled,
       missingIncomeCutoffHour: tenant.missingIncomeCutoffHour,
       missingIncomeTimezone: tenant.missingIncomeTimezone,

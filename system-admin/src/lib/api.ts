@@ -1,7 +1,18 @@
+import { redirect } from "next/navigation";
 import { getAuthToken } from "./auth";
 import { getApiUrl as getApiUrlBase } from "./api-url";
 
 export const getApiUrl = getApiUrlBase;
+
+function isNextRedirect(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "digest" in error &&
+    typeof (error as { digest?: unknown }).digest === "string" &&
+    String((error as { digest: string }).digest).startsWith("NEXT_REDIRECT")
+  );
+}
 
 export async function getAuthHeaders(): Promise<Record<string, string>> {
   const token = (await getAuthToken()) ?? "";
@@ -22,19 +33,14 @@ export async function fetchJson<T>(path: string) {
     });
 
     if (!res.ok) {
-      // Auto-logout on 401 (Unauthorized) - token expired
+      // Token expired / invalid — redirect only (cookie clear is not allowed in RSC)
       if (res.status === 401) {
-        const { clearAuthToken } = await import("./auth");
-        await clearAuthToken();
-        const { redirect } = await import("next/navigation");
         redirect("/login?error=expired");
       }
-      // 403 = wrong role (e.g. tenant admin viewing platform-only page)
+      // 403 = not entitled for this endpoint; do not wipe the session (SYS hits some admin-only routes)
       if (res.status === 403) {
-        const { clearAuthToken } = await import("./auth");
-        await clearAuthToken();
-        const { redirect } = await import("next/navigation");
-        redirect("/login?error=forbidden");
+        console.error(`API Error: ${res.status} ${res.statusText} for ${path}`);
+        return null;
       }
       console.error(`API Error: ${res.status} ${res.statusText} for ${path}`);
       return null;
@@ -42,8 +48,8 @@ export async function fetchJson<T>(path: string) {
 
     return (await res.json()) as T;
   } catch (error) {
+    if (isNextRedirect(error)) throw error;
     console.error(`Fetch error for ${path}:`, error);
     return null;
   }
 }
-

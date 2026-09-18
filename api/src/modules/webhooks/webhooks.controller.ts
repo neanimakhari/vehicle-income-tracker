@@ -8,6 +8,8 @@ import { TenantAccessGuard } from '../../tenancy/guards/tenant-access.guard';
 import { WebhooksService } from './webhooks.service';
 import { WebhookSubscription } from './webhook-subscription.entity';
 import { ApiTags } from '@nestjs/swagger';
+import { ModuleEntitlementGuard } from '../commercial/module-entitlement.guard';
+import { RequiresModule } from '../commercial/requires-module.decorator';
 
 class CreateWebhookDto {
   @IsUrl()
@@ -24,25 +26,44 @@ class CreateWebhookDto {
 
 @Controller('tenant/webhooks')
 @ApiTags('webhooks')
+@RequiresModule('webhooks')
 export class WebhooksController {
   constructor(private readonly webhooksService: WebhooksService) {}
 
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard, TenantContextGuard, TenantAccessGuard)
+  @UseGuards(
+    JwtAuthGuard,
+    RolesGuard,
+    TenantContextGuard,
+    TenantAccessGuard,
+    ModuleEntitlementGuard,
+  )
   @Roles('TENANT_ADMIN')
   list(): Promise<WebhookSubscription[]> {
     return this.webhooksService.list();
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard, TenantContextGuard, TenantAccessGuard)
+  @UseGuards(
+    JwtAuthGuard,
+    RolesGuard,
+    TenantContextGuard,
+    TenantAccessGuard,
+    ModuleEntitlementGuard,
+  )
   @Roles('TENANT_ADMIN')
   register(@Body() dto: CreateWebhookDto) {
     return this.webhooksService.register(dto.url, dto.secret, dto.eventTypes);
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard, TenantContextGuard, TenantAccessGuard)
+  @UseGuards(
+    JwtAuthGuard,
+    RolesGuard,
+    TenantContextGuard,
+    TenantAccessGuard,
+    ModuleEntitlementGuard,
+  )
   @Roles('TENANT_ADMIN')
   unregister(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.webhooksService.unregister(id);

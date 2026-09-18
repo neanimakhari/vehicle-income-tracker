@@ -12,7 +12,7 @@ export class AuditController {
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('PLATFORM_ADMIN')
+  @Roles('PLATFORM_ADMIN', 'SYS')
   findWithQuery(
     @Query('action') action?: string,
     @Query('dateFrom') dateFrom?: string,

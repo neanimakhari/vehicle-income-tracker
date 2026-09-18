@@ -5,7 +5,7 @@ import Script from "next/script";
 import { Suspense } from "react";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { getAuthToken } from "@/lib/auth";
+import { getAuthToken, getAuthRole } from "@/lib/auth";
 import { fetchJson } from "@/lib/api";
 import { logoutAction } from "@/lib/auth-actions";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -36,6 +36,8 @@ export default async function RootLayout({
 }>) {
   const token = await getAuthToken();
   const isAuthenticated = Boolean(token);
+  const role = isAuthenticated ? await getAuthRole() : null;
+  const isSys = role === "SYS";
   let mfaSummary: { admin: number; driver: number } | null = null;
   if (isAuthenticated) {
     try {
@@ -80,7 +82,7 @@ export default async function RootLayout({
           {isAuthenticated ? (
             <>
               <AuthChecker />
-              <MobileSidebarWrapper />
+              <MobileSidebarWrapper role={role} />
               <div className="min-h-screen">
                 {/* Desktop Sidebar */}
                 <aside className="hidden lg:flex lg:flex-col fixed inset-y-0 left-0 z-40 w-72 bg-gradient-to-b from-zinc-900 via-zinc-900 to-zinc-950 border-r border-zinc-800 shadow-2xl">
@@ -98,12 +100,14 @@ export default async function RootLayout({
                       </div>
                       <div className="min-w-0">
                         <div className="text-xl font-bold text-white truncate">VIT Platform</div>
-                        <div className="text-xs text-teal-400 font-medium">System Control</div>
+                        <div className="text-xs text-teal-400 font-medium">
+                          {isSys ? "SYS Support" : "System Control"}
+                        </div>
                       </div>
                     </Link>
                   </div>
                   <div className="flex-1 overflow-y-auto">
-                    <Navigation />
+                    <Navigation role={role} />
                   </div>
                   <div className="shrink-0 p-4 border-t border-zinc-800 space-y-2">
                     <div className="flex items-center justify-between">
@@ -123,7 +127,7 @@ export default async function RootLayout({
                   <header className="sticky top-0 z-30 flex h-16 lg:h-20 items-center gap-x-4 border-b border-zinc-200/80 bg-white/90 backdrop-blur-lg shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/90">
                     <div className="flex flex-1 items-center justify-between pl-14 pr-4 lg:px-8 min-w-0">
                       <div className="truncate text-sm sm:text-base lg:text-lg font-semibold bg-gradient-to-r from-teal-600 to-teal-700 bg-clip-text text-transparent">
-                        Platform Administration
+                        {isSys ? "SYS Support Access" : "Platform Administration"}
                       </div>
                       <div className="flex items-center gap-2 lg:gap-4">
                         {mfaSummary ? (
@@ -138,17 +142,21 @@ export default async function RootLayout({
                             P
                           </div>
                           <div className="hidden lg:flex flex-col">
-                            <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50">Platform Admin</span>
-                            <span className="text-xs text-zinc-500 dark:text-zinc-400">System Control</span>
+                            <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                              {isSys ? "SYS Account" : "Platform Admin"}
+                            </span>
+                            <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                              {isSys ? "Enter tenants to support" : "System Control"}
+                            </span>
                           </div>
                         </div>
                         <form action={logoutAction}>
                           <button
                             type="submit"
                             aria-label="Log out"
-                            className="flex items-center gap-1.5 lg:gap-2 rounded-lg border border-zinc-200 bg-white px-3 lg:px-4 py-1.5 lg:py-2 text-xs lg:text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-50 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                            className="flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-50 hover:shadow-md lg:gap-2 lg:px-4 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
                           >
-                            <LogOut className="h-3.5 w-3.5 lg:h-4 lg:w-4" aria-hidden />
+                            <LogOut className="h-4 w-4" aria-hidden />
                             <span className="hidden sm:inline">Logout</span>
                           </button>
                         </form>

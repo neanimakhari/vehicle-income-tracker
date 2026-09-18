@@ -11,6 +11,7 @@ import { EmailModule } from '../modules/email/email.module';
   imports: [TypeOrmModule.forFeature([AuthUser, Tenant]), AuditModule, EmailModule],
   controllers: [TenantAdminController],
   providers: [TenantAdminService],
+  exports: [TenantAdminService],
 })
 export class TenantAdminModule {}
 

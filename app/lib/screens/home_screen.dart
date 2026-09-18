@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/session.dart';
 import '../theme.dart';
+import '../widgets/platform_announcement_banner.dart';
 import '../widgets/sidebar.dart';
 import 'dashboard_screen.dart';
 import 'income_log_screen.dart';
@@ -24,6 +25,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _driverDisplayName;
   bool? _emailVerified;
   bool _showExpiryBadge = false;
+  Map<String, dynamic>? _announcement;
+  bool _announcementDismissed = false;
 
   @override
   void initState() {
@@ -32,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _driverDisplayName = Session.email;
     _loadDriverDisplayName();
     _loadExpiryStatus();
+    _loadAnnouncement();
     _pages = [
       DashboardScreen(openDrawer: () => _scaffoldKey.currentState?.openDrawer()),
       IncomeLogScreen(onBack: _handleBackToHome, openDrawer: () => _scaffoldKey.currentState?.openDrawer()),
@@ -91,11 +95,22 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _loadAnnouncement() async {
+    final a = await ApiService().fetchActiveAnnouncement();
+    if (!mounted) return;
+    setState(() {
+      _announcement = a;
+      _announcementDismissed = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final barColor = isDarkMode ? AppTheme.darkSurface : AppTheme.primary;
     final borderColor = isDarkMode ? AppTheme.darkBorder : Colors.transparent;
+    final showBanner =
+        !_announcementDismissed && _announcement != null;
     return Scaffold(
       key: _scaffoldKey,
       drawer: AppSidebar(
@@ -115,7 +130,17 @@ class _HomeScreenState extends State<HomeScreen> {
               // Add bottom padding to prevent content from being hidden
               Padding(
                 padding: EdgeInsets.only(bottom: _navbarVisible ? 88 : 16),
-                child: _pages[_index],
+                child: Column(
+                  children: [
+                    if (showBanner)
+                      PlatformAnnouncementBanner(
+                        announcement: _announcement!,
+                        onDismiss: () =>
+                            setState(() => _announcementDismissed = true),
+                      ),
+                    Expanded(child: _pages[_index]),
+                  ],
+                ),
               ),
               // Collapsible Navigation Bar with always-visible toggle handle
               Positioned(

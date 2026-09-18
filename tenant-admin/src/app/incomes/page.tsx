@@ -77,10 +77,18 @@ async function fetchTrips() {
 }
 
 async function fetchScholarPayments() {
-  const items = await fetchJson<Array<{ id: string; scholarName: string; status: string }>>(
-    "/tenant/scholar-payments",
+  const items = await fetchJson<
+    Array<{ id: string; passengerId: string; status: string; amount: number }>
+  >("/tenant/transport/payments?status=approved");
+  const passengers = await fetchJson<Array<{ id: string; name: string }>>(
+    "/tenant/transport/passengers?activeOnly=false",
   );
-  return items ?? [];
+  const names = new Map((passengers ?? []).map((p) => [p.id, p.name]));
+  return (items ?? []).map((row) => ({
+    id: row.id,
+    scholarName: `${names.get(row.passengerId) ?? "Passenger"} (R ${Number(row.amount).toFixed(2)})`,
+    status: row.status,
+  }));
 }
 
 export default async function IncomesPage() {

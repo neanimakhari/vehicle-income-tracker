@@ -23,6 +23,9 @@ type CreateIncomePayload = {
   petrolSlip?: string;
   driverId?: string;
   loggedOn: string;
+  incomeStream?: string;
+  tripId?: string;
+  scholarPaymentId?: string;
 };
 
 @Injectable()
@@ -203,6 +206,9 @@ export class TenantIncomesService {
         approvalStatus,
         approvedAt: null,
         approvedBy: null,
+        incomeStream: payload.incomeStream ?? 'general',
+        tripId: payload.tripId ?? null,
+        scholarPaymentId: payload.scholarPaymentId ?? null,
       });
       const saved = await repo.save(entity);
       await this.auditService.log({
@@ -277,6 +283,10 @@ export class TenantIncomesService {
       if (payload.expenseImage !== undefined) existing.expenseImage = payload.expenseImage ?? null;
       if (payload.petrolSlip !== undefined) existing.petrolSlip = payload.petrolSlip ?? null;
       if (payload.loggedOn !== undefined) existing.loggedOn = new Date(payload.loggedOn);
+      if (payload.incomeStream !== undefined) existing.incomeStream = payload.incomeStream;
+      if (payload.tripId !== undefined) existing.tripId = payload.tripId ?? null;
+      if (payload.scholarPaymentId !== undefined)
+        existing.scholarPaymentId = payload.scholarPaymentId ?? null;
 
       const saved = await repo.save(existing);
       await this.auditService.log({

@@ -1,7 +1,9 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { TenantAwareThrottlerGuard } from './common/tenant-aware-throttler.guard';
+import { OpsAlertExceptionFilter } from './common/ops-alert.exception-filter';
+import { MinAppVersionInterceptor } from './common/min-app-version.interceptor';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -23,6 +25,9 @@ import { HealthModule } from './health/health.module';
 import { TenantMaintenanceModule } from './modules/tenant-maintenance/tenant-maintenance.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { CommercialModule } from './modules/commercial/commercial.module';
+import { TenantTransportModule } from './modules/tenant-transport/tenant-transport.module';
+import { EmailModule } from './modules/email/email.module';
 
 @Module({
   imports: [
@@ -45,6 +50,7 @@ import { ScheduleModule } from '@nestjs/schedule';
       }),
     }),
     DatabaseModule,
+    EmailModule,
     AuthModule,
     TenantsModule,
     TenancyModule,
@@ -55,6 +61,8 @@ import { ScheduleModule } from '@nestjs/schedule';
     TenantReportsModule,
     TenantMaintenanceModule,
     WebhooksModule,
+    CommercialModule,
+    TenantTransportModule,
     PlatformAdminModule,
     TenantAdminModule,
     HealthModule,
@@ -65,6 +73,14 @@ import { ScheduleModule } from '@nestjs/schedule';
     {
       provide: APP_GUARD,
       useClass: TenantAwareThrottlerGuard,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: OpsAlertExceptionFilter,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: MinAppVersionInterceptor,
     },
   ],
 })

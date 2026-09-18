@@ -4,6 +4,7 @@ import { fetchJson, getApiUrl, getAuthHeaders } from "../../lib/api";
 import { Users, AlertTriangle } from "lucide-react";
 import { DriversTableBulk } from "@/components/drivers-table-bulk";
 import { CreateDriverModal } from "@/components/create-driver-modal";
+import { VitAppQrCard } from "@/components/VitAppQrCard";
 
 async function fetchDrivers() {
   try {
@@ -221,6 +222,10 @@ export default async function DriversPage() {
 
       <div className="mt-6 flex flex-wrap items-center gap-4">
         <CreateDriverModal createDriver={createDriver} />
+      </div>
+
+      <div className="mt-6">
+        <VitAppQrCard />
       </div>
 
       <DriversTableBulk
