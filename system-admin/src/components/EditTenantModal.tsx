@@ -111,7 +111,7 @@ export function EditTenantModal({ tenant, onClose, updateTenant }: EditTenantMod
       />
       <div
         className={`relative max-h-[90vh] w-full overflow-y-auto rounded-xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 ${
-          tab === "brand" ? "max-w-4xl" : "max-w-md"
+          tab === "brand" ? "max-w-5xl" : "max-w-md"
         }`}
       >
         <div className="mb-4 flex items-center justify-between">

@@ -10,8 +10,42 @@ type Props = {
   onAdminScreen?: (s: "login" | "dashboard" | "drivers" | "reports") => void;
   onPhoneScreen?: (s: "home" | "income" | "history" | "drawer") => void;
   watermark?: string;
-  dark?: boolean;
 };
+
+function ScreenTabs<T extends string>({
+  options,
+  value,
+  onChange,
+  activeStyle,
+}: {
+  options: readonly T[];
+  value: T;
+  onChange?: (s: T) => void;
+  activeStyle?: React.CSSProperties;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1 p-1.5 border-b border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-950">
+      {options.map((s) => {
+        const active = value === s;
+        return (
+          <button
+            key={s}
+            type="button"
+            onClick={() => onChange?.(s)}
+            className={`rounded-md px-2.5 py-1 text-[11px] font-medium capitalize transition-colors ${
+              active
+                ? "text-white"
+                : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            }`}
+            style={active ? activeStyle : undefined}
+          >
+            {s}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export function BrandMockFrames({
   draft,
@@ -21,7 +55,6 @@ export function BrandMockFrames({
   onAdminScreen,
   onPhoneScreen,
   watermark,
-  dark = false,
 }: Props) {
   const primary = draft.primaryHex || VIT_PRIMARY;
   const accent = draft.accentHex || VIT_ACCENT;
@@ -36,168 +69,163 @@ export function BrandMockFrames({
     ["--mock-a"]: tokens.accent,
   } as React.CSSProperties;
 
+  const tabActive = { background: "var(--mock-p6)" };
+
   return (
     <div className="space-y-3" style={cssVars}>
       {watermark ? (
-        <p className="text-xs font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded px-2 py-1">
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
           {watermark}
         </p>
       ) : null}
-      <div className={`grid grid-cols-1 xl:grid-cols-2 gap-4 ${dark ? "dark" : ""}`}>
-        {/* Admin frame */}
-        <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-100 dark:bg-slate-900">
-          <div className="flex items-center gap-1 px-2 py-1.5 bg-slate-200 dark:bg-slate-800 text-[10px] text-slate-600">
-            <span className="w-2 h-2 rounded-full bg-red-400" />
-            <span className="w-2 h-2 rounded-full bg-amber-400" />
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="ml-2 truncate">{name} · tenant-admin</span>
-          </div>
-          <div className="flex gap-1 p-1.5 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-[10px]">
-            {(["login", "dashboard", "drivers", "reports"] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => onAdminScreen?.(s)}
-                className={`px-2 py-0.5 rounded capitalize ${
-                  adminScreen === s ? "text-white" : "text-slate-600 hover:bg-slate-100"
-                }`}
-                style={adminScreen === s ? { background: "var(--mock-p6)" } : undefined}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-          <div className="h-56 flex text-[10px]">
-            {adminScreen === "login" ? (
-              <div className="flex-1 flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
-                <div className="w-40 rounded-lg bg-white dark:bg-slate-900 shadow p-3 space-y-2 border border-slate-200">
-                  {draft.logoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={draft.logoUrl} alt="" className="h-8 mx-auto object-contain" />
-                  ) : (
-                    <div
-                      className="h-8 w-8 mx-auto rounded"
-                      style={{ background: "var(--mock-p6)" }}
-                    />
-                  )}
-                  <p className="text-center font-semibold text-slate-800 dark:text-slate-100">{name}</p>
-                  <div className="h-5 rounded bg-slate-100 dark:bg-slate-800" />
-                  <div className="h-5 rounded bg-slate-100 dark:bg-slate-800" />
-                  <div
-                    className="h-6 rounded text-white flex items-center justify-center font-medium"
-                    style={{ background: "var(--mock-p6)" }}
-                  >
-                    Sign in
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <>
-                <aside
-                  className="w-16 shrink-0 p-1.5 space-y-1 text-white"
-                  style={{
-                    background: sidebarColored ? "var(--mock-p7)" : "#1e293b",
-                  }}
-                >
-                  {draft.logoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={draft.logoUrl} alt="" className="h-6 w-full object-contain mb-2" />
-                  ) : (
-                    <div className="h-6 rounded bg-white/20 mb-2" />
-                  )}
-                  <div className="h-4 rounded bg-white/25" />
-                  <div className="h-4 rounded bg-white/10" />
-                  <div className="h-4 rounded bg-white/10" />
-                </aside>
-                <div className="flex-1 p-2 bg-slate-50 dark:bg-slate-950 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-semibold text-slate-800 dark:text-slate-100 capitalize">
-                      {adminScreen}
-                    </span>
-                    <button
-                      type="button"
-                      className="px-2 py-0.5 rounded text-white"
-                      style={{ background: "var(--mock-p6)" }}
-                    >
-                      New
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-3 gap-1">
-                    {[1, 2, 3].map((i) => (
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_220px]">
+        {/* Admin */}
+        <div>
+          <p className="mb-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+            Tenant admin
+          </p>
+          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+            <div className="flex items-center gap-1.5 bg-zinc-200/80 px-3 py-2 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+              <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+              <span className="ml-2 truncate font-medium">{name}</span>
+            </div>
+            <ScreenTabs
+              options={["login", "dashboard", "drivers", "reports"] as const}
+              value={adminScreen}
+              onChange={onAdminScreen}
+              activeStyle={tabActive}
+            />
+            <div className="flex h-52 text-[11px]">
+              {adminScreen === "login" ? (
+                <div className="flex flex-1 items-center justify-center bg-zinc-50 p-4 dark:bg-zinc-950">
+                  <div className="w-44 space-y-2 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                    {draft.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={draft.logoUrl} alt="" className="mx-auto h-9 object-contain" />
+                    ) : (
                       <div
-                        key={i}
-                        className="h-12 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1"
-                      >
-                        <div
-                          className="h-1 w-6 rounded mb-1"
-                          style={{ background: "var(--mock-p)" }}
-                        />
-                        <div className="h-2 w-10 rounded bg-slate-200 dark:bg-slate-700" />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+                        className="mx-auto h-9 w-9 rounded-lg"
+                        style={{ background: "var(--mock-p6)" }}
+                      />
+                    )}
+                    <p className="text-center text-xs font-semibold text-zinc-800 dark:text-zinc-100">
+                      {name}
+                    </p>
+                    <div className="h-7 rounded-md bg-zinc-100 dark:bg-zinc-800" />
+                    <div className="h-7 rounded-md bg-zinc-100 dark:bg-zinc-800" />
                     <div
-                      className="h-5 flex items-center px-1 text-white"
-                      style={{ background: "var(--mock-p7)" }}
+                      className="flex h-8 items-center justify-center rounded-md text-xs font-semibold text-white"
+                      style={{ background: "var(--mock-p6)" }}
                     >
-                      Table
+                      Sign in
                     </div>
-                    <div className="h-3 m-1 rounded bg-slate-100 dark:bg-slate-800" />
-                    <div className="h-3 m-1 rounded bg-slate-100 dark:bg-slate-800" />
                   </div>
                 </div>
-              </>
-            )}
+              ) : (
+                <>
+                  <aside
+                    className="w-[4.5rem] shrink-0 space-y-1.5 p-2 text-white"
+                    style={{
+                      background: sidebarColored ? "var(--mock-p7)" : "#18181b",
+                    }}
+                  >
+                    {draft.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={draft.logoUrl}
+                        alt=""
+                        className="mb-2 h-7 w-full object-contain"
+                      />
+                    ) : (
+                      <div className="mb-2 h-7 rounded-md bg-white/20" />
+                    )}
+                    <div className="h-4 rounded bg-white/30" />
+                    <div className="h-4 rounded bg-white/10" />
+                    <div className="h-4 rounded bg-white/10" />
+                  </aside>
+                  <div className="flex-1 space-y-2 bg-zinc-50 p-2.5 dark:bg-zinc-950">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold capitalize text-zinc-800 dark:text-zinc-100">
+                        {adminScreen}
+                      </span>
+                      <span
+                        className="rounded-md px-2 py-0.5 text-[10px] font-semibold text-white"
+                        style={{ background: "var(--mock-p6)" }}
+                      >
+                        New
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[1, 2, 3].map((i) => (
+                        <div
+                          key={i}
+                          className="rounded-lg border border-zinc-200 bg-white p-1.5 dark:border-zinc-700 dark:bg-zinc-900"
+                        >
+                          <div
+                            className="mb-1.5 h-1 w-5 rounded"
+                            style={{ background: "var(--mock-p)" }}
+                          />
+                          <div className="h-2 w-8 rounded bg-zinc-200 dark:bg-zinc-700" />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
+                      <div
+                        className="flex h-6 items-center px-2 text-[10px] font-medium text-white"
+                        style={{ background: "var(--mock-p7)" }}
+                      >
+                        Records
+                      </div>
+                      <div className="m-1.5 h-2.5 rounded bg-zinc-100 dark:bg-zinc-800" />
+                      <div className="m-1.5 h-2.5 rounded bg-zinc-100 dark:bg-zinc-800" />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Phone frame */}
-        <div className="flex justify-center">
-          <div className="w-[200px] rounded-[1.5rem] border-4 border-slate-800 dark:border-slate-600 bg-slate-900 overflow-hidden shadow-lg">
-            <div className="h-4 bg-slate-900 flex justify-center items-end pb-0.5">
-              <div className="w-12 h-1 rounded-full bg-slate-700" />
+        {/* Phone */}
+        <div>
+          <p className="mb-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+            Driver app <span className="font-normal">(after login)</span>
+          </p>
+          <div className="mx-auto w-[200px] overflow-hidden rounded-[1.75rem] border-[5px] border-zinc-800 bg-zinc-900 shadow-md dark:border-zinc-600">
+            <div className="flex h-5 items-end justify-center bg-zinc-900 pb-0.5">
+              <div className="h-1 w-14 rounded-full bg-zinc-700" />
             </div>
-            <div className="bg-white dark:bg-slate-950 min-h-[280px]">
-              <div className="flex gap-0.5 p-1 border-b text-[9px] overflow-x-auto">
-                {(["home", "income", "history", "drawer"] as const).map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => onPhoneScreen?.(s)}
-                    className={`px-1.5 py-0.5 rounded capitalize shrink-0 ${
-                      phoneScreen === s ? "text-white" : "text-slate-500"
-                    }`}
-                    style={phoneScreen === s ? { background: "var(--mock-p6)" } : undefined}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-              <p className="text-[8px] text-center text-slate-400 py-0.5">
-                Splash &amp; login stay VIT
-              </p>
+            <div className="min-h-[260px] bg-white dark:bg-zinc-950">
+              <ScreenTabs
+                options={["home", "income", "history", "drawer"] as const}
+                value={phoneScreen}
+                onChange={onPhoneScreen}
+                activeStyle={tabActive}
+              />
               {phoneScreen === "drawer" ? (
-                <div className="flex h-52">
+                <div className="flex h-48">
                   <div
-                    className="w-28 p-2 text-white space-y-1 text-[9px]"
+                    className="w-28 space-y-1.5 p-2.5 text-[10px] text-white"
                     style={{ background: "var(--mock-p7)" }}
                   >
                     {draft.logoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={draft.logoUrl} alt="" className="h-6 object-contain mb-2" />
+                      <img src={draft.logoUrl} alt="" className="mb-2 h-6 object-contain" />
                     ) : null}
-                    <p className="font-semibold truncate">{name}</p>
-                    <div className="h-3 rounded bg-white/20" />
+                    <p className="truncate font-semibold">{name}</p>
+                    <div className="h-3 rounded bg-white/25" />
                     <div className="h-3 rounded bg-white/10" />
                     <div className="h-3 rounded bg-white/10" />
                   </div>
-                  <div className="flex-1 bg-slate-100 dark:bg-slate-900" />
+                  <div className="flex-1 bg-zinc-100 dark:bg-zinc-900" />
                 </div>
               ) : (
-                <div className="p-2 space-y-2">
+                <div className="space-y-2.5 p-2.5">
                   <div
-                    className="h-8 rounded flex items-center px-2 text-white text-[10px] font-medium"
+                    className="flex h-9 items-center rounded-lg px-2.5 text-xs font-semibold text-white"
                     style={{ background: "var(--mock-p6)" }}
                   >
                     {phoneScreen === "home"
@@ -206,20 +234,19 @@ export function BrandMockFrames({
                         ? "Log income"
                         : "History"}
                   </div>
-                  <div className="h-16 rounded-lg border border-slate-200 p-2">
+                  <div className="rounded-xl border border-zinc-200 p-2.5 dark:border-zinc-700">
                     <div
-                      className="h-2 w-16 rounded mb-2"
+                      className="mb-2 h-2 w-16 rounded"
                       style={{ background: "var(--mock-p)" }}
                     />
-                    <div className="h-8 rounded bg-slate-100" />
+                    <div className="h-10 rounded-lg bg-zinc-100 dark:bg-zinc-800" />
                   </div>
-                  <button
-                    type="button"
-                    className="w-full h-8 rounded-full text-white text-[10px] font-semibold"
+                  <div
+                    className="flex h-9 items-center justify-center rounded-full text-xs font-semibold text-white"
                     style={{ background: "var(--mock-p6)" }}
                   >
-                    {phoneScreen === "income" ? "Submit" : "Action"}
-                  </button>
+                    {phoneScreen === "income" ? "Submit" : "Continue"}
+                  </div>
                 </div>
               )}
             </div>
