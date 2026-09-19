@@ -11,6 +11,7 @@ import * as path from 'path';
 import { Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
 import { CommercialService } from '../commercial/commercial.service';
+import { TenantEventsService } from '../tenant-events/tenant-events.service';
 import { BrandKit } from './brand-kit.entity';
 import {
   BrandPayload,
@@ -68,6 +69,7 @@ export class BrandService {
     private readonly commercial: CommercialService,
     private readonly audit: AuditService,
     private readonly config: ConfigService,
+    private readonly tenantEvents: TenantEventsService,
   ) {
     for (const dir of [this.uploadsRoot, this.kitsRoot]) {
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -308,6 +310,11 @@ export class BrandService {
       targetId: tenant.id,
       metadata: { slug: tenant.slug },
     });
+    this.tenantEvents.notifyBrandUpdated({
+      tenantId: tenant.id,
+      slug: tenant.slug,
+      action: 'publish',
+    });
     return this.getBrandStudio(tenantId);
   }
 
@@ -343,6 +350,11 @@ export class BrandService {
       targetType: 'tenant',
       targetId: tenant.id,
       metadata: { slug: tenant.slug, wipeDraft },
+    });
+    this.tenantEvents.notifyBrandUpdated({
+      tenantId: tenant.id,
+      slug: tenant.slug,
+      action: 'reset',
     });
     return this.getBrandStudio(tenantId);
   }

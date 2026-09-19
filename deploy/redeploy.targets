@@ -5,12 +5,14 @@
 #   api              – Nest API (vit-api)
 #   system-admin     – Platform admin (vit-platform)
 #   tenant-admin     – Tenant admin (vit-admin)
-#   all              – api + system-admin + tenant-admin
+#   gps-ingest       – Private TCP GPS ingest sidecar
+#   all              – api + system-admin + tenant-admin + gps-ingest
 #
 # Aliases accepted by redeploy.sh / the workflow:
 #   vit-api, api
 #   platform, platform-admin, vit-platform, system-admin
 #   tenant, vit-admin, tenant-admin
+#   gps-ingest, ingest
 #   all
 
 SERVICES=tenant-admin
