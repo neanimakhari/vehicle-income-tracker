@@ -196,7 +196,7 @@ class _MfaSetupScreenState extends State<MfaSetupScreen> {
               ElevatedButton(
                 onPressed: _loading ? null : _generate,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
                   foregroundColor: Colors.white,
                 ),
                 child: _loading
@@ -236,7 +236,7 @@ class _MfaSetupScreenState extends State<MfaSetupScreen> {
                 ElevatedButton(
                   onPressed: _loading ? null : _verify,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: Colors.white,
                   ),
                   child: const Text('Verify & Enable'),

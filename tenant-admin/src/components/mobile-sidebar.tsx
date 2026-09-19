@@ -8,7 +8,13 @@ import { ThemeToggle } from "./theme-toggle";
 import Image from "next/image";
 import { X, Menu } from "lucide-react";
 
-export function MobileSidebar({ tenantName }: { tenantName: string | null }) {
+export function MobileSidebar({
+  tenantName,
+  logoSrc = "/vit-logo.png",
+}: {
+  tenantName: string | null;
+  logoSrc?: string;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
 
@@ -33,14 +39,25 @@ export function MobileSidebar({ tenantName }: { tenantName: string | null }) {
         <div className="flex h-20 items-center justify-between px-6 border-b border-zinc-800">
           <Link href="/" className="flex items-center gap-3 group w-full" onClick={() => setIsOpen(false)}>
             <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 shadow-lg group-hover:shadow-teal-500/50 transition-all group-hover:scale-105 overflow-hidden flex-shrink-0">
-              <Image
-                src="/vit-logo.png"
-                alt="VIT Logo"
-                width={48}
-                height={48}
-                className="object-contain p-1"
-                priority
-              />
+              {logoSrc.startsWith("http") ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoSrc}
+                  alt=""
+                  width={48}
+                  height={48}
+                  className="object-contain p-1 w-12 h-12"
+                />
+              ) : (
+                <Image
+                  src={logoSrc}
+                  alt="Logo"
+                  width={48}
+                  height={48}
+                  className="object-contain p-1"
+                  priority
+                />
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-lg font-bold text-white truncate">

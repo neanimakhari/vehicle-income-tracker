@@ -140,7 +140,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(color: AppTheme.primary),
+                  CircularProgressIndicator(color: Theme.of(context).colorScheme.primary),
                   const SizedBox(height: 16),
                   Text(
                     'Loading alerts...',

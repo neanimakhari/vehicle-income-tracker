@@ -48,7 +48,7 @@ class ConfirmationDialog {
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
               style: TextButton.styleFrom(
-                foregroundColor: confirmColor ?? (isDestructive ? Colors.red : AppTheme.primary),
+                foregroundColor: confirmColor ?? (isDestructive ? Colors.red : Theme.of(context).colorScheme.primary),
               ),
               child: Text(confirmText),
             ),

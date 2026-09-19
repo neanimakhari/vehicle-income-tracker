@@ -298,6 +298,21 @@ export class BrandController {
     );
   }
 
+  @Delete('tenants/:id/brand/snapshots/:snapshotId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PLATFORM_ADMIN')
+  deleteSnapshot(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('snapshotId', new ParseUUIDPipe()) snapshotId: string,
+    @Req() req: Request,
+  ) {
+    return this.brandService.deleteSnapshot(
+      id,
+      snapshotId,
+      (req.user as { sub?: string } | undefined)?.sub ?? null,
+    );
+  }
+
   @Post('tenants/:id/brand/save-kit')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('PLATFORM_ADMIN')
@@ -377,6 +392,51 @@ export class BrandController {
     return this.brandService.cloneKit(id, (req.user as { sub?: string } | undefined)?.sub ?? null);
   }
 
+  @Get('brand-kits/:id/export')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PLATFORM_ADMIN', 'SYS')
+  exportKit(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.brandService.exportKit(id);
+  }
+
+  @Post('brand-kits/import')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PLATFORM_ADMIN')
+  importKit(@Body() body: Record<string, unknown>, @Req() req: Request) {
+    return this.brandService.importKit(
+      body as {
+        name?: string;
+        description?: string | null;
+        tags?: string[];
+        payload: Record<string, unknown>;
+        logoMime?: string | null;
+        logoBase64?: string | null;
+      },
+      (req.user as { sub?: string } | undefined)?.sub ?? null,
+    );
+  }
+
+  @Post('brand-kits/:id/apply-bulk')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PLATFORM_ADMIN')
+  applyKitBulk(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body()
+    body: {
+      tenantIds: string[];
+      target?: 'draft' | 'live';
+      includeLogo?: boolean;
+      setDisplayName?: boolean;
+    },
+    @Req() req: Request,
+  ) {
+    return this.brandService.applyKitBulk(
+      id,
+      body ?? { tenantIds: [] },
+      (req.user as { sub?: string } | undefined)?.sub ?? null,
+    );
+  }
+
   @Delete('brand-kits/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('PLATFORM_ADMIN')
@@ -399,6 +459,11 @@ export class BrandController {
   }
 
   // --- Public ---
+
+  @Get('public/tenants/:slug/brand-chrome')
+  async publicBrandChrome(@Param('slug') slug: string) {
+    return this.brandService.policyForSlug(slug);
+  }
 
   @Get('public/tenants/:slug/logo')
   async publicLogo(

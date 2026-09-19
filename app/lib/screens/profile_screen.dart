@@ -282,12 +282,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       CircleAvatar(
                         radius: 60,
-                        backgroundColor: AppTheme.primary.withOpacity(0.2),
+                        backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
                         backgroundImage: _profilePictureBytes != null
                             ? MemoryImage(Uint8List.fromList(_profilePictureBytes!))
                             : null,
                         child: _profilePictureBytes == null
-                            ? const Icon(Icons.person, size: 60, color: AppTheme.primary)
+                            ? const Icon(Icons.person, size: 60, color: Theme.of(context).colorScheme.primary)
                             : null,
                       ),
                       const SizedBox(height: 16),
@@ -365,7 +365,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     : const Icon(Icons.email_outlined, size: 20),
                                 label: Text(_resendVerificationLoading ? 'Sending…' : 'Resend email'),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.primary,
+                                  backgroundColor: Theme.of(context).colorScheme.primary,
                                   foregroundColor: Colors.white,
                                 ),
                               ),
@@ -389,8 +389,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 icon: const Icon(Icons.pin_outlined, size: 20),
                                 label: const Text('Verify with code'),
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppTheme.primary,
-                                  side: BorderSide(color: AppTheme.primary),
+                                  foregroundColor: Theme.of(context).colorScheme.primary,
+                                  side: BorderSide(color: Theme.of(context).colorScheme.primary),
                                 ),
                               ),
                             ),
@@ -477,7 +477,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       icon: const Icon(Icons.shield_outlined),
                       label: const Text('Enable MFA Now'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                       ),
                     ),
@@ -499,7 +499,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     icon: const Icon(Icons.person),
                     label: const Text('View Driver Profile & Documents'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       foregroundColor: Colors.white,
                     ),
                   ),
@@ -545,7 +545,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   isDarkMode,
                   [
                     ListTile(
-                      leading: Icon(Icons.help_outline, color: AppTheme.primary),
+                      leading: Icon(Icons.help_outline, color: Theme.of(context).colorScheme.primary),
                       title: const Text('Help & Support'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () {
@@ -557,7 +557,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     Divider(color: isDarkMode ? Colors.grey[700] : Colors.grey[300]),
                     ListTile(
-                      leading: Icon(Icons.shield_outlined, color: AppTheme.primary),
+                      leading: Icon(Icons.shield_outlined, color: Theme.of(context).colorScheme.primary),
                       title: const Text('Privacy Policy'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () {
@@ -569,7 +569,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     Divider(color: isDarkMode ? Colors.grey[700] : Colors.grey[300]),
                     ListTile(
-                      leading: Icon(Icons.description_outlined, color: AppTheme.primary),
+                      leading: Icon(Icons.description_outlined, color: Theme.of(context).colorScheme.primary),
                       title: const Text('Terms of Service'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () {
@@ -637,10 +637,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppTheme.primary.withOpacity(0.1),
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(AppTheme.radius),
             ),
-            child: Icon(icon, color: AppTheme.primary, size: 20),
+            child: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 20),
           ),
           const SizedBox(width: 16),
           Expanded(

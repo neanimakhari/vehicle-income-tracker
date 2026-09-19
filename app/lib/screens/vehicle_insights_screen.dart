@@ -75,7 +75,7 @@ class _VehicleInsightsScreenState extends State<VehicleInsightsScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(color: AppTheme.primary),
+                  CircularProgressIndicator(color: Theme.of(context).colorScheme.primary),
                   const SizedBox(height: 16),
                   Text(
                     'Loading insights...',
@@ -196,7 +196,7 @@ class _VehicleInsightsScreenState extends State<VehicleInsightsScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppTheme.radius),
         color: isDarkMode ? AppTheme.darkSurface : Colors.white,
-        border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
+        border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,7 +289,7 @@ class _VehicleInsightsScreenState extends State<VehicleInsightsScreen> {
                 LineChartBarData(
                   spots: incomeSpots,
                   isCurved: true,
-                  color: AppTheme.primary,
+                  color: Theme.of(context).colorScheme.primary,
                   barWidth: 3,
                   dotData: FlDotData(show: false),
                 ),
@@ -307,7 +307,7 @@ class _VehicleInsightsScreenState extends State<VehicleInsightsScreen> {
         const SizedBox(height: 8),
         Row(
           children: [
-            _legendDot(AppTheme.primary, 'Income'),
+            _legendDot(Theme.of(context).colorScheme.primary, 'Income'),
             const SizedBox(width: 12),
             _legendDot(Colors.orange, 'Cost / km'),
           ],

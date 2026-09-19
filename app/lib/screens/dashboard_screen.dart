@@ -254,7 +254,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(color: AppTheme.primary),
+                  CircularProgressIndicator(color: Theme.of(context).colorScheme.primary),
                   const SizedBox(height: 16),
                   Text(
                     'Loading dashboard...',
@@ -315,8 +315,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter,
                                   colors: [
-                                    AppTheme.primary.withOpacity(0.12),
-                                    AppTheme.primary.withOpacity(0.45),
+                                    Theme.of(context).colorScheme.primary.withOpacity(0.12),
+                                    Theme.of(context).colorScheme.primary.withOpacity(0.45),
                                   ],
                                 ),
                               ),
@@ -641,7 +641,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               offset: const Offset(0, 2),
             ),
           ],
-          border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
+          border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.1)),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -649,10 +649,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.1),
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: AppTheme.primary, size: 24),
+              child: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 24),
             ),
             const SizedBox(height: 12),
             Text(
@@ -865,7 +865,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           'Net Income',
           'R $netIncome',
           Icons.account_balance_wallet,
-          AppTheme.primary,
+          Theme.of(context).colorScheme.primary,
           isDarkMode,
         ),
       ],

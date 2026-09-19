@@ -376,7 +376,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       contentPadding: EdgeInsets.zero,
                                       title: Text(name, style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87)),
                                       trailing: _chosenTenantSlug == slug
-                                          ? const Icon(Icons.check, color: AppTheme.primary)
+                                          ? const Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
                                           : null,
                                       onTap: () => setState(() => _chosenTenantSlug = slug),
                                     );
@@ -389,7 +389,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     children: [
                                       TextFormField(
                                         controller: _emailController,
-                                        cursorColor: AppTheme.primary,
+                                        cursorColor: Theme.of(context).colorScheme.primary,
                                         autofillHints: const [AutofillHints.username, AutofillHints.email],
                                         decoration: InputDecoration(
                                           filled: true,
@@ -398,7 +398,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                           labelStyle: TextStyle(
                                             color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                                           ),
-                                          floatingLabelStyle: const TextStyle(color: AppTheme.primary),
+                                          floatingLabelStyle: const TextStyle(color: Theme.of(context).colorScheme.primary),
                                           hintText: 'Enter your email',
                                           hintStyle: TextStyle(
                                             color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
@@ -422,7 +422,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       const SizedBox(height: 20),
                                       TextFormField(
                                         controller: _passwordController,
-                                        cursorColor: AppTheme.primary,
+                                        cursorColor: Theme.of(context).colorScheme.primary,
                                         obscureText: !_showPassword,
                                         autofillHints: const [AutofillHints.password],
                                         decoration: InputDecoration(
@@ -432,7 +432,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                           labelStyle: TextStyle(
                                             color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                                           ),
-                                          floatingLabelStyle: const TextStyle(color: AppTheme.primary),
+                                          floatingLabelStyle: const TextStyle(color: Theme.of(context).colorScheme.primary),
                                           hintText: 'Enter your password...',
                                           hintStyle: TextStyle(
                                             color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
@@ -462,7 +462,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       const SizedBox(height: 16),
                                       TextFormField(
                                         controller: _mfaController,
-                                        cursorColor: AppTheme.primary,
+                                        cursorColor: Theme.of(context).colorScheme.primary,
                                         decoration: InputDecoration(
                                           filled: true,
                                           fillColor: (isDarkMode ? Colors.black : Colors.white).withOpacity(0.35),
@@ -470,7 +470,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                           labelStyle: TextStyle(
                                             color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                                           ),
-                                          floatingLabelStyle: const TextStyle(color: AppTheme.primary),
+                                          floatingLabelStyle: const TextStyle(color: Theme.of(context).colorScheme.primary),
                                           hintText: '123456',
                                           hintStyle: TextStyle(
                                             color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
@@ -493,7 +493,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   child: ElevatedButton(
                                     onPressed: _isLoading ? null : _login,
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.primary,
+                                      backgroundColor: Theme.of(context).colorScheme.primary,
                                       foregroundColor: Colors.white,
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
@@ -526,7 +526,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     icon: const Icon(Icons.fingerprint),
                                     label: const Text('Sign in with biometrics'),
                                     style: TextButton.styleFrom(
-                                      foregroundColor: AppTheme.primary,
+                                      foregroundColor: Theme.of(context).colorScheme.primary,
                                     ),
                                   ),
                                 ],

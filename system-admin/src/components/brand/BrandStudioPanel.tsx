@@ -7,13 +7,16 @@ import { VIT_ACCENT, VIT_PRIMARY, type BrandDraft } from "@/lib/brand-tokens";
 import {
   brandApplyKit,
   brandCreatePreview,
+  brandDeleteSnapshot,
   brandGetStudio,
   brandListKits,
   brandListPreviewTokens,
   brandListSnapshots,
   brandPublish,
+  brandReplace,
   brandReset,
   brandRestoreSnapshot,
+  brandRevokePreview,
   brandSaveDraft,
   brandSaveKit,
   brandSaveSnapshot,
@@ -26,11 +29,19 @@ type Studio = {
   draft: BrandDraft & { logoUrl?: string };
   tenantName: string;
   tenantSlug: string;
+  primaryContrastWarning?: string | null;
 };
 
 type Kit = { id: string; name: string; isStarter: boolean };
-type Snapshot = { id: string; label: string };
-type PreviewToken = { id: string; token: string; revokedAt: string | null };
+type Snapshot = { id: string; label: string; createdAt?: string };
+type PreviewToken = {
+  id: string;
+  token: string;
+  source?: string;
+  expiresAt?: string;
+  revokedAt: string | null;
+  createdAt?: string;
+};
 
 type Toast = { type: "success" | "error"; message: string };
 
@@ -94,8 +105,25 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
   );
   const [phoneScreen, setPhoneScreen] = useState<"home" | "income" | "history" | "drawer">("home");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [wipeDraftOnReset, setWipeDraftOnReset] = useState(false);
+  const [showReplaceConfirm, setShowReplaceConfirm] = useState(false);
 
   const dismissToast = useCallback(() => setToast(null), []);
+
+  /** Soft client-side luminance check (mirrors API soft warning threshold). */
+  function isPrimaryLight(hex: string): boolean {
+    if (!/^#[0-9A-Fa-f]{6}$/i.test(hex)) return false;
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b) > 0.7;
+  }
+
+  const contrastWarning =
+    isPrimaryLight(primaryHex)
+      ? "Primary color is quite light — buttons and links may be hard to read on white backgrounds."
+      : studio?.primaryContrastWarning || null;
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -278,6 +306,12 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
           </div>
         </div>
 
+        {contrastWarning ? (
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-100">
+            {contrastWarning}
+          </p>
+        ) : null}
+
         <div className="mt-4 flex flex-wrap gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-700">
           <button
             type="button"
@@ -311,16 +345,76 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
             type="button"
             className="btn btn-secondary px-4 py-2"
             disabled={busy}
+            onClick={() => setShowReplaceConfirm(true)}
+          >
+            Replace brand
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary px-4 py-2"
+            disabled={busy}
             onClick={() => {
-              if (confirm("Reset live brand to the default VIT theme?")) {
-                void run(() => brandReset(tenantId, false), "Reset to VIT default");
+              const msg = wipeDraftOnReset
+                ? "Reset live brand to VIT default and wipe the draft?"
+                : "Reset live brand to the default VIT theme?";
+              if (confirm(msg)) {
+                void run(
+                  () => brandReset(tenantId, wipeDraftOnReset),
+                  wipeDraftOnReset ? "Reset to VIT (draft wiped)" : "Reset to VIT default",
+                );
               }
             }}
           >
             Use VIT default
           </button>
         </div>
+        <label className="mt-3 flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+          <input
+            type="checkbox"
+            checked={wipeDraftOnReset}
+            onChange={(e) => setWipeDraftOnReset(e.target.checked)}
+            className="rounded border-zinc-300"
+          />
+          Also wipe draft when resetting to VIT
+        </label>
       </section>
+
+      {showReplaceConfirm ? (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-900/20">
+          <p className="text-sm font-medium text-amber-950 dark:text-amber-100">
+            Replace live brand with the current theme settings? A snapshot will be saved first.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn btn-primary px-4 py-2"
+              disabled={busy}
+              onClick={() => {
+                void run(async () => {
+                  const res = await brandReplace(tenantId, {
+                    displayName: displayName || null,
+                    primaryHex,
+                    accentHex,
+                    sidebarStyle,
+                  });
+                  if (res.ok) setShowReplaceConfirm(false);
+                  return res;
+                }, studio.entitled ? "Brand replaced and published" : "Brand replaced (saved as draft — module off)");
+              }}
+            >
+              Confirm replace
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary px-4 py-2"
+              disabled={busy}
+              onClick={() => setShowReplaceConfirm(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Live preview */}
       <section className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
@@ -388,29 +482,96 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
           </button>
         </div>
         {activePreviews > 0 ? (
-          <p className="mt-2 text-xs text-zinc-500">{activePreviews} active preview link(s)</p>
-        ) : null}
+          <ul className="mt-3 max-h-36 space-y-1.5 overflow-auto rounded-lg border border-zinc-200 bg-zinc-50 p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800/50">
+            {tokens
+              .filter((t) => !t.revokedAt)
+              .map((t) => (
+                <li key={t.id} className="flex items-center justify-between gap-2 px-1">
+                  <span className="min-w-0 truncate text-zinc-700 dark:text-zinc-300">
+                    {t.source || "draft"}
+                    {t.expiresAt
+                      ? ` · expires ${new Date(t.expiresAt).toLocaleDateString()}`
+                      : ""}
+                  </span>
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      className="btn btn-secondary px-2.5 py-1 text-xs"
+                      disabled={busy}
+                      onClick={() => {
+                        const url = `${window.location.origin}/brand-preview/${t.token}`;
+                        void navigator.clipboard.writeText(url).then(
+                          () => setToast({ type: "success", message: "Link copied" }),
+                          () => setToast({ type: "error", message: "Could not copy link" }),
+                        );
+                      }}
+                    >
+                      Copy
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary px-2.5 py-1 text-xs"
+                      disabled={busy}
+                      onClick={() => {
+                        if (confirm("Revoke this preview link?")) {
+                          void run(() => brandRevokePreview(t.id), "Preview link revoked");
+                        }
+                      }}
+                    >
+                      Revoke
+                    </button>
+                  </div>
+                </li>
+              ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-xs text-zinc-500">No active preview links</p>
+        )}
 
         {snapshots.length > 0 ? (
-          <ul className="mt-3 max-h-28 space-y-1.5 overflow-auto rounded-lg border border-zinc-200 bg-zinc-50 p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800/50">
+          <ul className="mt-3 max-h-36 space-y-1.5 overflow-auto rounded-lg border border-zinc-200 bg-zinc-50 p-2 text-sm dark:border-zinc-700 dark:bg-zinc-800/50">
             {snapshots.map((s) => (
               <li key={s.id} className="flex items-center justify-between gap-2 px-1">
-                <span className="truncate text-zinc-700 dark:text-zinc-300">{s.label}</span>
-                <button
-                  type="button"
-                  className="btn btn-secondary shrink-0 px-2.5 py-1 text-xs"
-                  disabled={busy}
-                  onClick={() => {
-                    if (confirm("Restore this snapshot into draft/live?")) {
-                      void run(
-                        () => brandRestoreSnapshot(tenantId, s.id),
-                        "Snapshot restored",
-                      );
-                    }
-                  }}
-                >
-                  Restore
-                </button>
+                <span className="min-w-0 truncate text-zinc-700 dark:text-zinc-300">
+                  {s.label}
+                  {s.createdAt ? (
+                    <span className="ml-1 text-xs text-zinc-500">
+                      ({new Date(s.createdAt).toLocaleString()})
+                    </span>
+                  ) : null}
+                </span>
+                <div className="flex shrink-0 gap-1">
+                  <button
+                    type="button"
+                    className="btn btn-secondary px-2.5 py-1 text-xs"
+                    disabled={busy}
+                    onClick={() => {
+                      if (confirm("Restore this snapshot into draft/live?")) {
+                        void run(
+                          () => brandRestoreSnapshot(tenantId, s.id),
+                          "Snapshot restored",
+                        );
+                      }
+                    }}
+                  >
+                    Restore
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary px-2.5 py-1 text-xs"
+                    disabled={busy}
+                    onClick={() => {
+                      if (confirm("Delete this snapshot permanently?")) {
+                        void run(
+                          () => brandDeleteSnapshot(tenantId, s.id),
+                          "Snapshot deleted",
+                        );
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

@@ -1,24 +1,39 @@
 import { brandListKits } from "@/app/tenants/brand-actions";
 import { BrandKitsClient } from "./BrandKitsClient";
+import { fetchJson } from "@/lib/api";
 
 export default async function BrandKitsPage() {
-  const res = await brandListKits();
-  const kits = res.ok && Array.isArray(res.data) ? res.data : [];
+  const [kitsRes, tenants] = await Promise.all([
+    brandListKits(),
+    fetchJson<Array<{ id: string; name: string; slug: string }>>("/tenants").catch(
+      () => [] as Array<{ id: string; name: string; slug: string }>,
+    ),
+  ]);
+  const kits = kitsRes.ok && Array.isArray(kitsRes.data) ? kitsRes.data : [];
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4 p-6">
       <div>
         <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Brand kits</h1>
-        <p className="text-sm text-zinc-500 mt-1">
-          Reusable themes you can apply to any tenant from the Brand tab.
+        <p className="mt-1 text-sm text-zinc-500">
+          Reusable themes — export/import JSON, or apply to many tenants at once.
         </p>
       </div>
-      <BrandKitsClient initialKits={kits as Array<{
-        id: string;
-        name: string;
-        description: string | null;
-        isStarter: boolean;
-        payload: { primaryHex?: string; accentHex?: string; sidebarStyle?: string };
-      }>} />
+      <BrandKitsClient
+        initialKits={
+          kits as Array<{
+            id: string;
+            name: string;
+            description: string | null;
+            isStarter: boolean;
+            payload: { primaryHex?: string; accentHex?: string; sidebarStyle?: string };
+          }>
+        }
+        tenants={(tenants ?? []).map((t) => ({
+          id: t.id,
+          name: t.name,
+          slug: t.slug,
+        }))}
+      />
     </div>
   );
 }

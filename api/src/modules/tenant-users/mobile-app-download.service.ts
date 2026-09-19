@@ -15,6 +15,8 @@ import { Tenant } from '../tenants/tenant.entity';
 import { TenantUser } from './tenant-user.entity';
 import { AuditService } from '../audit/audit.service';
 import { EmailService } from '../email/email.service';
+import { BrandService } from '../tenants/brand.service';
+import { letterheadFromPolicy } from '../tenants/brand.util';
 import { TenantScopeService } from '../../tenancy/tenant-scope.service';
 import { TenantAwareRepository } from '../../tenancy/tenant-aware.repository';
 
@@ -48,6 +50,7 @@ export class MobileAppDownloadService {
     @InjectRepository(Tenant) private readonly tenants: Repository<Tenant>,
     private readonly audit: AuditService,
     private readonly email: EmailService,
+    private readonly brandService: BrandService,
   ) {}
 
   private tenantUsers() {
@@ -273,7 +276,13 @@ export class MobileAppDownloadService {
       'https://vit-app.vehinc.co.za';
     const inviteUrl = `${appBase.replace(/\/$/, '')}/${encodeURIComponent(admin.tenantId)}/?invite=${encodeURIComponent(token)}`;
 
-    await this.email.sendAppInstallInvite(user.email, tenant.name, inviteUrl);
+    const policy = await this.brandService.policyForSlug(tenant.slug);
+    const letterhead = letterheadFromPolicy(policy, tenant.name);
+    await this.email.sendAppInstallInvite(user.email, tenant.name, inviteUrl, {
+      displayName: letterhead.displayName,
+      primaryColor: letterhead.primaryColor,
+      logoUrl: letterhead.logoUrl,
+    });
     await this.audit.log({
       action: 'mobile_app.install_invite',
       actorUserId: admin.sub,

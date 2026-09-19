@@ -39,7 +39,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(
         title: const Text('Settings'),
         centerTitle: true,
-        backgroundColor: isDarkMode ? AppTheme.darkBackground : AppTheme.primary,
+        backgroundColor: isDarkMode ? AppTheme.darkBackground : Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -89,7 +89,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             trailing: Switch(
               value: _isDarkMode,
               onChanged: (_) => _toggleTheme(),
-              activeColor: AppTheme.primary,
+              activeColor: Theme.of(context).colorScheme.primary,
             ),
             isDarkMode: isDarkMode,
           ),
@@ -106,7 +106,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (value) {
                 // TODO: Save notification preference
               },
-              activeColor: AppTheme.primary,
+              activeColor: Theme.of(context).colorScheme.primary,
             ),
             isDarkMode: isDarkMode,
           ),
@@ -120,7 +120,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (value) {
                 // TODO: Save maintenance notification preference
               },
-              activeColor: AppTheme.primary,
+              activeColor: Theme.of(context).colorScheme.primary,
             ),
             isDarkMode: isDarkMode,
           ),
@@ -134,7 +134,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (value) {
                 // TODO: Save document alert preference
               },
-              activeColor: AppTheme.primary,
+              activeColor: Theme.of(context).colorScheme.primary,
             ),
             isDarkMode: isDarkMode,
           ),
@@ -217,10 +217,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           leading: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppTheme.primary.withOpacity(0.12),
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: AppTheme.primary, size: 22),
+            child: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 22),
           ),
           title: Text(
             title,

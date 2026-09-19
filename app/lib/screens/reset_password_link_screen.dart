@@ -64,7 +64,7 @@ class _ResetPasswordLinkScreenState extends State<ResetPasswordLinkScreen> {
       appBar: AppBar(
         title: const Text('Reset Password', style: TextStyle(fontSize: 18)),
         centerTitle: true,
-        backgroundColor: AppTheme.primary,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
       ),
       body: SafeArea(
@@ -75,7 +75,7 @@ class _ResetPasswordLinkScreenState extends State<ResetPasswordLinkScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 40),
-                    Icon(Icons.check_circle, size: 80, color: AppTheme.primary),
+                    Icon(Icons.check_circle, size: 80, color: Theme.of(context).colorScheme.primary),
                     const SizedBox(height: 24),
                     Text(
                       'Password reset successfully',
@@ -105,7 +105,7 @@ class _ResetPasswordLinkScreenState extends State<ResetPasswordLinkScreen> {
                         );
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
@@ -176,7 +176,7 @@ class _ResetPasswordLinkScreenState extends State<ResetPasswordLinkScreen> {
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _submit,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primary,
+                            backgroundColor: Theme.of(context).colorScheme.primary,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(AppTheme.radius),

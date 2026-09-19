@@ -563,7 +563,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(color: AppTheme.primary),
+                  CircularProgressIndicator(color: Theme.of(context).colorScheme.primary),
                   const SizedBox(height: 16),
                   Text(
                     'Loading profile...',
@@ -593,7 +593,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: AppTheme.primary,
+                                    color: Theme.of(context).colorScheme.primary,
                                     width: 4,
                                   ),
                                   boxShadow: [
@@ -625,7 +625,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                                 right: 0,
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    color: AppTheme.primary,
+                                    color: Theme.of(context).colorScheme.primary,
                                     shape: BoxShape.circle,
                                     border: Border.all(color: Colors.white, width: 3),
                                   ),
@@ -696,8 +696,8 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                             : const Icon(Icons.send_outlined, size: 18),
                         label: Text(_submittingExpiry ? 'Submitting...' : 'Submit expiry dates for approval'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.primary,
-                          side: const BorderSide(color: AppTheme.primary),
+                          foregroundColor: Theme.of(context).colorScheme.primary,
+                          side: const BorderSide(color: Theme.of(context).colorScheme.primary),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -751,7 +751,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                           : const Icon(Icons.upload),
                       label: Text(_uploading ? 'Uploading...' : 'Upload Document'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                       ),
                     ),
@@ -810,7 +810,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: AppTheme.primary, size: 20),
+          Icon(icon, color: Theme.of(context).colorScheme.primary, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -880,7 +880,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
         decoration: InputDecoration(
           labelText: label,
           labelStyle: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[600]),
-          prefixIcon: Icon(icon, color: AppTheme.primary, size: 20),
+          prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 20),
           filled: true,
           fillColor: isDarkMode ? AppTheme.darkBackground : Colors.grey.shade50,
           border: OutlineInputBorder(
@@ -892,7 +892,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppTheme.radius),
-            borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+            borderSide: const BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5),
           ),
         ),
       ),
@@ -916,11 +916,11 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               labelText: label,
               hintText: 'Tap to pick date',
               labelStyle: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[600]),
-              prefixIcon: Icon(icon, color: AppTheme.primary, size: 20),
+              prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 20),
               suffixIcon: Icon(
                 Icons.calendar_today,
                 size: 20,
-                color: isDarkMode ? Colors.white : AppTheme.primary,
+                color: isDarkMode ? Colors.white : Theme.of(context).colorScheme.primary,
               ),
               filled: true,
               fillColor: isDarkMode ? AppTheme.darkBackground : Colors.grey.shade50,
@@ -933,7 +933,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppTheme.radius),
-                borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+                borderSide: const BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5),
               ),
             ),
           ),
@@ -957,7 +957,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
       ),
       child: Row(
         children: [
-          Icon(Icons.description, color: AppTheme.primary),
+          Icon(Icons.description, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1015,7 +1015,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppTheme.primary, AppTheme.primary.withOpacity(0.8)],
+          colors: [Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.primary.withOpacity(0.8)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

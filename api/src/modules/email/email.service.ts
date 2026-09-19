@@ -138,19 +138,26 @@ export class EmailService {
     to: string,
     tenantName: string,
     inviteUrl: string,
+    brand?: { displayName?: string; primaryColor?: string; logoUrl?: string } | null,
   ): Promise<{ sent: boolean }> {
-    const subject = `Install the VIT app — ${tenantName}`;
-    const text = `Your fleet admin invited you to install the VIT driver app for ${tenantName}.
+    const name = brand?.displayName || tenantName;
+    const primary = brand?.primaryColor || '#0d9488';
+    const subject = `Install the ${name} app`;
+    const text = `Your fleet admin invited you to install the driver app for ${name}.
 
 Open this link on your Android phone, sign in with your driver email and password, then download the app:
 
 ${inviteUrl}
 
 This invite expires in 48 hours. Do not share the link.`;
+    const logoHtml = brand?.logoUrl
+      ? `<img src="${brand.logoUrl}" alt="" width="56" height="56" style="display:block;margin:0 auto 12px;border-radius:12px" />`
+      : '';
     const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;line-height:1.5">
-      <h2>Install VIT</h2>
-      <p>Your fleet admin invited you to install the <strong>VIT</strong> driver app for <strong>${tenantName}</strong>.</p>
-      <p><a href="${inviteUrl}" style="display:inline-block;background:#0d9488;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:600">Open install page</a></p>
+      ${logoHtml}
+      <h2>Install ${name}</h2>
+      <p>Your fleet admin invited you to install the driver app for <strong>${name}</strong>.</p>
+      <p><a href="${inviteUrl}" style="display:inline-block;background:${primary};color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:600">Open install page</a></p>
       <p style="color:#666;font-size:14px">You will sign in with your driver email and password, then download the APK. Invite expires in 48 hours.</p>
     </body></html>`;
     return this.send({ to, subject, text, html });
@@ -234,9 +241,13 @@ This invite expires in 48 hours. Do not share the link.`;
       maintenanceSpend?: number | null;
     },
     pdfAttachment?: { filename: string; content: Buffer } | null,
+    brand?: { displayName?: string; primaryColor?: string; accentColor?: string } | null,
   ) {
     const formatCurrency = (amount: number) => `R ${amount.toFixed(2)}`;
     const formatDate = (date: Date) => date.toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
+    const headerName = brand?.displayName || tenantName;
+    const primary = brand?.primaryColor || '#0d9488';
+    const accent = brand?.accentColor || '#14b8a6';
 
     const html = `
       <!DOCTYPE html>
@@ -245,7 +256,7 @@ This invite expires in 48 hours. Do not share the link.`;
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 800px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; }
+          .header { background: linear-gradient(135deg, ${accent} 0%, ${primary} 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; }
           .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
           .summary-box { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
           .summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 15px; }
@@ -254,7 +265,7 @@ This invite expires in 48 hours. Do not share the link.`;
           .summary-value { font-size: 24px; font-weight: bold; color: #111827; margin-top: 5px; }
           table { width: 100%; border-collapse: collapse; margin: 20px 0; background: white; }
           th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
-          th { background: #14b8a6; color: white; font-weight: 600; }
+          th { background: ${primary}; color: white; font-weight: 600; }
           tr:hover { background: #f9fafb; }
           .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 12px; }
         </style>
@@ -263,7 +274,7 @@ This invite expires in 48 hours. Do not share the link.`;
         <div class="container">
           <div class="header">
             <h1>Monthly Financial Report</h1>
-            <p>${tenantName}</p>
+            <p>${headerName}</p>
             <p>${formatDate(reportData.period.startDate)} - ${formatDate(reportData.period.endDate)}</p>
           </div>
           <div class="content">
@@ -402,7 +413,7 @@ This invite expires in 48 hours. Do not share the link.`;
             }
 
             <div class="footer">
-              <p>This is an automated monthly report from VIT (Vehicle Income Tracker)</p>
+              <p>This is an automated monthly report from ${headerName}</p>
               <p>A detailed PDF with charts is attached.</p>
               <p>Generated on ${new Date().toLocaleDateString('en-ZA')}</p>
             </div>
@@ -417,7 +428,7 @@ This invite expires in 48 hours. Do not share the link.`;
     for (const recipient of recipients) {
       lastResult = await this.send({
         to: recipient,
-        subject: `Monthly Financial Report - ${tenantName} - ${formatDate(reportData.period.startDate)}`,
+        subject: `Monthly Financial Report - ${headerName} - ${formatDate(reportData.period.startDate)}`,
         html,
         attachments: pdfAttachment
           ? [

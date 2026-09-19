@@ -184,7 +184,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.camera_alt, color: AppTheme.primary),
+              leading: const Icon(Icons.camera_alt, color: Theme.of(context).colorScheme.primary),
               title: const Text('Take photo'),
               onTap: () {
                 Navigator.pop(context);
@@ -195,7 +195,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: AppTheme.primary),
+              leading: const Icon(Icons.photo_library, color: Theme.of(context).colorScheme.primary),
               title: const Text('Choose from gallery'),
               onTap: () {
                 Navigator.pop(context);
@@ -511,7 +511,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary,
+                      color: Theme.of(context).colorScheme.primary,
                       borderRadius: BorderRadius.circular(AppTheme.radius),
                       boxShadow: [
                         BoxShadow(
@@ -583,7 +583,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
                                 _incomeDate = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day - 1);
                               }
                             }),
-                            activeColor: AppTheme.primary,
+                            activeColor: Theme.of(context).colorScheme.primary,
                           ),
                         ],
                       ),
@@ -732,7 +732,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
                     trailing: IconButton(
                       icon: Icon(
                         _showExpenseFields ? Icons.expand_less : Icons.expand_more,
-                        color: AppTheme.primary,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                       onPressed: () {
                         setState(() => _showExpenseFields = !_showExpenseFields);
@@ -780,7 +780,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
                     child: ElevatedButton(
                       onPressed: _submitting ? null : _submit,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(AppTheme.radius),
@@ -891,7 +891,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
                                 return ListTile(
                                   leading: Icon(
                                     Icons.directions_car,
-                                    color: isSelected ? AppTheme.primary : (isDarkMode ? Colors.grey[400] : Colors.grey[600]),
+                                    color: isSelected ? Theme.of(context).colorScheme.primary : (isDarkMode ? Colors.grey[400] : Colors.grey[600]),
                                   ),
                                   title: Text(
                                     _vehicleDisplayLabel(v),
@@ -1052,7 +1052,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.primary,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
               if (trailing != null) trailing,
@@ -1089,9 +1089,9 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(
-          color: isDarkMode ? Colors.grey[400] : AppTheme.primary.withOpacity(0.7),
+          color: isDarkMode ? Colors.grey[400] : Theme.of(context).colorScheme.primary.withOpacity(0.7),
         ),
-        prefixIcon: Icon(icon, color: AppTheme.primary),
+        prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.primary),
       ),
     );
   }
@@ -1114,7 +1114,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
         labelStyle: TextStyle(
           color: isDarkMode ? Colors.grey[500] : Colors.grey[500],
         ),
-        prefixIcon: Icon(icon, color: AppTheme.primary.withOpacity(0.6)),
+        prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.primary.withOpacity(0.6)),
         filled: true,
         fillColor: isDarkMode ? AppTheme.darkSurface : Colors.grey[100],
       ),
@@ -1144,7 +1144,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
               borderRadius: BorderRadius.circular(AppTheme.radius),
               child: Row(
                 children: [
-                  Icon(icon, color: AppTheme.primary),
+                  Icon(icon, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -1154,7 +1154,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
                       ),
                     ),
                   ),
-                  const Icon(Icons.arrow_forward_ios, size: 14, color: AppTheme.primary),
+                  const Icon(Icons.arrow_forward_ios, size: 14, color: Theme.of(context).colorScheme.primary),
                 ],
               ),
             )
@@ -1197,7 +1197,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
                             icon: const Icon(Icons.refresh, size: 16),
                             label: const Text('Change'),
                             style: TextButton.styleFrom(
-                              foregroundColor: AppTheme.primary,
+                              foregroundColor: Theme.of(context).colorScheme.primary,
                               padding: EdgeInsets.zero,
                               minimumSize: Size.zero,
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,

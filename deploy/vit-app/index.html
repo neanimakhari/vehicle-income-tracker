@@ -34,6 +34,17 @@
         box-shadow: 0 20px 50px rgba(0,0,0,0.45);
       }
       h1 { font-size: 1.5rem; margin: 0 0 0.35rem; }
+      .brand-logo {
+        display: none;
+        width: 3.5rem;
+        height: 3.5rem;
+        object-fit: contain;
+        border-radius: 0.75rem;
+        margin-bottom: 0.75rem;
+        background: rgba(255,255,255,0.08);
+        padding: 0.35rem;
+      }
+      .brand-logo.show { display: block; }
       .sub { color: var(--muted); font-size: 0.95rem; margin: 0 0 1.25rem; line-height: 1.45; }
       label { display: block; font-size: 0.8rem; font-weight: 600; margin: 0.85rem 0 0.35rem; color: #d4d4d8; }
       input {
@@ -96,7 +107,8 @@
   </head>
   <body>
     <main>
-      <h1>VIT for Android</h1>
+      <img id="brandLogo" class="brand-logo" alt="" />
+      <h1 id="pageTitle">VIT for Android</h1>
       <p class="sub" id="subtitle">Sign in with your driver account to download the app.</p>
 
       <div id="loginPanel">
@@ -167,6 +179,38 @@
         } else {
           banner.classList.add("hidden");
           bare.classList.remove("hidden");
+        }
+      }
+
+      async function applyBrandChrome() {
+        if (!tenantSlug) return;
+        try {
+          const res = await fetch(
+            API + "/public/tenants/" + encodeURIComponent(tenantSlug) + "/brand-chrome",
+            { cache: "no-store" },
+          );
+          if (!res.ok) return;
+          const brand = await res.json();
+          if (!brand || brand.mode !== "custom") return;
+          const primary = brand.primaryColor || "#0d9488";
+          const accent = brand.accentColor || "#134e4a";
+          document.documentElement.style.setProperty("--teal", primary);
+          document.body.style.background =
+            "linear-gradient(165deg, #0a0a0a 0%, " + accent + " 45%, #0a0a0a 100%)";
+          const name = brand.displayName || tenantSlug;
+          document.getElementById("pageTitle").textContent = name + " — Android app";
+          document.title = name + " — Download";
+          const banner = document.getElementById("companyBanner");
+          if (banner && !banner.classList.contains("hidden")) {
+            banner.innerHTML = "Company: <strong>" + name + "</strong>";
+          }
+          if (brand.logoUrl) {
+            const img = document.getElementById("brandLogo");
+            img.src = brand.logoUrl;
+            img.classList.add("show");
+          }
+        } catch (_) {
+          /* keep VIT defaults */
         }
       }
 
@@ -294,6 +338,7 @@
 
       document.getElementById("outBtn").onclick = () => location.reload();
       setupCompanyUi();
+      applyBrandChrome();
     </script>
   </body>
 </html>

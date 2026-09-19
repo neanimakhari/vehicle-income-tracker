@@ -8,6 +8,7 @@ import '../services/offline_queue.dart';
 import '../theme.dart';
 import '../services/brand_theme_controller.dart';
 import '../widgets/confirmation_dialog.dart';
+import '../widgets/brand_logo.dart';
 import '../screens/login_screen.dart';
 import '../screens/vehicle_insights_screen.dart';
 import '../screens/maintenance_screen.dart';
@@ -75,19 +76,51 @@ class AppSidebar extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Main Menu title
+            // Main Menu title + brand logo
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-              child: Text(
-                'Main Menu',
-                style: textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: _MenuColors.text,
-                ) ?? const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: _MenuColors.text,
-                ),
+              child: Row(
+                children: [
+                  ListenableBuilder(
+                    listenable: BrandThemeController.instance,
+                    builder: (context, _) => const BrandLogo(size: 40),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Main Menu',
+                          style: textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: _MenuColors.text,
+                          ) ?? const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: _MenuColors.text,
+                          ),
+                        ),
+                        ListenableBuilder(
+                          listenable: BrandThemeController.instance,
+                          builder: (context, _) {
+                            final name = BrandThemeController.instance.displayName ??
+                                Session.tenantName ??
+                                _formatTenantDisplay(Session.tenantId);
+                            return Text(
+                              name,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
             // Alert / CTA card (verify email) – only when email is not verified
@@ -438,9 +471,9 @@ class _ProfileAvatarState extends State<_ProfileAvatar> {
   Widget build(BuildContext context) {
     return CircleAvatar(
       radius: widget.radius,
-      backgroundColor: AppTheme.primary.withOpacity(0.2),
+      backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
       backgroundImage: _bytes != null ? MemoryImage(Uint8List.fromList(_bytes!)) : null,
-      child: _bytes == null ? Icon(Icons.person, color: AppTheme.primary, size: widget.radius * 1.2) : null,
+      child: _bytes == null ? Icon(Icons.person, color: Theme.of(context).colorScheme.primary, size: widget.radius * 1.2) : null,
     );
   }
 }

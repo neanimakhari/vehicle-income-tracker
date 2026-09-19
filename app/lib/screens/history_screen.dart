@@ -344,7 +344,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 'Net Income',
                 _formatCurrency(netIncome),
                 Icons.account_balance_wallet,
-                AppTheme.primary,
+                Theme.of(context).colorScheme.primary,
                 isDarkMode,
               ),
             ),
@@ -367,7 +367,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          CircularProgressIndicator(color: AppTheme.primary),
+                          CircularProgressIndicator(color: Theme.of(context).colorScheme.primary),
                           const SizedBox(height: 16),
                           Text(
                             'Loading history...',
@@ -416,7 +416,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         )
                       : RefreshIndicator(
                           onRefresh: _load,
-                          color: AppTheme.primary,
+                          color: Theme.of(context).colorScheme.primary,
                           child: ListView.builder(
                             controller: _scrollController,
                             padding: const EdgeInsets.all(16),
@@ -427,7 +427,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   padding: const EdgeInsets.symmetric(vertical: 16),
                                   child: Center(
                                     child: _loadingMore
-                                        ? CircularProgressIndicator(color: AppTheme.primary)
+                                        ? CircularProgressIndicator(color: Theme.of(context).colorScheme.primary)
                                         : TextButton(
                                             onPressed: _loadMore,
                                             child: const Text('Load more'),
@@ -457,12 +457,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         Container(
                                           padding: const EdgeInsets.all(12),
                                           decoration: BoxDecoration(
-                                            color: AppTheme.primary.withOpacity(0.15),
+                                            color: Theme.of(context).colorScheme.primary.withOpacity(0.15),
                                             shape: BoxShape.circle,
                                           ),
                                           child: const Icon(
                                             Icons.directions_car,
-                                            color: AppTheme.primary,
+                                            color: Theme.of(context).colorScheme.primary,
                                             size: 24,
                                           ),
                                         ),
@@ -786,10 +786,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
       label: Text(label),
       selected: selected,
       onSelected: (_) => onTap(),
-      selectedColor: AppTheme.primary.withOpacity(0.2),
-      checkmarkColor: AppTheme.primary,
+      selectedColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+      checkmarkColor: Theme.of(context).colorScheme.primary,
       labelStyle: TextStyle(
-        color: selected ? AppTheme.primary : (isDarkMode ? Colors.white : Colors.black87),
+        color: selected ? Theme.of(context).colorScheme.primary : (isDarkMode ? Colors.white : Colors.black87),
         fontWeight: selected ? FontWeight.bold : FontWeight.normal,
       ),
     );
@@ -841,7 +841,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   color: isDarkMode ? Colors.white : Colors.black87,
                   fontSize: 16,
                 ),
-                icon: const Icon(Icons.arrow_drop_down, color: AppTheme.primary),
+                icon: const Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
                 items: [
                   const DropdownMenuItem<String?>(value: null, child: Text('All Vehicles')),
                   ...vehicles.map((vehicle) {
@@ -886,7 +886,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   color: isDarkMode ? Colors.white : Colors.black87,
                   fontSize: 16,
                 ),
-                icon: const Icon(Icons.arrow_drop_down, color: AppTheme.primary),
+                icon: const Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
                 items: _sortOptions.map((option) {
                   return DropdownMenuItem<String?>(value: option, child: Text(option));
                 }).toList(),

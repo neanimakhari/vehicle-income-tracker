@@ -115,10 +115,17 @@ export default async function RootLayout({
           .map(([k, v]) => `${k}:${v}`)
           .join(";")}}`
       : null;
+  const pageTitle =
+    brand?.mode === "custom" && brand.displayName
+      ? `${brand.displayName} Admin`
+      : tenantName
+        ? `${tenantName} Admin`
+        : "VIT Tenant Admin";
 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <title>{pageTitle}</title>
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('theme');var d=window.matchMedia('(prefers-color-scheme: dark)').matches;if(t==='dark'||(t!=='light'&&d)){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}}catch(e){}})();`,

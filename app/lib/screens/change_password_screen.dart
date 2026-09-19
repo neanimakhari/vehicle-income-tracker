@@ -89,7 +89,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       appBar: AppBar(
         title: const Text('Change Password'),
         centerTitle: true,
-        backgroundColor: isDarkMode ? AppTheme.darkBackground : AppTheme.primary,
+        backgroundColor: isDarkMode ? AppTheme.darkBackground : Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         leading: widget.forcedFirstLogin
             ? null
@@ -112,13 +112,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     padding: const EdgeInsets.all(16),
                     margin: const EdgeInsets.only(bottom: 24),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.2),
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(AppTheme.radius),
-                      border: Border.all(color: AppTheme.primary.withOpacity(0.5)),
+                      border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, color: AppTheme.primary, size: 28),
+                        Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary, size: 28),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
@@ -225,7 +225,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _changePassword,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppTheme.radius),

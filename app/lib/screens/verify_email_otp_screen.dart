@@ -87,7 +87,7 @@ class _VerifyEmailOtpScreenState extends State<VerifyEmailOtpScreen> {
       appBar: AppBar(
         title: const Text('Verify with code', style: TextStyle(fontSize: 18)),
         centerTitle: true,
-        backgroundColor: AppTheme.primary,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
       ),
       body: SafeArea(
@@ -98,7 +98,7 @@ class _VerifyEmailOtpScreenState extends State<VerifyEmailOtpScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 40),
-                    Icon(Icons.check_circle, size: 80, color: AppTheme.primary),
+                    Icon(Icons.check_circle, size: 80, color: Theme.of(context).colorScheme.primary),
                     const SizedBox(height: 24),
                     Text(
                       'Email verified',
@@ -115,7 +115,7 @@ class _VerifyEmailOtpScreenState extends State<VerifyEmailOtpScreen> {
                       child: ElevatedButton(
                         onPressed: () => Navigator.pop(context),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
+                          backgroundColor: Theme.of(context).colorScheme.primary,
                           foregroundColor: Colors.white,
                         ),
                         child: const Text('Back to Profile'),
@@ -148,7 +148,7 @@ class _VerifyEmailOtpScreenState extends State<VerifyEmailOtpScreen> {
                             : const Icon(Icons.email_outlined),
                         label: Text(_sendLoading ? 'Sending…' : 'Send verification code'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
+                          backgroundColor: Theme.of(context).colorScheme.primary,
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -184,7 +184,7 @@ class _VerifyEmailOtpScreenState extends State<VerifyEmailOtpScreen> {
                         child: ElevatedButton(
                           onPressed: _verifyLoading ? null : _verifyCode,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primary,
+                            backgroundColor: Theme.of(context).colorScheme.primary,
                             foregroundColor: Colors.white,
                           ),
                           child: _verifyLoading

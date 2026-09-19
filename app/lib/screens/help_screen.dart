@@ -123,7 +123,7 @@ class HelpScreen extends StatelessWidget {
                     children: [
                       Icon(
                         Icons.support_agent,
-                        color: AppTheme.primary,
+                        color: Theme.of(context).colorScheme.primary,
                         size: 20,
                       ),
                       const SizedBox(width: 8),
@@ -177,10 +177,10 @@ class HelpScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.1),
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(icon, color: AppTheme.primary, size: 24),
+              child: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 24),
             ),
             const SizedBox(width: 16),
             Expanded(

@@ -17,6 +17,7 @@ import {
   BrandPolicyDto,
   brandFieldsFromTenant,
   buildBrandTokens,
+  relativeLuminance,
   validateBrandColors,
 } from './brand.util';
 import { Tenant } from './tenant.entity';
@@ -126,6 +127,16 @@ export class BrandService {
     if (draft.logoPath) {
       draftOut.logoUrl = `${this.apiPublicBase()}/tenants/${tenant.id}/brand/logo-file?v=${v}`;
     }
+    const primaryForWarn = draft.primaryHex || tenant.brandPrimaryHex;
+    let primaryLuminance: number | null = null;
+    let primaryContrastWarning: string | null = null;
+    if (primaryForWarn && /^#[0-9A-Fa-f]{6}$/.test(primaryForWarn)) {
+      primaryLuminance = relativeLuminance(primaryForWarn);
+      if (primaryLuminance > 0.7) {
+        primaryContrastWarning =
+          'Primary color is quite light — buttons and links may be hard to read on white backgrounds.';
+      }
+    }
     return {
       entitled,
       brandMode: tenant.brandMode,
@@ -136,6 +147,8 @@ export class BrandService {
       brandUpdatedAt: tenant.brandUpdatedAt,
       tenantName: tenant.name,
       tenantSlug: tenant.slug,
+      primaryLuminance,
+      primaryContrastWarning,
     };
   }
 
@@ -263,10 +276,26 @@ export class BrandService {
     );
     await this.saveDraft(tenantId, input, actorUserId);
     const entitled = await this.isBrandingEntitled(tenant.slug);
+    let result;
     if (entitled) {
-      return this.publishDraft(tenantId, actorUserId);
+      result = await this.publishDraft(tenantId, actorUserId);
+    } else {
+      result = await this.getBrandStudio(tenantId);
     }
-    return this.getBrandStudio(tenantId);
+    await this.audit.log({
+      action: 'tenant.brand.replace',
+      actorUserId,
+      actorRole: 'PLATFORM_ADMIN',
+      targetType: 'tenant',
+      targetId: tenant.id,
+      metadata: {
+        slug: tenant.slug,
+        published: entitled,
+        displayName: input.displayName ?? null,
+        primaryHex: input.primaryHex ?? null,
+      },
+    });
+    return result;
   }
 
   async uploadAsset(
@@ -444,6 +473,28 @@ export class BrandService {
     return this.createSnapshot(tenant, label || 'Manual snapshot', actorUserId);
   }
 
+  async deleteSnapshot(
+    tenantId: string,
+    snapshotId: string,
+    actorUserId: string | null,
+  ) {
+    const tenant = await this.findTenant(tenantId);
+    const snap = await this.snapshots.findOne({ where: { id: snapshotId } });
+    if (!snap || snap.tenantSlug !== tenant.slug) {
+      throw new NotFoundException('Snapshot not found');
+    }
+    await this.snapshots.remove(snap);
+    await this.audit.log({
+      action: 'tenant.brand.snapshot_delete',
+      actorUserId,
+      actorRole: 'PLATFORM_ADMIN',
+      targetType: 'tenant',
+      targetId: tenant.id,
+      metadata: { slug: tenant.slug, snapshotId, label: snap.label },
+    });
+    return { deleted: true };
+  }
+
   async restoreSnapshot(
     tenantId: string,
     snapshotId: string,
@@ -615,6 +666,132 @@ export class BrandService {
     }
     await this.kits.remove(kit);
     return { deleted: true };
+  }
+
+  async exportKit(id: string) {
+    const kit = await this.getKit(id);
+    let logoBase64: string | null = null;
+    if (kit.logoPath) {
+      const abs = path.join(process.cwd(), 'uploads', kit.logoPath);
+      if (fs.existsSync(abs)) {
+        logoBase64 = fs.readFileSync(abs).toString('base64');
+      }
+    }
+    return {
+      version: 1,
+      name: kit.name,
+      description: kit.description,
+      tags: kit.tags,
+      payload: kit.payload,
+      logoMime: kit.logoMime,
+      logoBase64,
+    };
+  }
+
+  async importKit(
+    body: {
+      name?: string;
+      description?: string | null;
+      tags?: string[];
+      payload: Record<string, unknown>;
+      logoMime?: string | null;
+      logoBase64?: string | null;
+    },
+    actorUserId: string | null,
+  ) {
+    const p = body.payload || {};
+    const colors = validateBrandColors({
+      primaryHex: (p.primaryHex as string) ?? null,
+      accentHex: (p.accentHex as string) ?? null,
+    });
+    if (!colors.primaryHex) {
+      throw new BadRequestException('Import payload needs primaryHex');
+    }
+    const kit = this.kits.create({
+      name: (body.name || 'Imported kit').trim(),
+      description: body.description?.trim() || null,
+      tags: body.tags ?? ['imported'],
+      payload: {
+        primaryHex: colors.primaryHex,
+        accentHex: colors.accentHex,
+        sidebarStyle: p.sidebarStyle === 'neutral' ? 'neutral' : 'colored',
+        displayName: (p.displayName as string) ?? null,
+      },
+      isStarter: false,
+      createdBy: actorUserId,
+    });
+    const saved = await this.kits.save(kit);
+    if (body.logoBase64 && body.logoMime && ALLOWED_MIME.has(body.logoMime)) {
+      const buf = Buffer.from(body.logoBase64, 'base64');
+      if (buf.length > 0 && buf.length <= MAX_BYTES) {
+        const kitDir = path.join(this.kitsRoot, saved.id);
+        fs.mkdirSync(kitDir, { recursive: true });
+        const ext =
+          body.logoMime === 'image/png'
+            ? '.png'
+            : body.logoMime === 'image/webp'
+              ? '.webp'
+              : '.jpg';
+        const destRel = path
+          .join('brand-kits', saved.id, `logo${ext}`)
+          .replace(/\\/g, '/');
+        fs.writeFileSync(path.join(process.cwd(), 'uploads', destRel), buf);
+        saved.logoPath = destRel;
+        saved.logoMime = body.logoMime;
+        await this.kits.save(saved);
+      }
+    }
+    await this.audit.log({
+      action: 'tenant.brand.kit_import',
+      actorUserId,
+      actorRole: 'PLATFORM_ADMIN',
+      targetType: 'brand_kit',
+      targetId: saved.id,
+      metadata: { name: saved.name },
+    });
+    return saved;
+  }
+
+  async applyKitBulk(
+    kitId: string,
+    opts: {
+      tenantIds: string[];
+      target?: 'draft' | 'live';
+      includeLogo?: boolean;
+      setDisplayName?: boolean;
+    },
+    actorUserId: string | null,
+  ) {
+    if (!opts.tenantIds?.length) {
+      throw new BadRequestException('tenantIds required');
+    }
+    const results: Array<{ tenantId: string; ok: boolean; error?: string }> = [];
+    for (const tenantId of opts.tenantIds) {
+      try {
+        await this.applyKitToTenant(
+          tenantId,
+          kitId,
+          {
+            includeLogo: opts.includeLogo === true,
+            setDisplayName: opts.setDisplayName === true,
+            publish: opts.target === 'live',
+          },
+          actorUserId,
+        );
+        results.push({ tenantId, ok: true });
+      } catch (e) {
+        results.push({
+          tenantId,
+          ok: false,
+          error: e instanceof Error ? e.message : 'failed',
+        });
+      }
+    }
+    return {
+      applied: results.filter((r) => r.ok).length,
+      failed: results.filter((r) => !r.ok).length,
+      results,
+    };
   }
 
   async applyKitToTenant(

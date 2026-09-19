@@ -26,6 +26,33 @@ export type BrandPolicyDto = {
   loginBackgroundUrl?: string;
 };
 
+/** Letterhead for tenant emails/PDFs when white-label is live. */
+export type BrandLetterhead = {
+  displayName: string;
+  primaryColor: string;
+  accentColor: string;
+  logoUrl?: string;
+};
+
+export function letterheadFromPolicy(
+  policy: BrandPolicyDto,
+  fallbackName: string,
+): BrandLetterhead {
+  if (policy.mode === 'custom' && policy.entitled && policy.primaryColor) {
+    return {
+      displayName: policy.displayName || fallbackName,
+      primaryColor: policy.primaryColor,
+      accentColor: policy.accentColor || mixHex(policy.primaryColor, '#000000', 0.35),
+      logoUrl: policy.logoUrl,
+    };
+  }
+  return {
+    displayName: fallbackName,
+    primaryColor: VIT_PRIMARY,
+    accentColor: VIT_ACCENT,
+  };
+}
+
 export function normalizeHex(input: string | null | undefined): string | null {
   if (input == null || input === '') return null;
   const hex = input.trim();

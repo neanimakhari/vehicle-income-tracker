@@ -70,7 +70,7 @@ class _AuditScreenState extends State<AuditScreen> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(AppTheme.radius),
                       color: isDarkMode ? AppTheme.darkSurface : Colors.white,
-                      border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
+                      border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.1)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

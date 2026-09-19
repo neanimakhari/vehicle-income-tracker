@@ -4,6 +4,8 @@ import { TenantScopeService } from '../../tenancy/tenant-scope.service';
 import { EmailService } from '../email/email.service';
 import { TenantContextService } from '../../tenancy/tenant-context.service';
 import { TenantsService } from '../tenants/tenants.service';
+import { BrandService } from '../tenants/brand.service';
+import { letterheadFromPolicy } from '../tenants/brand.util';
 import { DailyTargetRulesService } from '../tenants/daily-target-rules.service';
 import { TenantReportRecipientsService } from '../tenants/tenant-report-recipients.service';
 import PDFDocument from 'pdfkit';
@@ -48,6 +50,7 @@ export class TenantReportsService {
     private readonly tenantsService: TenantsService,
     private readonly dailyTargetRulesService: DailyTargetRulesService,
     private readonly reportRecipientsService: TenantReportRecipientsService,
+    private readonly brandService: BrandService,
   ) {}
 
   async getSummary(actor?: { sub?: string; role?: string }) {
@@ -743,6 +746,22 @@ export class TenantReportsService {
     report: MonthlyReportData,
     tenantName: string,
   ): Promise<Buffer> {
+    const slug = this.tenantContext.getTenantId();
+    let primary = '#0d9488';
+    let accent = '#14b8a6';
+    let titleName = tenantName;
+    if (slug) {
+      try {
+        const policy = await this.brandService.policyForSlug(slug);
+        const lh = letterheadFromPolicy(policy, tenantName);
+        primary = lh.primaryColor;
+        accent = lh.accentColor;
+        titleName = lh.displayName;
+      } catch {
+        /* keep VIT defaults */
+      }
+    }
+
     const chunks: Buffer[] = [];
     const doc = new PDFDocument({ size: 'A4', margin: 40 });
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -752,11 +771,11 @@ export class TenantReportsService {
       pct == null ? 'n/a' : `${pct >= 0 ? '+' : ''}${pct}%`;
 
     doc
-      .fillColor('#0f766e')
+      .fillColor(primary)
       .fontSize(20)
       .text('Monthly Fleet Report', { underline: false });
     doc.moveDown(0.3);
-    doc.fillColor('#111827').fontSize(11).text(tenantName);
+    doc.fillColor('#111827').fontSize(11).text(titleName);
     doc
       .fontSize(10)
       .fillColor('#4b5563')
@@ -797,6 +816,7 @@ export class TenantReportsService {
         label: d.date.slice(8),
         value: d.income,
       })),
+      primary,
     );
 
     doc.moveDown(1.2);
@@ -807,6 +827,7 @@ export class TenantReportsService {
         label: v.vehicle.slice(0, 10),
         value: v.totalIncome,
       })),
+      accent,
     );
 
     if (doc.y > 620) doc.addPage();
@@ -819,6 +840,7 @@ export class TenantReportsService {
         label: d.driverName.slice(0, 12),
         value: d.totalIncome,
       })),
+      primary,
     );
 
     doc.moveDown(1);
@@ -839,6 +861,7 @@ export class TenantReportsService {
     doc: InstanceType<typeof PDFDocument>,
     title: string,
     points: Array<{ label: string; value: number }>,
+    fillColor = '#14b8a6',
   ) {
     doc.fillColor('#111827').fontSize(12).text(title);
     doc.moveDown(0.3);
@@ -857,7 +880,7 @@ export class TenantReportsService {
       const h = (p.value / max) * (chartH - 24);
       const x = chartX + i * ((chartW - 20) / points.length) + 10;
       const y = chartY + chartH - h;
-      doc.rect(x, y, barW, h).fill('#14b8a6');
+      doc.rect(x, y, barW, h).fill(fillColor);
       doc
         .fillColor('#374151')
         .fontSize(7)
@@ -873,6 +896,7 @@ export class TenantReportsService {
     doc: InstanceType<typeof PDFDocument>,
     title: string,
     points: Array<{ label: string; value: number }>,
+    strokeColor = '#0d9488',
   ) {
     doc.fillColor('#111827').fontSize(12).text(title);
     doc.moveDown(0.3);
@@ -890,7 +914,7 @@ export class TenantReportsService {
       .strokeColor('#e5e7eb')
       .rect(chartX, chartY, chartW, chartH)
       .stroke();
-    doc.strokeColor('#0d9488').lineWidth(1.5);
+    doc.strokeColor(strokeColor).lineWidth(1.5);
     points.forEach((p, i) => {
       const x = chartX + (i / (points.length - 1)) * chartW;
       const y = chartY + chartH - (p.value / max) * (chartH - 8) - 4;

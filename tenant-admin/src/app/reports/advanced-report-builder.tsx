@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -31,8 +31,9 @@ import {
   Square,
 } from "lucide-react";
 import { fetchJsonClient } from "../../lib/api-client";
+import { getBrandChartColors, getBrandPrimary } from "@/lib/brand-chart-colors";
 
-const COLORS = ['#14b8a6', '#0d9488', '#0f766e', '#115e59', '#134e4a', '#042f2e', '#0891b2', '#06b6d4'];
+const FALLBACK_COLORS = ['#14b8a6', '#0d9488', '#0f766e', '#115e59', '#134e4a', '#042f2e', '#0891b2', '#06b6d4'];
 
 interface CustomReportData {
   aggregated: any[];
@@ -55,6 +56,11 @@ export function AdvancedReportBuilder() {
   const [reportData, setReportData] = useState<CustomReportData | null>(null);
   const [availableDrivers, setAvailableDrivers] = useState<Array<{ driver_id: string; driver_name: string }>>([]);
   const [availableVehicles, setAvailableVehicles] = useState<string[]>([]);
+  const COLORS = useMemo(() => {
+    const c = getBrandChartColors();
+    return c.length >= 4 ? c : FALLBACK_COLORS;
+  }, []);
+  const primary = useMemo(() => getBrandPrimary(), []);
   
   // Filter states
   const [dateMode, setDateMode] = useState<'range' | 'single'>('range');
@@ -301,7 +307,7 @@ export function AdvancedReportBuilder() {
             <Tooltip />
             <Legend />
             {selectedMetrics.includes('income') && (
-              <Line type="monotone" dataKey="income" stroke="#14b8a6" name="Income" />
+              <Line type="monotone" dataKey="income" stroke={primary} name="Income" />
             )}
             {selectedMetrics.includes('expenses') && (
               <Line type="monotone" dataKey="expenses" stroke="#ef4444" name="Expenses" />
@@ -327,7 +333,7 @@ export function AdvancedReportBuilder() {
             <Tooltip />
             <Legend />
             {selectedMetrics.includes('income') && (
-              <Area type="monotone" dataKey="income" stackId="1" stroke="#14b8a6" fill="#14b8a6" name="Income" />
+              <Area type="monotone" dataKey="income" stackId="1" stroke={primary} fill={primary} name="Income" />
             )}
             {selectedMetrics.includes('expenses') && (
               <Area type="monotone" dataKey="expenses" stackId="1" stroke="#ef4444" fill="#ef4444" name="Expenses" />
@@ -350,7 +356,7 @@ export function AdvancedReportBuilder() {
           <Tooltip />
           <Legend />
           {selectedMetrics.includes('income') && (
-            <Bar dataKey="income" fill="#14b8a6" name="Income" />
+            <Bar dataKey="income" fill={primary} name="Income" />
           )}
           {selectedMetrics.includes('expenses') && (
             <Bar dataKey="expenses" fill="#ef4444" name="Expenses" />

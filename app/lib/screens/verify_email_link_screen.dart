@@ -60,7 +60,7 @@ class _VerifyEmailLinkScreenState extends State<VerifyEmailLinkScreen> {
       appBar: AppBar(
         title: const Text('Verify Email', style: TextStyle(fontSize: 18)),
         centerTitle: true,
-        backgroundColor: AppTheme.primary,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
       ),
       body: SafeArea(
@@ -73,7 +73,7 @@ class _VerifyEmailLinkScreenState extends State<VerifyEmailLinkScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Icon(Icons.mark_email_read, size: 80, color: AppTheme.primary),
+                        Icon(Icons.mark_email_read, size: 80, color: Theme.of(context).colorScheme.primary),
                         const SizedBox(height: 24),
                         Text(
                           'Email verified successfully',
@@ -103,7 +103,7 @@ class _VerifyEmailLinkScreenState extends State<VerifyEmailLinkScreen> {
                             );
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primary,
+                            backgroundColor: Theme.of(context).colorScheme.primary,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                           ),
@@ -147,7 +147,7 @@ class _VerifyEmailLinkScreenState extends State<VerifyEmailLinkScreen> {
                             );
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primary,
+                            backgroundColor: Theme.of(context).colorScheme.primary,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                           ),

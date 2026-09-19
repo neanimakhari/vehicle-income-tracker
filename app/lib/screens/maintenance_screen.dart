@@ -61,7 +61,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
       backgroundColor: isDarkMode ? AppTheme.darkBackground : Colors.white,
       floatingActionButton: isAdmin
           ? FloatingActionButton(
-              backgroundColor: AppTheme.primary,
+              backgroundColor: Theme.of(context).colorScheme.primary,
               onPressed: _showCreateDialog,
               child: const Icon(Icons.add),
             )
@@ -71,7 +71,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(color: AppTheme.primary),
+                  CircularProgressIndicator(color: Theme.of(context).colorScheme.primary),
                   const SizedBox(height: 16),
                   Text(
                     'Loading maintenance...',
@@ -135,7 +135,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(AppTheme.radius),
                       color: isDarkMode ? AppTheme.darkSurface : Colors.white,
-                      border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
+                      border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.1)),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,

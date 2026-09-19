@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -29,6 +29,7 @@ import {
 import { fetchJsonClient } from "../../lib/api-client";
 import { sendMonthlyReportAction } from "./send-report-action";
 import { AdvancedReportBuilder } from "./advanced-report-builder";
+import { getBrandChartColors, getBrandPrimary } from "@/lib/brand-chart-colors";
 
 interface Summary {
   totalIncome: number;
@@ -70,8 +71,6 @@ interface FuelEfficiency {
   costPerLitre: number;
 }
 
-const COLORS = ['#14b8a6', '#0d9488', '#0f766e', '#115e59', '#134e4a', '#042f2e'];
-
 export function ReportsClient({
   summary,
   topVehicles,
@@ -102,6 +101,9 @@ export function ReportsClient({
   }>;
 }) {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const COLORS = useMemo(() => getBrandChartColors(), []);
+  const primary = useMemo(() => getBrandPrimary(), []);
+  const primaryAlt = COLORS[1] ?? primary;
 
   async function generateCustomReport() {
     if (!dateRange.start || !dateRange.end) {
@@ -304,7 +306,7 @@ export function ReportsClient({
                 <YAxis />
                 <Tooltip formatter={(value: number | undefined) => value != null ? formatCurrency(value) : ''} />
                 <Legend />
-                <Bar dataKey="totalIncome" fill="#14b8a6" name="Total Income" />
+                <Bar dataKey="totalIncome" fill={primary} name="Total Income" />
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -326,7 +328,7 @@ export function ReportsClient({
                 <YAxis />
                 <Tooltip formatter={(value: number | undefined) => value != null ? formatCurrency(value) : ''} />
                 <Legend />
-                <Bar dataKey="totalIncome" fill="#0d9488" name="Total Income" />
+                <Bar dataKey="totalIncome" fill={primaryAlt} name="Total Income" />
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -440,7 +442,7 @@ export function ReportsClient({
               <XAxis dataKey="vehicle" />
               <YAxis />
               <Tooltip formatter={(value: number | undefined) => value != null ? formatCurrency(value) : ''} />
-              <Bar dataKey="profit" fill="#14b8a6" name="Profit" />
+              <Bar dataKey="profit" fill={primary} name="Profit" />
             </BarChart>
           </ResponsiveContainer>
         </div>

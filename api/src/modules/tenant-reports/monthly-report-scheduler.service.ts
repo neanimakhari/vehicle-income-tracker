@@ -5,6 +5,8 @@ import { Tenant } from '../tenants/tenant.entity';
 import { TenantReportsService } from './tenant-reports.service';
 import { EmailService } from '../email/email.service';
 import { TenantContextService } from '../../tenancy/tenant-context.service';
+import { BrandService } from '../tenants/brand.service';
+import { letterheadFromPolicy } from '../tenants/brand.util';
 
 @Injectable()
 export class MonthlyReportSchedulerService {
@@ -13,6 +15,7 @@ export class MonthlyReportSchedulerService {
     private readonly tenantReportsService: TenantReportsService,
     private readonly emailService: EmailService,
     private readonly tenantContext: TenantContextService,
+    private readonly brandService: BrandService,
   ) {}
 
   // Run on the 1st of every month at 9:00 AM
@@ -58,11 +61,22 @@ export class MonthlyReportSchedulerService {
                   );
                 const fileName = `monthly-report-${startDate.toISOString().slice(0, 10)}-${endDate.toISOString().slice(0, 10)}.pdf`;
 
+                const policy = await this.brandService.policyForSlug(tenant.slug);
+                const letterhead = letterheadFromPolicy(
+                  policy,
+                  tenant.name || tenant.slug,
+                );
+
                 await this.emailService.sendMonthlyReport(
                   recipients,
                   tenant.name || tenant.slug,
                   reportData,
                   { filename: fileName, content: pdf },
+                  {
+                    displayName: letterhead.displayName,
+                    primaryColor: letterhead.primaryColor,
+                    accentColor: letterhead.accentColor,
+                  },
                 );
 
                 console.log(

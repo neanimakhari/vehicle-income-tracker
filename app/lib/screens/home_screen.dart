@@ -107,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final barColor = isDarkMode ? AppTheme.darkSurface : AppTheme.primary;
+    final barColor = isDarkMode ? AppTheme.darkSurface : Theme.of(context).colorScheme.primary;
     final borderColor = isDarkMode ? AppTheme.darkBorder : Colors.transparent;
     final showBanner =
         !_announcementDismissed && _announcement != null;
@@ -232,10 +232,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _navItem(IconData icon, String label, int index, bool isDarkMode) {
     final isSelected = _index == index;
     final iconColor = isDarkMode
-        ? (isSelected ? AppTheme.primary : Colors.white70)
+        ? (isSelected ? Theme.of(context).colorScheme.primary : Colors.white70)
         : (isSelected ? Colors.white : Colors.white.withOpacity(0.6));
     final textColor = isDarkMode
-        ? (isSelected ? AppTheme.primary : Colors.white70)
+        ? (isSelected ? Theme.of(context).colorScheme.primary : Colors.white70)
         : (isSelected ? Colors.white : Colors.white.withOpacity(0.6));
     return InkWell(
       onTap: () => setState(() => _index = index),
