@@ -12,8 +12,14 @@ export function BrandStyleApplier({ brand }: { brand?: PolicyBrand | null }) {
     for (const [k, v] of Object.entries(vars)) {
       root.style.setProperty(k, v);
     }
+    if (brand?.sidebarStyle === "neutral") {
+      root.classList.add("brand-sidebar-neutral");
+    } else {
+      root.classList.remove("brand-sidebar-neutral");
+    }
     return () => {
       for (const k of keys) root.style.removeProperty(k);
+      root.classList.remove("brand-sidebar-neutral");
     };
   }, [brand]);
 

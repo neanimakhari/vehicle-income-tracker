@@ -24,13 +24,18 @@ describe('brand.util', () => {
   it('validateBrandColors returns pair', () => {
     expect(
       validateBrandColors({ primaryHex: '#1d4ed8', accentHex: '#1e3a8a' }),
-    ).toEqual({ primaryHex: '#1d4ed8', accentHex: '#1e3a8a' });
+    ).toEqual({
+      primaryHex: '#1d4ed8',
+      accentHex: '#1e3a8a',
+      primaryDarkHex: null,
+    });
   });
 
-  it('buildBrandTokens generates scale', () => {
+  it('buildBrandTokens generates scale with seed at primary600', () => {
     const t = buildBrandTokens('#0d9488', '#134e4a');
-    expect(t.primary500).toBe('#0d9488');
-    expect(t.primary600).toMatch(/^#[0-9a-f]{6}$/);
+    expect(t.primary600).toBe('#0d9488');
+    expect(t.primary500).toMatch(/^#[0-9a-f]{6}$/);
+    expect(t.primary50).toMatch(/^#[0-9a-f]{6}$/);
     expect(t.accent).toBe('#134e4a');
   });
 });

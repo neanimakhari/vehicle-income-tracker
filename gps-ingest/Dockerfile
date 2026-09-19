@@ -1,0 +1,9 @@
+FROM node:20-alpine
+WORKDIR /app
+COPY package.json ./
+COPY src ./src
+ENV TRACKING_TCP_BIND=0.0.0.0
+ENV TRACKING_TCP_PORT=5023
+ENV HEALTH_PORT=9088
+EXPOSE 5023 9088
+CMD ["node", "src/server.js"]

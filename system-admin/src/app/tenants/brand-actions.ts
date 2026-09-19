@@ -45,7 +45,11 @@ export async function brandSaveDraft(
     displayName?: string | null;
     primaryHex?: string | null;
     accentHex?: string | null;
+    primaryDarkHex?: string | null;
     sidebarStyle?: "colored" | "neutral";
+    fontFamily?: string | null;
+    borderRadius?: string | null;
+    density?: string | null;
   },
 ) {
   return api(`/tenants/${tenantId}/brand/draft`, {
@@ -71,7 +75,11 @@ export async function brandReplace(
     displayName?: string | null;
     primaryHex?: string | null;
     accentHex?: string | null;
+    primaryDarkHex?: string | null;
     sidebarStyle?: "colored" | "neutral";
+    fontFamily?: string | null;
+    borderRadius?: string | null;
+    density?: string | null;
     snapshotLabel?: string;
   },
 ) {
@@ -86,6 +94,47 @@ export async function brandUploadLogo(tenantId: string, formData: FormData) {
     method: "POST",
     body: formData,
   });
+}
+
+export async function brandUploadLoginBg(tenantId: string, formData: FormData) {
+  return api(`/tenants/${tenantId}/brand/login-bg`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function brandClearLogo(tenantId: string) {
+  return api(`/tenants/${tenantId}/brand/logo`, { method: "DELETE" });
+}
+
+export async function brandClearLoginBg(tenantId: string) {
+  return api(`/tenants/${tenantId}/brand/login-bg`, { method: "DELETE" });
+}
+
+export async function brandCreateKit(body: {
+  name: string;
+  description?: string;
+  primaryHex: string;
+  accentHex?: string | null;
+  primaryDarkHex?: string | null;
+  sidebarStyle?: "colored" | "neutral";
+  displayName?: string | null;
+  fontFamily?: string | null;
+  borderRadius?: string | null;
+  density?: string | null;
+}) {
+  return api(`/brand-kits`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function brandCloneKit(kitId: string) {
+  return api(`/brand-kits/${kitId}/clone`, { method: "POST" });
+}
+
+export async function brandDeleteKit(kitId: string) {
+  return api(`/brand-kits/${kitId}`, { method: "DELETE" });
 }
 
 export async function brandListKits() {

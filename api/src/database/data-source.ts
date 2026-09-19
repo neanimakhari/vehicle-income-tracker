@@ -41,6 +41,8 @@ import { AddScholarStaffTransport1700000000034 } from './migrations/170000000003
 import { AddPlatformSettingsAndSysEnter1700000000035 } from './migrations/1700000000035-add-platform-settings-and-sys-enter';
 import { AddDriverEmailIndex1700000000036 } from './migrations/1700000000036-add-driver-email-index';
 import { AddTenantBranding1700000000037 } from './migrations/1700000000037-add-tenant-branding';
+import { BrandDepthUpgrade1700000000038 } from './migrations/1700000000038-brand-depth-upgrade';
+import { AddGpsTrackingDepth1700000000039 } from './migrations/1700000000039-add-gps-tracking-depth';
 
 export default new DataSource({
   type: 'postgres',
@@ -90,5 +92,7 @@ export default new DataSource({
     AddPlatformSettingsAndSysEnter1700000000035,
     AddDriverEmailIndex1700000000036,
     AddTenantBranding1700000000037,
+    BrandDepthUpgrade1700000000038,
+    AddGpsTrackingDepth1700000000039,
   ],
 });

@@ -22,6 +22,7 @@ import { TenantReportRecipientsService } from './tenant-report-recipients.servic
 import { DailyTargetRulesController } from './daily-target-rules.controller';
 import { DailyTargetRulesService } from './daily-target-rules.service';
 import { CommercialModule } from '../commercial/commercial.module';
+import { TenantEventsModule } from '../tenant-events/tenant-events.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { CommercialModule } from '../commercial/commercial.module';
     EmailModule,
     forwardRef(() => TenancyModule),
     forwardRef(() => CommercialModule),
+    TenantEventsModule,
   ],
   controllers: [
     TenantsController,

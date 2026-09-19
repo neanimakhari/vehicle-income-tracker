@@ -241,13 +241,16 @@ This invite expires in 48 hours. Do not share the link.`;
       maintenanceSpend?: number | null;
     },
     pdfAttachment?: { filename: string; content: Buffer } | null,
-    brand?: { displayName?: string; primaryColor?: string; accentColor?: string } | null,
+    brand?: { displayName?: string; primaryColor?: string; accentColor?: string; logoUrl?: string } | null,
   ) {
     const formatCurrency = (amount: number) => `R ${amount.toFixed(2)}`;
     const formatDate = (date: Date) => date.toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
     const headerName = brand?.displayName || tenantName;
     const primary = brand?.primaryColor || '#0d9488';
     const accent = brand?.accentColor || '#14b8a6';
+    const logoHtml = brand?.logoUrl
+      ? `<img src="${brand.logoUrl}" alt="" width="64" height="64" style="display:block;margin:0 auto 12px;border-radius:12px;background:rgba(255,255,255,0.15);padding:6px" />`
+      : '';
 
     const html = `
       <!DOCTYPE html>
@@ -256,7 +259,7 @@ This invite expires in 48 hours. Do not share the link.`;
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 800px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, ${accent} 0%, ${primary} 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; }
+          .header { background: linear-gradient(135deg, ${accent} 0%, ${primary} 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
           .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
           .summary-box { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
           .summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 15px; }
@@ -273,6 +276,7 @@ This invite expires in 48 hours. Do not share the link.`;
       <body>
         <div class="container">
           <div class="header">
+            ${logoHtml}
             <h1>Monthly Financial Report</h1>
             <p>${headerName}</p>
             <p>${formatDate(reportData.period.startDate)} - ${formatDate(reportData.period.endDate)}</p>

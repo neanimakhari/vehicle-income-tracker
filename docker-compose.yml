@@ -39,11 +39,31 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-refresh-secret-min-32}
       BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-}
       CORS_ORIGINS: "http://localhost:3001,http://localhost:3002,http://127.0.0.1:3001,http://127.0.0.1:3002"
+      GPS_INGEST_SECRET: ${GPS_INGEST_SECRET:-local-dev-ingest-secret}
+      TRACKING_SIMULATE_ENABLED: "true"
     ports:
       - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
+
+  gps-ingest:
+    build:
+      context: ./gps-ingest
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      API_BASE_URL: http://api:3000
+      GPS_INGEST_SECRET: ${GPS_INGEST_SECRET:-local-dev-ingest-secret}
+      TRACKING_TCP_BIND: 0.0.0.0
+      TRACKING_TCP_PORT: 5023
+      HEALTH_PORT: 9088
+    ports:
+      # Health only on localhost; TCP left internal unless overridden
+      - "127.0.0.1:9088:9088"
+      - "127.0.0.1:5023:5023"
+    depends_on:
+      - api
 
   system-admin:
     build:

@@ -71,11 +71,12 @@ normalize_service() {
     api|vit-api) echo "api" ;;
     system-admin|system_admin|platform|platform-admin|vit-platform) echo "system-admin" ;;
     tenant-admin|tenant_admin|tenant|vit-admin) echo "tenant-admin" ;;
+    gps-ingest|gps_ingest|ingest) echo "gps-ingest" ;;
     all) echo "all" ;;
     "" ) ;;
     *)
       echo "Unknown service/alias: $1" >&2
-      echo "Use: api | system-admin | tenant-admin | all" >&2
+      echo "Use: api | system-admin | tenant-admin | gps-ingest | all" >&2
       exit 1
       ;;
   esac
@@ -87,7 +88,7 @@ for part in "${RAW_PARTS[@]}"; do
   norm="$(normalize_service "$part")"
   [[ -z "$norm" ]] && continue
   if [[ "$norm" == "all" ]]; then
-    SERVICES=(api system-admin tenant-admin)
+    SERVICES=(api system-admin tenant-admin gps-ingest)
     break
   fi
   # de-dupe

@@ -28,6 +28,8 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { CommercialModule } from './modules/commercial/commercial.module';
 import { TenantTransportModule } from './modules/tenant-transport/tenant-transport.module';
 import { EmailModule } from './modules/email/email.module';
+import { TenantEventsModule } from './modules/tenant-events/tenant-events.module';
+import { TenantTrackingModule } from './modules/tenant-tracking/tenant-tracking.module';
 
 @Module({
   imports: [
@@ -61,6 +63,8 @@ import { EmailModule } from './modules/email/email.module';
     TenantReportsModule,
     TenantMaintenanceModule,
     WebhooksModule,
+    TenantEventsModule,
+    TenantTrackingModule,
     CommercialModule,
     TenantTransportModule,
     PlatformAdminModule,

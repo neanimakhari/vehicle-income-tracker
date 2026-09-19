@@ -113,7 +113,9 @@ class HelpScreen extends StatelessWidget {
                 color: isDarkMode ? AppTheme.darkSurface : Colors.teal[50],
                 borderRadius: BorderRadius.circular(AppTheme.radius),
                 border: Border.all(
-                  color: isDarkMode ? Colors.teal[800]! : Colors.teal[200]!,
+                  color: isDarkMode
+                      ? Theme.of(context).colorScheme.primary.withOpacity(0.45)
+                      : Theme.of(context).colorScheme.primary.withOpacity(0.25),
                 ),
               ),
               child: Column(

@@ -174,7 +174,13 @@ export class CommercialService {
 
   async hasModule(tenantSlug: string, moduleKey: string): Promise<boolean> {
     const entitlements = await this.resolveEntitlements(tenantSlug);
-    return entitlements.includes(moduleKey);
+    if (!entitlements.includes(moduleKey)) return false;
+    // Submodules require parent entitled as well
+    const mod = await this.modulesRepo.findOne({ where: { key: moduleKey } });
+    if (mod?.parentKey && !entitlements.includes(mod.parentKey)) {
+      return false;
+    }
+    return true;
   }
 
   async upsertTenantEntitlement(
@@ -217,7 +223,18 @@ export class CommercialService {
       }
     }
     if (data.moduleOverrides !== undefined) {
-      row.moduleOverrides = data.moduleOverrides;
+      const overrides = { ...data.moduleOverrides };
+      // Enabling a submodule forces parent on
+      const allMods = await this.modulesRepo.find();
+      const byKey = new Map(allMods.map((m) => [m.key, m]));
+      for (const [key, enabled] of Object.entries(overrides)) {
+        if (!enabled) continue;
+        const parent = byKey.get(key)?.parentKey;
+        if (parent && overrides[parent] !== false) {
+          overrides[parent] = true;
+        }
+      }
+      row.moduleOverrides = overrides;
     }
     if (data.trialEndsAt !== undefined) {
       row.trialEndsAt = data.trialEndsAt ? new Date(data.trialEndsAt) : null;

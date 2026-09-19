@@ -231,10 +231,26 @@ export class TenantSchemasService {
         "longitude" numeric NOT NULL,
         "speed_kph" numeric NULL DEFAULT NULL,
         "heading" numeric NULL DEFAULT NULL,
+        "ignition_on" boolean NULL DEFAULT NULL,
+        "external_voltage" numeric NULL DEFAULT NULL,
+        "backup_battery_level" smallint NULL DEFAULT NULL,
+        "gps_fix_ok" boolean NULL DEFAULT NULL,
+        "satellites" smallint NULL DEFAULT NULL,
+        "engine_rpm" numeric NULL DEFAULT NULL,
+        "fuel_rate_lph" numeric NULL DEFAULT NULL,
+        "fuel_level_percent" numeric NULL DEFAULT NULL,
+        "odometer_km" numeric NULL DEFAULT NULL,
+        "coolant_c" numeric NULL DEFAULT NULL,
+        "engine_load_percent" numeric NULL DEFAULT NULL,
+        "overspeed" boolean NULL DEFAULT NULL,
         "recorded_at" timestamptz NOT NULL,
         "raw_payload" text NULL DEFAULT NULL,
         "created_at" timestamptz NOT NULL DEFAULT now()
       )`,
+    );
+    await this.dataSource.query(
+      `ALTER TABLE "${schemaName}"."vehicles"
+       ADD COLUMN IF NOT EXISTS "tracker_imei" varchar NULL`,
     );
     await this.dataSource.query(
       `CREATE TABLE IF NOT EXISTS "${schemaName}"."vehicles" (

@@ -63,13 +63,15 @@ export function BrandMockFrames({
   const sidebarColored = draft.sidebarStyle !== "neutral";
 
   const cssVars = {
-    ["--mock-p"]: tokens.primary500,
-    ["--mock-p6"]: tokens.primary600,
+    ["--mock-p"]: tokens.primary600,
+    ["--mock-p6"]: tokens.primary700,
     ["--mock-p7"]: tokens.primary700,
     ["--mock-a"]: tokens.accent,
   } as React.CSSProperties;
 
   const tabActive = { background: "var(--mock-p6)" };
+  const radius =
+    draft.borderRadius === "sm" ? 8 : draft.borderRadius === "lg" ? 20 : 12;
 
   return (
     <div className="space-y-3" style={cssVars}>
@@ -78,6 +80,16 @@ export function BrandMockFrames({
           {watermark}
         </p>
       ) : null}
+      {draft.loginBackgroundUrl ? (
+        <p className="text-xs text-zinc-500">
+          Login background set · Font: {draft.fontFamily || "inter"} · Radius:{" "}
+          {draft.borderRadius || "md"} ({radius}px)
+        </p>
+      ) : (
+        <p className="text-xs text-zinc-500">
+          Font: {draft.fontFamily || "inter"} · Radius: {draft.borderRadius || "md"} ({radius}px)
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_220px]">
         {/* Admin */}

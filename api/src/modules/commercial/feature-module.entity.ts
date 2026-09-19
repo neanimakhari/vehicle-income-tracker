@@ -14,6 +14,9 @@ export class FeatureModuleEntity {
   @Column({ unique: true })
   key: string;
 
+  @Column({ name: 'parent_key', type: 'varchar', nullable: true, default: null })
+  parentKey: string | null;
+
   @Column()
   name: string;
 

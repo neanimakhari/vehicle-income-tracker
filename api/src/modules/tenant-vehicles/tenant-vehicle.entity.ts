@@ -79,6 +79,9 @@ export class TenantVehicle {
   @Column({ name: 'seat_capacity', type: 'int', nullable: true, default: null })
   seatCapacity: number | null;
 
+  @Column({ name: 'tracker_imei', type: 'varchar', nullable: true, default: null })
+  trackerImei: string | null;
+
   @Column({ default: true, name: 'is_active' })
   isActive: boolean;
 

@@ -732,11 +732,31 @@ export class TenantReportsService {
     );
     const fileName = `monthly-report-${startDate.toISOString().slice(0, 10)}-${endDate.toISOString().slice(0, 10)}.pdf`;
 
+    let brand: {
+      displayName?: string;
+      primaryColor?: string;
+      accentColor?: string;
+      logoUrl?: string;
+    } | null = null;
+    try {
+      const policy = await this.brandService.policyForSlug(tenantId);
+      const lh = letterheadFromPolicy(policy, tenant.name || tenant.slug);
+      brand = {
+        displayName: lh.displayName,
+        primaryColor: lh.primaryColor,
+        accentColor: lh.accentColor,
+        logoUrl: lh.logoUrl,
+      };
+    } catch {
+      /* VIT defaults in email */
+    }
+
     await this.emailService.sendMonthlyReport(
       recipients,
       tenant.name || tenant.slug,
       reportData,
       { filename: fileName, content: pdf },
+      brand,
     );
 
     return { sent: true, emails: recipients };
@@ -750,6 +770,7 @@ export class TenantReportsService {
     let primary = '#0d9488';
     let accent = '#14b8a6';
     let titleName = tenantName;
+    let logoUrl: string | undefined;
     if (slug) {
       try {
         const policy = await this.brandService.policyForSlug(slug);
@@ -757,6 +778,7 @@ export class TenantReportsService {
         primary = lh.primaryColor;
         accent = lh.accentColor;
         titleName = lh.displayName;
+        logoUrl = lh.logoUrl;
       } catch {
         /* keep VIT defaults */
       }
@@ -769,6 +791,20 @@ export class TenantReportsService {
     const fmt = (n: number) => `R ${n.toFixed(2)}`;
     const delta = (pct: number | null | undefined) =>
       pct == null ? 'n/a' : `${pct >= 0 ? '+' : ''}${pct}%`;
+
+    if (logoUrl) {
+      try {
+        const res = await fetch(logoUrl);
+        if (res.ok) {
+          const ab = await res.arrayBuffer();
+          const imgBuf = Buffer.from(ab);
+          doc.image(imgBuf, 40, 40, { fit: [56, 56] });
+          doc.moveDown(3);
+        }
+      } catch {
+        /* skip logo if fetch fails */
+      }
+    }
 
     doc
       .fillColor(primary)

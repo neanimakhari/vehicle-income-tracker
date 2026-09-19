@@ -11,12 +11,20 @@ import * as path from 'path';
 import { Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
 import { CommercialService } from '../commercial/commercial.service';
+import { TenantEventsService } from '../tenant-events/tenant-events.service';
 import { BrandKit } from './brand-kit.entity';
 import {
   BrandPayload,
   BrandPolicyDto,
+  MAX_BRAND_ASSET_BYTES,
   brandFieldsFromTenant,
   buildBrandTokens,
+  hasLoginBgAsset,
+  hasLogoAsset,
+  normalizeBorderRadius,
+  normalizeDensity,
+  normalizeDisplayName,
+  normalizeFontFamily,
   relativeLuminance,
   validateBrandColors,
 } from './brand.util';
@@ -25,14 +33,20 @@ import { TenantBrandPreviewToken } from './tenant-brand-preview-token.entity';
 import { TenantBrandSnapshot } from './tenant-brand-snapshot.entity';
 
 const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp']);
-const MAX_BYTES = 1_000_000;
+const MAX_BYTES = MAX_BRAND_ASSET_BYTES;
 
 export type BrandDraftInput = {
   displayName?: string | null;
   primaryHex?: string | null;
   accentHex?: string | null;
+  primaryDarkHex?: string | null;
   sidebarStyle?: 'colored' | 'neutral';
+  fontFamily?: string | null;
+  borderRadius?: string | null;
+  density?: string | null;
 };
+
+export type BrandAssetBytes = { buffer: Buffer; mime: string };
 
 @Injectable()
 export class BrandService {
@@ -55,6 +69,7 @@ export class BrandService {
     private readonly commercial: CommercialService,
     private readonly audit: AuditService,
     private readonly config: ConfigService,
+    private readonly tenantEvents: TenantEventsService,
   ) {
     for (const dir of [this.uploadsRoot, this.kitsRoot]) {
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -92,10 +107,29 @@ export class BrandService {
     if (tenant.brandDisplayName) dto.displayName = tenant.brandDisplayName;
     if (tenant.brandPrimaryHex) dto.primaryColor = tenant.brandPrimaryHex;
     if (tenant.brandAccentHex) dto.accentColor = tenant.brandAccentHex;
-    if (tenant.brandLogoPath) {
+    if (tenant.brandPrimaryDarkHex) {
+      dto.primaryDarkColor = tenant.brandPrimaryDarkHex;
+    }
+    if (tenant.brandFontFamily) {
+      dto.fontFamily = tenant.brandFontFamily as BrandPolicyDto['fontFamily'];
+    }
+    if (tenant.brandBorderRadius) {
+      dto.borderRadius =
+        tenant.brandBorderRadius as BrandPolicyDto['borderRadius'];
+    }
+    if (tenant.brandDensity) {
+      dto.density = tenant.brandDensity as BrandPolicyDto['density'];
+    }
+    if (hasLogoAsset({
+      logoData: tenant.brandLogoData,
+      logoPath: tenant.brandLogoPath,
+    })) {
       dto.logoUrl = `${this.apiPublicBase()}/public/tenants/${tenant.slug}/logo?v=${v}`;
     }
-    if (tenant.brandLoginBgPath) {
+    if (hasLoginBgAsset({
+      loginBgData: tenant.brandLoginBgData,
+      loginBgPath: tenant.brandLoginBgPath,
+    })) {
       dto.loginBackgroundUrl = `${this.apiPublicBase()}/public/tenants/${tenant.slug}/login-bg?v=${v}`;
     }
     return dto;
@@ -124,8 +158,14 @@ export class BrandService {
       logoUrl?: string;
       loginBackgroundUrl?: string;
     } = { ...draft };
-    if (draft.logoPath) {
+    // Never leak base64 in studio JSON responses — use URL endpoints
+    delete (draftOut as { logoData?: string }).logoData;
+    delete (draftOut as { loginBgData?: string }).loginBgData;
+    if (hasLogoAsset(draft)) {
       draftOut.logoUrl = `${this.apiPublicBase()}/tenants/${tenant.id}/brand/logo-file?v=${v}`;
+    }
+    if (hasLoginBgAsset(draft)) {
+      draftOut.loginBackgroundUrl = `${this.apiPublicBase()}/tenants/${tenant.id}/brand/login-bg-file?v=${v}`;
     }
     const primaryForWarn = draft.primaryHex || tenant.brandPrimaryHex;
     let primaryLuminance: number | null = null;
@@ -161,21 +201,38 @@ export class BrandService {
     const colors = validateBrandColors({
       primaryHex: input.primaryHex,
       accentHex: input.accentHex,
+      primaryDarkHex: input.primaryDarkHex,
     });
     const prev = this.getDraft(tenant);
     const draft: BrandPayload = {
       ...prev,
       displayName:
         input.displayName !== undefined
-          ? input.displayName?.trim() || null
+          ? normalizeDisplayName(input.displayName)
           : prev.displayName ?? null,
       primaryHex:
         input.primaryHex !== undefined ? colors.primaryHex : prev.primaryHex,
       accentHex:
         input.accentHex !== undefined ? colors.accentHex : prev.accentHex,
+      primaryDarkHex:
+        input.primaryDarkHex !== undefined
+          ? colors.primaryDarkHex
+          : prev.primaryDarkHex ?? null,
       sidebarStyle:
         input.sidebarStyle ??
         (prev.sidebarStyle === 'neutral' ? 'neutral' : 'colored'),
+      fontFamily:
+        input.fontFamily !== undefined
+          ? normalizeFontFamily(input.fontFamily)
+          : prev.fontFamily ?? null,
+      borderRadius:
+        input.borderRadius !== undefined
+          ? normalizeBorderRadius(input.borderRadius)
+          : prev.borderRadius ?? null,
+      density:
+        input.density !== undefined
+          ? normalizeDensity(input.density)
+          : prev.density ?? null,
     };
     tenant.brandDraftJson = draft as Record<string, unknown>;
     await this.tenants.save(tenant);
@@ -185,7 +242,14 @@ export class BrandService {
       actorRole: 'PLATFORM_ADMIN',
       targetType: 'tenant',
       targetId: tenant.id,
-      metadata: { slug: tenant.slug, draft },
+      metadata: {
+        slug: tenant.slug,
+        draft: {
+          ...draft,
+          logoData: draft.logoData ? '[base64]' : null,
+          loginBgData: draft.loginBgData ? '[base64]' : null,
+        },
+      },
     });
     return this.getBrandStudio(tenantId);
   }
@@ -202,6 +266,7 @@ export class BrandService {
     const colors = validateBrandColors({
       primaryHex: draft.primaryHex ?? null,
       accentHex: draft.accentHex ?? null,
+      primaryDarkHex: draft.primaryDarkHex ?? null,
     });
     if (!colors.primaryHex) {
       throw new BadRequestException('Draft needs a primary color to publish');
@@ -210,15 +275,30 @@ export class BrandService {
     tenant.brandDisplayName = draft.displayName ?? null;
     tenant.brandPrimaryHex = colors.primaryHex;
     tenant.brandAccentHex = colors.accentHex;
+    tenant.brandPrimaryDarkHex = colors.primaryDarkHex;
     tenant.brandSidebarStyle =
       draft.sidebarStyle === 'neutral' ? 'neutral' : 'colored';
-    if (draft.logoPath) {
-      tenant.brandLogoPath = draft.logoPath;
-      tenant.brandLogoMime = draft.logoMime ?? null;
+    tenant.brandFontFamily = draft.fontFamily ?? null;
+    tenant.brandBorderRadius = draft.borderRadius ?? null;
+    tenant.brandDensity = draft.density ?? null;
+    if (hasLogoAsset(draft)) {
+      tenant.brandLogoData = draft.logoData ?? tenant.brandLogoData;
+      tenant.brandLogoMime = draft.logoMime ?? tenant.brandLogoMime;
+      tenant.brandLogoPath = draft.logoPath ?? null;
+      if (draft.logoData) {
+        tenant.brandLogoData = draft.logoData;
+        tenant.brandLogoPath = null;
+      }
     }
-    if (draft.loginBgPath) {
-      tenant.brandLoginBgPath = draft.loginBgPath;
-      tenant.brandLoginBgMime = draft.loginBgMime ?? null;
+    if (hasLoginBgAsset(draft)) {
+      tenant.brandLoginBgMime = draft.loginBgMime ?? tenant.brandLoginBgMime;
+      tenant.brandLoginBgPath = draft.loginBgPath ?? null;
+      if (draft.loginBgData) {
+        tenant.brandLoginBgData = draft.loginBgData;
+        tenant.brandLoginBgPath = null;
+      } else if (draft.loginBgPath) {
+        tenant.brandLoginBgPath = draft.loginBgPath;
+      }
     }
     tenant.brandUpdatedAt = new Date();
     await this.tenants.save(tenant);
@@ -229,6 +309,11 @@ export class BrandService {
       targetType: 'tenant',
       targetId: tenant.id,
       metadata: { slug: tenant.slug },
+    });
+    this.tenantEvents.notifyBrandUpdated({
+      tenantId: tenant.id,
+      slug: tenant.slug,
+      action: 'publish',
     });
     return this.getBrandStudio(tenantId);
   }
@@ -243,11 +328,17 @@ export class BrandService {
     tenant.brandDisplayName = null;
     tenant.brandPrimaryHex = null;
     tenant.brandAccentHex = null;
+    tenant.brandPrimaryDarkHex = null;
     tenant.brandSidebarStyle = 'colored';
+    tenant.brandFontFamily = null;
+    tenant.brandBorderRadius = null;
+    tenant.brandDensity = null;
     tenant.brandLogoPath = null;
     tenant.brandLogoMime = null;
+    tenant.brandLogoData = null;
     tenant.brandLoginBgPath = null;
     tenant.brandLoginBgMime = null;
+    tenant.brandLoginBgData = null;
     tenant.brandKitId = null;
     tenant.brandUpdatedAt = new Date();
     if (wipeDraft) tenant.brandDraftJson = null;
@@ -259,6 +350,11 @@ export class BrandService {
       targetType: 'tenant',
       targetId: tenant.id,
       metadata: { slug: tenant.slug, wipeDraft },
+    });
+    this.tenantEvents.notifyBrandUpdated({
+      tenantId: tenant.id,
+      slug: tenant.slug,
+      action: 'reset',
     });
     return this.getBrandStudio(tenantId);
   }
@@ -309,39 +405,31 @@ export class BrandService {
       throw new BadRequestException('file is required');
     }
     if (!ALLOWED_MIME.has(file.mimetype)) {
-      throw new BadRequestException('Logo must be png, jpeg, or webp');
+      throw new BadRequestException('Image must be png, jpeg, or webp');
     }
-    if (file.size > MAX_BYTES) {
-      throw new BadRequestException('Image must be 1MB or smaller');
+    if (file.size > MAX_BYTES || file.buffer.length > MAX_BYTES) {
+      throw new BadRequestException('Image must be 2MB or smaller');
     }
     const tenant = await this.findTenant(tenantId);
-    const ext =
-      file.mimetype === 'image/png'
-        ? 'png'
-        : file.mimetype === 'image/webp'
-          ? 'webp'
-          : 'jpg';
-    const dir = path.join(this.uploadsRoot, tenant.slug);
-    fs.mkdirSync(dir, { recursive: true });
-    const filename = `${kind === 'logo' ? 'logo' : 'login-bg'}-draft.${ext}`;
-    const abs = path.join(dir, filename);
-    fs.writeFileSync(abs, file.buffer);
-    const rel = path.join('tenant-branding', tenant.slug, filename).replace(/\\/g, '/');
-
+    const b64 = file.buffer.toString('base64');
     const draft = this.getDraft(tenant);
     if (kind === 'logo') {
-      draft.logoPath = rel;
+      draft.logoData = b64;
       draft.logoMime = file.mimetype;
+      draft.logoPath = null;
       if (target === 'live') {
-        tenant.brandLogoPath = rel;
+        tenant.brandLogoData = b64;
         tenant.brandLogoMime = file.mimetype;
+        tenant.brandLogoPath = null;
       }
     } else {
-      draft.loginBgPath = rel;
+      draft.loginBgData = b64;
       draft.loginBgMime = file.mimetype;
+      draft.loginBgPath = null;
       if (target === 'live') {
-        tenant.brandLoginBgPath = rel;
+        tenant.brandLoginBgData = b64;
         tenant.brandLoginBgMime = file.mimetype;
+        tenant.brandLoginBgPath = null;
       }
     }
     tenant.brandDraftJson = draft as Record<string, unknown>;
@@ -353,7 +441,12 @@ export class BrandService {
       actorRole: 'PLATFORM_ADMIN',
       targetType: 'tenant',
       targetId: tenant.id,
-      metadata: { slug: tenant.slug, kind, rel },
+      metadata: {
+        slug: tenant.slug,
+        kind,
+        bytes: file.buffer.length,
+        mime: file.mimetype,
+      },
     });
     return this.getBrandStudio(tenantId);
   }
@@ -368,13 +461,17 @@ export class BrandService {
     if (kind === 'logo') {
       draft.logoPath = null;
       draft.logoMime = null;
+      draft.logoData = null;
       tenant.brandLogoPath = null;
       tenant.brandLogoMime = null;
+      tenant.brandLogoData = null;
     } else {
       draft.loginBgPath = null;
       draft.loginBgMime = null;
+      draft.loginBgData = null;
       tenant.brandLoginBgPath = null;
       tenant.brandLoginBgMime = null;
+      tenant.brandLoginBgData = null;
     }
     tenant.brandDraftJson = draft as Record<string, unknown>;
     tenant.brandUpdatedAt = new Date();
@@ -390,32 +487,66 @@ export class BrandService {
     return this.getBrandStudio(tenantId);
   }
 
+  /** Resolve logo/login-bg bytes from DB base64, with filesystem fallback. */
+  resolveTenantAsset(
+    tenant: Tenant,
+    kind: 'logo' | 'login-bg',
+    preferDraft = false,
+  ): BrandAssetBytes | null {
+    const draft = preferDraft ? this.getDraft(tenant) : null;
+    let data: string | null | undefined;
+    let mime: string | null | undefined;
+    let relPath: string | null | undefined;
+    if (kind === 'logo') {
+      data = preferDraft
+        ? draft?.logoData ?? tenant.brandLogoData
+        : tenant.brandLogoData;
+      mime = preferDraft
+        ? draft?.logoMime ?? tenant.brandLogoMime
+        : tenant.brandLogoMime;
+      relPath = preferDraft
+        ? draft?.logoPath ?? tenant.brandLogoPath
+        : tenant.brandLogoPath;
+    } else {
+      data = preferDraft
+        ? draft?.loginBgData ?? tenant.brandLoginBgData
+        : tenant.brandLoginBgData;
+      mime = preferDraft
+        ? draft?.loginBgMime ?? tenant.brandLoginBgMime
+        : tenant.brandLoginBgMime;
+      relPath = preferDraft
+        ? draft?.loginBgPath ?? tenant.brandLoginBgPath
+        : tenant.brandLoginBgPath;
+    }
+    if (data && mime) {
+      return { buffer: Buffer.from(data, 'base64'), mime };
+    }
+    if (relPath && mime) {
+      const abs = path.join(process.cwd(), 'uploads', relPath);
+      if (fs.existsSync(abs)) {
+        return { buffer: fs.readFileSync(abs), mime };
+      }
+    }
+    return null;
+  }
+
+  /** @deprecated use resolveTenantAsset */
   resolveTenantAssetPath(
     tenant: Tenant,
     kind: 'logo' | 'login-bg',
     preferDraft = false,
   ): { absPath: string; mime: string } | null {
-    const draft = preferDraft ? this.getDraft(tenant) : null;
-    const rel =
-      kind === 'logo'
-        ? preferDraft
-          ? draft?.logoPath ?? tenant.brandLogoPath
-          : tenant.brandLogoPath
-        : preferDraft
-          ? draft?.loginBgPath ?? tenant.brandLoginBgPath
-          : tenant.brandLoginBgPath;
-    const mime =
-      kind === 'logo'
-        ? preferDraft
-          ? draft?.logoMime ?? tenant.brandLogoMime
-          : tenant.brandLogoMime
-        : preferDraft
-          ? draft?.loginBgMime ?? tenant.brandLoginBgMime
-          : tenant.brandLoginBgMime;
-    if (!rel || !mime) return null;
-    const abs = path.join(process.cwd(), 'uploads', rel);
-    if (!fs.existsSync(abs)) return null;
-    return { absPath: abs, mime };
+    const asset = this.resolveTenantAsset(tenant, kind, preferDraft);
+    if (!asset) return null;
+    // Controllers now prefer buffer; keep shim for any leftover sendFile callers
+    const tmpDir = path.join(process.cwd(), 'uploads', '.tmp-brand');
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const tmp = path.join(
+      tmpDir,
+      `${tenant.slug}-${kind}-${Date.now()}.${asset.mime.split('/')[1] || 'bin'}`,
+    );
+    fs.writeFileSync(tmp, asset.buffer);
+    return { absPath: tmp, mime: asset.mime };
   }
 
   async servePublicLogo(slug: string, kind: 'logo' | 'login-bg') {
@@ -425,7 +556,7 @@ export class BrandService {
     if (!entitled || tenant.brandMode !== 'custom') {
       throw new NotFoundException();
     }
-    const asset = this.resolveTenantAssetPath(tenant, kind, false);
+    const asset = this.resolveTenantAsset(tenant, kind, false);
     if (!asset) throw new NotFoundException();
     return asset;
   }
@@ -509,17 +640,24 @@ export class BrandService {
     const colors = validateBrandColors({
       primaryHex: p.primaryHex ?? null,
       accentHex: p.accentHex ?? null,
+      primaryDarkHex: p.primaryDarkHex ?? null,
     });
     tenant.brandMode = p.brandMode === 'custom' ? 'custom' : 'vit_default';
     tenant.brandDisplayName = p.displayName ?? null;
     tenant.brandPrimaryHex = colors.primaryHex;
     tenant.brandAccentHex = colors.accentHex;
+    tenant.brandPrimaryDarkHex = colors.primaryDarkHex;
     tenant.brandSidebarStyle =
       p.sidebarStyle === 'neutral' ? 'neutral' : 'colored';
+    tenant.brandFontFamily = p.fontFamily ?? null;
+    tenant.brandBorderRadius = p.borderRadius ?? null;
+    tenant.brandDensity = p.density ?? null;
     tenant.brandLogoPath = p.logoPath ?? null;
     tenant.brandLogoMime = p.logoMime ?? null;
+    tenant.brandLogoData = p.logoData ?? null;
     tenant.brandLoginBgPath = p.loginBgPath ?? null;
     tenant.brandLoginBgMime = p.loginBgMime ?? null;
+    tenant.brandLoginBgData = p.loginBgData ?? null;
     if (p.draft && typeof p.draft === 'object') {
       tenant.brandDraftJson = p.draft as Record<string, unknown>;
     } else {
@@ -574,25 +712,23 @@ export class BrandService {
       payload: {
         primaryHex: colors.primaryHex,
         accentHex: colors.accentHex,
+        primaryDarkHex: draft.primaryDarkHex ?? null,
         sidebarStyle: draft.sidebarStyle ?? 'colored',
         displayName: draft.displayName ?? null,
+        fontFamily: draft.fontFamily ?? null,
+        borderRadius: draft.borderRadius ?? null,
+        density: draft.density ?? null,
       },
       isStarter: false,
       createdBy: actorUserId,
     });
     const saved = await this.kits.save(kit);
-    if (body.includeLogo && draft.logoPath) {
-      const src = path.join(process.cwd(), 'uploads', draft.logoPath);
-      if (fs.existsSync(src)) {
-        const kitDir = path.join(this.kitsRoot, saved.id);
-        fs.mkdirSync(kitDir, { recursive: true });
-        const ext = path.extname(src) || '.png';
-        const destRel = path
-          .join('brand-kits', saved.id, `logo${ext}`)
-          .replace(/\\/g, '/');
-        fs.copyFileSync(src, path.join(process.cwd(), 'uploads', destRel));
-        saved.logoPath = destRel;
-        saved.logoMime = draft.logoMime ?? 'image/png';
+    if (body.includeLogo && hasLogoAsset(draft)) {
+      const bytes = this.resolveTenantAsset(tenant, 'logo', true);
+      if (bytes) {
+        saved.logoData = bytes.buffer.toString('base64');
+        saved.logoMime = bytes.mime;
+        saved.logoPath = null;
         await this.kits.save(saved);
       }
     }
@@ -614,14 +750,19 @@ export class BrandService {
       tags?: string[];
       primaryHex: string;
       accentHex?: string | null;
+      primaryDarkHex?: string | null;
       sidebarStyle?: 'colored' | 'neutral';
       displayName?: string | null;
+      fontFamily?: string | null;
+      borderRadius?: string | null;
+      density?: string | null;
     },
     actorUserId: string | null,
   ) {
     const colors = validateBrandColors({
       primaryHex: body.primaryHex,
       accentHex: body.accentHex ?? null,
+      primaryDarkHex: body.primaryDarkHex ?? null,
     });
     if (!colors.primaryHex) {
       throw new BadRequestException('primaryHex required');
@@ -633,8 +774,12 @@ export class BrandService {
       payload: {
         primaryHex: colors.primaryHex,
         accentHex: colors.accentHex,
+        primaryDarkHex: colors.primaryDarkHex,
         sidebarStyle: body.sidebarStyle ?? 'colored',
-        displayName: body.displayName ?? null,
+        displayName: normalizeDisplayName(body.displayName) ?? null,
+        fontFamily: normalizeFontFamily(body.fontFamily ?? null),
+        borderRadius: normalizeBorderRadius(body.borderRadius ?? null),
+        density: normalizeDensity(body.density ?? null),
       },
       isStarter: false,
       createdBy: actorUserId,
@@ -649,10 +794,12 @@ export class BrandService {
       description: kit.description,
       tags: kit.tags,
       payload: { ...kit.payload },
-      logoPath: kit.logoPath,
+      logoPath: null,
       logoMime: kit.logoMime,
-      loginBgPath: kit.loginBgPath,
+      logoData: kit.logoData,
+      loginBgPath: null,
       loginBgMime: kit.loginBgMime,
+      loginBgData: kit.loginBgData,
       isStarter: false,
       createdBy: actorUserId,
     });
@@ -670,15 +817,15 @@ export class BrandService {
 
   async exportKit(id: string) {
     const kit = await this.getKit(id);
-    let logoBase64: string | null = null;
-    if (kit.logoPath) {
+    let logoBase64: string | null = kit.logoData ?? null;
+    if (!logoBase64 && kit.logoPath) {
       const abs = path.join(process.cwd(), 'uploads', kit.logoPath);
       if (fs.existsSync(abs)) {
         logoBase64 = fs.readFileSync(abs).toString('base64');
       }
     }
     return {
-      version: 1,
+      version: 2,
       name: kit.name,
       description: kit.description,
       tags: kit.tags,
@@ -703,6 +850,7 @@ export class BrandService {
     const colors = validateBrandColors({
       primaryHex: (p.primaryHex as string) ?? null,
       accentHex: (p.accentHex as string) ?? null,
+      primaryDarkHex: (p.primaryDarkHex as string) ?? null,
     });
     if (!colors.primaryHex) {
       throw new BadRequestException('Import payload needs primaryHex');
@@ -714,8 +862,12 @@ export class BrandService {
       payload: {
         primaryHex: colors.primaryHex,
         accentHex: colors.accentHex,
+        primaryDarkHex: colors.primaryDarkHex,
         sidebarStyle: p.sidebarStyle === 'neutral' ? 'neutral' : 'colored',
         displayName: (p.displayName as string) ?? null,
+        fontFamily: (p.fontFamily as string) ?? null,
+        borderRadius: (p.borderRadius as string) ?? null,
+        density: (p.density as string) ?? null,
       },
       isStarter: false,
       createdBy: actorUserId,
@@ -724,20 +876,9 @@ export class BrandService {
     if (body.logoBase64 && body.logoMime && ALLOWED_MIME.has(body.logoMime)) {
       const buf = Buffer.from(body.logoBase64, 'base64');
       if (buf.length > 0 && buf.length <= MAX_BYTES) {
-        const kitDir = path.join(this.kitsRoot, saved.id);
-        fs.mkdirSync(kitDir, { recursive: true });
-        const ext =
-          body.logoMime === 'image/png'
-            ? '.png'
-            : body.logoMime === 'image/webp'
-              ? '.webp'
-              : '.jpg';
-        const destRel = path
-          .join('brand-kits', saved.id, `logo${ext}`)
-          .replace(/\\/g, '/');
-        fs.writeFileSync(path.join(process.cwd(), 'uploads', destRel), buf);
-        saved.logoPath = destRel;
+        saved.logoData = body.logoBase64;
         saved.logoMime = body.logoMime;
+        saved.logoPath = null;
         await this.kits.save(saved);
       }
     }
@@ -814,23 +955,28 @@ export class BrandService {
     const draft = this.getDraft(tenant);
     draft.primaryHex = colors.primaryHex;
     draft.accentHex = colors.accentHex;
+    draft.primaryDarkHex = (p.primaryDarkHex as string) ?? null;
     draft.sidebarStyle =
       p.sidebarStyle === 'neutral' ? 'neutral' : 'colored';
+    draft.fontFamily = (p.fontFamily as BrandPayload['fontFamily']) ?? null;
+    draft.borderRadius =
+      (p.borderRadius as BrandPayload['borderRadius']) ?? null;
+    draft.density = (p.density as BrandPayload['density']) ?? null;
     if (opts.setDisplayName && p.displayName) {
       draft.displayName = String(p.displayName);
     }
-    if (opts.includeLogo && kit.logoPath) {
-      const src = path.join(process.cwd(), 'uploads', kit.logoPath);
-      if (fs.existsSync(src)) {
-        const dir = path.join(this.uploadsRoot, tenant.slug);
-        fs.mkdirSync(dir, { recursive: true });
-        const ext = path.extname(kit.logoPath) || '.png';
-        const destRel = path
-          .join('tenant-branding', tenant.slug, `logo-draft${ext}`)
-          .replace(/\\/g, '/');
-        fs.copyFileSync(src, path.join(process.cwd(), 'uploads', destRel));
-        draft.logoPath = destRel;
+    if (opts.includeLogo && (kit.logoData || kit.logoPath)) {
+      if (kit.logoData) {
+        draft.logoData = kit.logoData;
         draft.logoMime = kit.logoMime ?? 'image/png';
+        draft.logoPath = null;
+      } else if (kit.logoPath) {
+        const src = path.join(process.cwd(), 'uploads', kit.logoPath);
+        if (fs.existsSync(src)) {
+          draft.logoData = fs.readFileSync(src).toString('base64');
+          draft.logoMime = kit.logoMime ?? 'image/png';
+          draft.logoPath = null;
+        }
       }
     }
     tenant.brandDraftJson = draft as Record<string, unknown>;
@@ -963,7 +1109,11 @@ export class BrandService {
     const primary = payload.primaryHex || '#0d9488';
     const accent = payload.accentHex || null;
     const v = createHash('sha1')
-      .update(JSON.stringify(payload))
+      .update(JSON.stringify({
+        ...payload,
+        logoData: payload.logoData ? '1' : null,
+        loginBgData: payload.loginBgData ? '1' : null,
+      }))
       .digest('hex')
       .slice(0, 8);
     const brand: BrandPolicyDto & {
@@ -974,12 +1124,19 @@ export class BrandService {
       displayName: payload.displayName || tenant.name,
       primaryColor: primary,
       accentColor: accent ?? undefined,
+      primaryDarkColor: payload.primaryDarkHex ?? undefined,
       sidebarStyle:
         payload.sidebarStyle === 'neutral' ? 'neutral' : 'colored',
+      fontFamily: payload.fontFamily ?? undefined,
+      borderRadius: payload.borderRadius ?? undefined,
+      density: payload.density ?? undefined,
       tokens: buildBrandTokens(primary, accent),
     };
-    if (payload.logoPath) {
+    if (hasLogoAsset(payload)) {
       brand.logoUrl = `${this.apiPublicBase()}/public/brand-preview/${token}/logo?v=${v}`;
+    }
+    if (hasLoginBgAsset(payload)) {
+      brand.loginBackgroundUrl = `${this.apiPublicBase()}/public/tenants/${tenant.slug}/login-bg?v=${v}`;
     }
     return {
       brand,
@@ -992,17 +1149,20 @@ export class BrandService {
     };
   }
 
-  async servePreviewLogo(token: string) {
+  async servePreviewLogo(token: string): Promise<BrandAssetBytes> {
     const row = await this.previewTokens.findOne({ where: { token } });
     if (!row || row.revokedAt || row.expiresAt.getTime() < Date.now()) {
       throw new NotFoundException();
     }
     if (row.kitId && !row.tenantSlug) {
       const kit = await this.getKit(row.kitId);
+      if (kit.logoData && kit.logoMime) {
+        return { buffer: Buffer.from(kit.logoData, 'base64'), mime: kit.logoMime };
+      }
       if (!kit.logoPath || !kit.logoMime) throw new NotFoundException();
       const abs = path.join(process.cwd(), 'uploads', kit.logoPath);
       if (!fs.existsSync(abs)) throw new NotFoundException();
-      return { absPath: abs, mime: kit.logoMime };
+      return { buffer: fs.readFileSync(abs), mime: kit.logoMime };
     }
     if (!row.tenantSlug) throw new NotFoundException();
     const tenant = await this.tenants.findOne({
@@ -1010,14 +1170,21 @@ export class BrandService {
     });
     if (!tenant) throw new NotFoundException();
     const preferDraft = row.source === 'draft';
-    const asset = this.resolveTenantAssetPath(tenant, 'logo', preferDraft);
+    const asset = this.resolveTenantAsset(tenant, 'logo', preferDraft);
     if (!asset) throw new NotFoundException();
     return asset;
   }
 
-  async serveStudioLogo(tenantId: string) {
+  async serveStudioLogo(tenantId: string): Promise<BrandAssetBytes> {
     const tenant = await this.findTenant(tenantId);
-    const asset = this.resolveTenantAssetPath(tenant, 'logo', true);
+    const asset = this.resolveTenantAsset(tenant, 'logo', true);
+    if (!asset) throw new NotFoundException();
+    return asset;
+  }
+
+  async serveStudioLoginBg(tenantId: string): Promise<BrandAssetBytes> {
+    const tenant = await this.findTenant(tenantId);
+    const asset = this.resolveTenantAsset(tenant, 'login-bg', true);
     if (!asset) throw new NotFoundException();
     return asset;
   }

@@ -29,11 +29,17 @@ export class BrandKit {
   @Column({ name: 'logo_mime', type: 'varchar', nullable: true })
   logoMime: string | null;
 
+  @Column({ name: 'logo_data', type: 'text', nullable: true })
+  logoData: string | null;
+
   @Column({ name: 'login_bg_path', type: 'varchar', nullable: true })
   loginBgPath: string | null;
 
   @Column({ name: 'login_bg_mime', type: 'varchar', nullable: true })
   loginBgMime: string | null;
+
+  @Column({ name: 'login_bg_data', type: 'text', nullable: true })
+  loginBgData: string | null;
 
   @Column({ name: 'is_starter', default: false })
   isStarter: boolean;
