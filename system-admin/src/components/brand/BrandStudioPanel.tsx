@@ -1,11 +1,28 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, XCircle, X, Upload, Link2, Camera } from "lucide-react";
+import { Upload, Link2, Camera, Trash2 } from "lucide-react";
 import { BrandMockFrames } from "@/components/brand/BrandMockFrames";
-import { VIT_ACCENT, VIT_PRIMARY, type BrandDraft } from "@/lib/brand-tokens";
+import {
+  BrandInlineToast,
+  type BrandToast,
+  validateBrandImageFile,
+} from "@/components/brand/BrandInlineToast";
+import {
+  DENSITY_OPTIONS,
+  FONT_OPTIONS,
+  RADIUS_OPTIONS,
+  VIT_ACCENT,
+  VIT_PRIMARY,
+  type BrandBorderRadius,
+  type BrandDensity,
+  type BrandDraft,
+  type BrandFontFamily,
+} from "@/lib/brand-tokens";
 import {
   brandApplyKit,
+  brandClearLoginBg,
+  brandClearLogo,
   brandCreatePreview,
   brandDeleteSnapshot,
   brandGetStudio,
@@ -20,13 +37,14 @@ import {
   brandSaveDraft,
   brandSaveKit,
   brandSaveSnapshot,
+  brandUploadLoginBg,
   brandUploadLogo,
 } from "@/app/tenants/brand-actions";
 
 type Studio = {
   entitled: boolean;
   brandMode: string;
-  draft: BrandDraft & { logoUrl?: string };
+  draft: BrandDraft & { logoUrl?: string; loginBackgroundUrl?: string };
   tenantName: string;
   tenantSlug: string;
   primaryContrastWarning?: string | null;
@@ -43,61 +61,22 @@ type PreviewToken = {
   createdAt?: string;
 };
 
-type Toast = { type: "success" | "error"; message: string };
-
-function InlineToast({
-  toast,
-  onDismiss,
-}: {
-  toast: Toast | null;
-  onDismiss: () => void;
-}) {
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(onDismiss, 4500);
-    return () => clearTimeout(t);
-  }, [toast, onDismiss]);
-
-  if (!toast) return null;
-  const ok = toast.type === "success";
-  return (
-    <div
-      className={`flex items-start gap-3 rounded-lg border px-4 py-3 shadow-sm ${
-        ok
-          ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-100"
-          : "border-red-200 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-900/30 dark:text-red-100"
-      }`}
-      role="status"
-    >
-      {ok ? (
-        <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
-      ) : (
-        <XCircle className="h-5 w-5 flex-shrink-0 text-red-600 dark:text-red-400" />
-      )}
-      <p className="flex-1 text-sm font-medium">{toast.message}</p>
-      <button
-        type="button"
-        onClick={onDismiss}
-        className="rounded p-1 hover:opacity-80"
-        aria-label="Dismiss"
-      >
-        <X className="h-4 w-4" />
-      </button>
-    </div>
-  );
-}
-
 export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
   const [studio, setStudio] = useState<Studio | null>(null);
   const [kits, setKits] = useState<Kit[]>([]);
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [tokens, setTokens] = useState<PreviewToken[]>([]);
-  const [toast, setToast] = useState<Toast | null>(null);
+  const [toast, setToast] = useState<BrandToast | null>(null);
   const [busy, setBusy] = useState(false);
+  const [busyLabel, setBusyLabel] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [primaryHex, setPrimaryHex] = useState(VIT_PRIMARY);
   const [accentHex, setAccentHex] = useState(VIT_ACCENT);
+  const [primaryDarkHex, setPrimaryDarkHex] = useState("");
   const [sidebarStyle, setSidebarStyle] = useState<"colored" | "neutral">("colored");
+  const [fontFamily, setFontFamily] = useState<BrandFontFamily>("inter");
+  const [borderRadius, setBorderRadius] = useState<BrandBorderRadius>("md");
+  const [density, setDensity] = useState<BrandDensity>("comfortable");
   const [kitName, setKitName] = useState("");
   const [selectedKit, setSelectedKit] = useState("");
   const [adminScreen, setAdminScreen] = useState<"login" | "dashboard" | "drivers" | "reports">(
@@ -143,29 +122,56 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
     setDisplayName(d.displayName || "");
     setPrimaryHex(d.primaryHex || VIT_PRIMARY);
     setAccentHex(d.accentHex || VIT_ACCENT);
+    setPrimaryDarkHex(d.primaryDarkHex || "");
     setSidebarStyle(d.sidebarStyle === "neutral" ? "neutral" : "colored");
-    if (k.ok && Array.isArray(k.data)) setKits(k.data as Kit[]);
-    if (snap.ok && Array.isArray(snap.data)) setSnapshots(snap.data as Snapshot[]);
-    if (t.ok && Array.isArray(t.data)) setTokens(t.data as PreviewToken[]);
+    setFontFamily((d.fontFamily as BrandFontFamily) || "inter");
+    setBorderRadius((d.borderRadius as BrandBorderRadius) || "md");
+    setDensity((d.density as BrandDensity) || "comfortable");
+    if (k.ok && Array.isArray(k.data)) {
+      setKits(k.data as Kit[]);
+    } else if (!k.ok) {
+      setToast({ type: "error", message: k.error || "Failed to load brand kits" });
+    }
+    if (snap.ok && Array.isArray(snap.data)) {
+      setSnapshots(snap.data as Snapshot[]);
+    } else if (!snap.ok) {
+      setToast({ type: "error", message: snap.error || "Failed to load snapshots" });
+    }
+    if (t.ok && Array.isArray(t.data)) {
+      setTokens(t.data as PreviewToken[]);
+    } else if (!t.ok) {
+      setToast({ type: "error", message: t.error || "Failed to load preview links" });
+    }
   }, [tenantId]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const draftView: BrandDraft = {
+  const draftFields = () => ({
     displayName: displayName || null,
     primaryHex,
     accentHex,
+    primaryDarkHex: primaryDarkHex || null,
     sidebarStyle,
+    fontFamily,
+    borderRadius,
+    density,
+  });
+
+  const draftView: BrandDraft = {
+    ...draftFields(),
     logoUrl: studio?.draft?.logoUrl,
+    loginBackgroundUrl: studio?.draft?.loginBackgroundUrl,
   };
 
   async function run(
     fn: () => Promise<{ ok: boolean; error: string | null; data?: unknown }>,
     successMessage: string,
+    label?: string,
   ) {
     setBusy(true);
+    setBusyLabel(label || "Working…");
     setToast(null);
     try {
       const res = await fn();
@@ -184,14 +190,35 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
       return { ok: false as const, error: "failed", data: null };
     } finally {
       setBusy(false);
+      setBusyLabel(null);
     }
+  }
+
+  function onPickImage(
+    file: File | undefined,
+    upload: (fd: FormData) => Promise<{ ok: boolean; error: string | null }>,
+    success: string,
+    label: string,
+  ) {
+    if (!file) return;
+    const err = validateBrandImageFile(file);
+    if (err) {
+      setToast({ type: "error", message: err });
+      return;
+    }
+    const fd = new FormData();
+    fd.append("file", file);
+    void run(() => upload(fd), success, label);
   }
 
   if (!studio) {
     return (
       <div className="space-y-3">
         {loadError ? (
-          <InlineToast toast={{ type: "error", message: loadError }} onDismiss={() => setLoadError(null)} />
+          <BrandInlineToast
+            toast={{ type: "error", message: loadError }}
+            onDismiss={() => setLoadError(null)}
+          />
         ) : (
           <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading brand studio…</p>
         )}
@@ -203,7 +230,10 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
 
   return (
     <div className="space-y-5">
-      <InlineToast toast={toast} onDismiss={dismissToast} />
+      <BrandInlineToast toast={toast} onDismiss={dismissToast} />
+      {busy && busyLabel ? (
+        <p className="text-xs font-medium text-teal-700 dark:text-teal-300">{busyLabel}</p>
+      ) : null}
 
       {/* Status */}
       <div className="flex flex-wrap items-center gap-2">
@@ -281,28 +311,169 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
               />
             </div>
           </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+              Dark primary (optional)
+            </span>
+            <div className="flex gap-2">
+              <input
+                type="color"
+                value={primaryDarkHex || "#0f172a"}
+                onChange={(e) => setPrimaryDarkHex(e.target.value)}
+                className="h-10 w-12 cursor-pointer rounded-lg border border-zinc-300 bg-white dark:border-zinc-600"
+                aria-label="Dark primary color picker"
+              />
+              <input
+                className="input flex-1 px-3 py-2 font-mono text-sm"
+                value={primaryDarkHex}
+                placeholder="#0f172a"
+                onChange={(e) => setPrimaryDarkHex(e.target.value)}
+              />
+            </div>
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Font</span>
+            <select
+              className="input w-full px-3 py-2 text-sm"
+              value={fontFamily}
+              onChange={(e) => setFontFamily(e.target.value as BrandFontFamily)}
+            >
+              {FONT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+              Corner radius
+            </span>
+            <select
+              className="input w-full px-3 py-2 text-sm"
+              value={borderRadius}
+              onChange={(e) => setBorderRadius(e.target.value as BrandBorderRadius)}
+            >
+              {RADIUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Density</span>
+            <select
+              className="input w-full px-3 py-2 text-sm"
+              value={density}
+              onChange={(e) => setDensity(e.target.value as BrandDensity)}
+            >
+              {DENSITY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="sm:col-span-2 space-y-1.5">
             <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              Logo (png / jpeg / webp, max 1 MB)
+              Logo (png / jpeg / webp, max 2 MB) — stored as base64 in the database
             </span>
-            <label className="btn btn-secondary flex w-full cursor-pointer gap-2 px-4 py-2.5 sm:w-auto">
-              <Upload className="h-4 w-4" />
-              {studio.draft?.logoUrl ? "Replace logo" : "Upload logo"}
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="sr-only"
-                disabled={busy}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = "";
-                  if (!f) return;
-                  const fd = new FormData();
-                  fd.append("file", f);
-                  void run(() => brandUploadLogo(tenantId, fd), "Logo uploaded");
-                }}
+            <div className="flex flex-wrap gap-2">
+              <label className="btn btn-secondary flex cursor-pointer gap-2 px-4 py-2.5">
+                <Upload className="h-4 w-4" />
+                {studio.draft?.logoUrl ? "Replace logo" : "Upload logo"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="sr-only"
+                  disabled={busy}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    onPickImage(
+                      f,
+                      (fd) => brandUploadLogo(tenantId, fd),
+                      "Logo uploaded",
+                      "Uploading logo…",
+                    );
+                  }}
+                />
+              </label>
+              {studio.draft?.logoUrl ? (
+                <button
+                  type="button"
+                  className="btn btn-secondary flex gap-2 px-4 py-2.5"
+                  disabled={busy}
+                  onClick={() => {
+                    if (confirm("Remove the logo from draft and live brand?")) {
+                      void run(
+                        () => brandClearLogo(tenantId),
+                        "Logo cleared",
+                        "Clearing logo…",
+                      );
+                    }
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Clear logo
+                </button>
+              ) : null}
+            </div>
+            {studio.draft?.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={studio.draft.logoUrl}
+                alt="Logo preview"
+                className="mt-2 h-12 w-auto rounded border border-zinc-200 bg-white object-contain p-1 dark:border-zinc-600"
               />
-            </label>
+            ) : null}
+          </div>
+          <div className="sm:col-span-2 space-y-1.5">
+            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+              Login background (png / jpeg / webp, max 2 MB)
+            </span>
+            <div className="flex flex-wrap gap-2">
+              <label className="btn btn-secondary flex cursor-pointer gap-2 px-4 py-2.5">
+                <Upload className="h-4 w-4" />
+                {studio.draft?.loginBackgroundUrl ? "Replace login BG" : "Upload login BG"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="sr-only"
+                  disabled={busy}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    onPickImage(
+                      f,
+                      (fd) => brandUploadLoginBg(tenantId, fd),
+                      "Login background uploaded",
+                      "Uploading login background…",
+                    );
+                  }}
+                />
+              </label>
+              {studio.draft?.loginBackgroundUrl ? (
+                <button
+                  type="button"
+                  className="btn btn-secondary flex gap-2 px-4 py-2.5"
+                  disabled={busy}
+                  onClick={() => {
+                    if (confirm("Remove the login background?")) {
+                      void run(
+                        () => brandClearLoginBg(tenantId),
+                        "Login background cleared",
+                        "Clearing…",
+                      );
+                    }
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Clear login BG
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
 
@@ -319,27 +490,24 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
             disabled={busy}
             onClick={() =>
               void run(
-                () =>
-                  brandSaveDraft(tenantId, {
-                    displayName: displayName || null,
-                    primaryHex,
-                    accentHex,
-                    sidebarStyle,
-                  }),
+                () => brandSaveDraft(tenantId, draftFields()),
                 "Draft saved",
+                "Saving draft…",
               )
             }
           >
-            Save draft
+            {busy && busyLabel?.includes("Saving") ? "Saving…" : "Save draft"}
           </button>
           <button
             type="button"
             className="btn btn-primary px-4 py-2"
             disabled={busy || !studio.entitled}
             title={!studio.entitled ? "Enable White-label branding on the plan first" : undefined}
-            onClick={() => void run(() => brandPublish(tenantId), "Published to live apps")}
+            onClick={() =>
+              void run(() => brandPublish(tenantId), "Published to live apps", "Publishing…")
+            }
           >
-            Publish to live
+            {busy && busyLabel?.includes("Publish") ? "Publishing…" : "Publish to live"}
           </button>
           <button
             type="button"
@@ -361,6 +529,7 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
                 void run(
                   () => brandReset(tenantId, wipeDraftOnReset),
                   wipeDraftOnReset ? "Reset to VIT (draft wiped)" : "Reset to VIT default",
+                  "Resetting…",
                 );
               }
             }}
@@ -391,15 +560,10 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
               disabled={busy}
               onClick={() => {
                 void run(async () => {
-                  const res = await brandReplace(tenantId, {
-                    displayName: displayName || null,
-                    primaryHex,
-                    accentHex,
-                    sidebarStyle,
-                  });
+                  const res = await brandReplace(tenantId, draftFields());
                   if (res.ok) setShowReplaceConfirm(false);
                   return res;
-                }, studio.entitled ? "Brand replaced and published" : "Brand replaced (saved as draft — module off)");
+                }, studio.entitled ? "Brand replaced and published" : "Brand replaced (saved as draft — module off)", "Replacing…");
               }}
             >
               Confirm replace
@@ -637,19 +801,14 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
                 disabled={busy || !kitName.trim()}
                 onClick={() =>
                   void run(async () => {
-                    await brandSaveDraft(tenantId, {
-                      displayName: displayName || null,
-                      primaryHex,
-                      accentHex,
-                      sidebarStyle,
-                    });
+                    await brandSaveDraft(tenantId, draftFields());
                     const res = await brandSaveKit(tenantId, {
                       name: kitName.trim(),
                       includeLogo: true,
                     });
                     if (res.ok) setKitName("");
                     return res;
-                  }, "Kit saved")
+                  }, "Kit saved", "Saving kit…")
                 }
               >
                 Save kit

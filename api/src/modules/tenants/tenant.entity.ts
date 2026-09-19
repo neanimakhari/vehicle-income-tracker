@@ -118,17 +118,35 @@ export class Tenant {
   @Column({ name: 'brand_sidebar_style', default: 'colored' })
   brandSidebarStyle: string;
 
+  @Column({ name: 'brand_font_family', type: 'varchar', nullable: true })
+  brandFontFamily: string | null;
+
+  @Column({ name: 'brand_border_radius', type: 'varchar', nullable: true })
+  brandBorderRadius: string | null;
+
+  @Column({ name: 'brand_density', type: 'varchar', nullable: true })
+  brandDensity: string | null;
+
+  @Column({ name: 'brand_primary_dark_hex', type: 'varchar', length: 7, nullable: true })
+  brandPrimaryDarkHex: string | null;
+
   @Column({ name: 'brand_logo_path', type: 'varchar', nullable: true })
   brandLogoPath: string | null;
 
   @Column({ name: 'brand_logo_mime', type: 'varchar', nullable: true })
   brandLogoMime: string | null;
 
+  @Column({ name: 'brand_logo_data', type: 'text', nullable: true })
+  brandLogoData: string | null;
+
   @Column({ name: 'brand_login_bg_path', type: 'varchar', nullable: true })
   brandLoginBgPath: string | null;
 
   @Column({ name: 'brand_login_bg_mime', type: 'varchar', nullable: true })
   brandLoginBgMime: string | null;
+
+  @Column({ name: 'brand_login_bg_data', type: 'text', nullable: true })
+  brandLoginBgData: string | null;
 
   @Column({ name: 'brand_draft_json', type: 'jsonb', nullable: true })
   brandDraftJson: Record<string, unknown> | null;

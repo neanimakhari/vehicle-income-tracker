@@ -31,6 +31,11 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { BrandService } from './brand.service';
+import { MAX_BRAND_ASSET_BYTES } from './brand.util';
+
+const brandUpload = FileInterceptor('file', {
+  limits: { fileSize: MAX_BRAND_ASSET_BYTES },
+});
 
 class BrandDraftDto {
   @IsOptional()
@@ -46,8 +51,24 @@ class BrandDraftDto {
   accentHex?: string | null;
 
   @IsOptional()
+  @IsString()
+  primaryDarkHex?: string | null;
+
+  @IsOptional()
   @IsIn(['colored', 'neutral'])
   sidebarStyle?: 'colored' | 'neutral';
+
+  @IsOptional()
+  @IsIn(['inter', 'source_sans_3', 'nunito', 'roboto', 'system'])
+  fontFamily?: string | null;
+
+  @IsOptional()
+  @IsIn(['sm', 'md', 'lg'])
+  borderRadius?: string | null;
+
+  @IsOptional()
+  @IsIn(['comfortable', 'compact'])
+  density?: string | null;
 }
 
 class ReplaceBrandDto extends BrandDraftDto {
@@ -95,12 +116,28 @@ class CreateKitDto {
   accentHex?: string | null;
 
   @IsOptional()
+  @IsString()
+  primaryDarkHex?: string | null;
+
+  @IsOptional()
   @IsIn(['colored', 'neutral'])
   sidebarStyle?: 'colored' | 'neutral';
 
   @IsOptional()
   @IsString()
   displayName?: string | null;
+
+  @IsOptional()
+  @IsIn(['inter', 'source_sans_3', 'nunito', 'roboto', 'system'])
+  fontFamily?: string | null;
+
+  @IsOptional()
+  @IsIn(['sm', 'md', 'lg'])
+  borderRadius?: string | null;
+
+  @IsOptional()
+  @IsIn(['comfortable', 'compact'])
+  density?: string | null;
 }
 
 class ApplyKitDto {
@@ -165,7 +202,20 @@ export class BrandController {
     const asset = await this.brandService.serveStudioLogo(id);
     res.setHeader('Content-Type', asset.mime);
     res.setHeader('Cache-Control', 'private, max-age=60');
-    return res.sendFile(asset.absPath);
+    return res.send(asset.buffer);
+  }
+
+  @Get('tenants/:id/brand/login-bg-file')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PLATFORM_ADMIN', 'SYS')
+  async draftLoginBgFile(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Res() res: Response,
+  ) {
+    const asset = await this.brandService.serveStudioLoginBg(id);
+    res.setHeader('Content-Type', asset.mime);
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    return res.send(asset.buffer);
   }
 
   @Put('tenants/:id/brand/draft')
@@ -218,7 +268,7 @@ export class BrandController {
   @Post('tenants/:id/brand/logo')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('PLATFORM_ADMIN')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(brandUpload)
   uploadLogo(
     @Param('id', new ParseUUIDPipe()) id: string,
     @UploadedFile()
@@ -246,7 +296,7 @@ export class BrandController {
   @Post('tenants/:id/brand/login-bg')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('PLATFORM_ADMIN')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(brandUpload)
   uploadLoginBg(
     @Param('id', new ParseUUIDPipe()) id: string,
     @UploadedFile()
@@ -257,6 +307,20 @@ export class BrandController {
       id,
       'login-bg',
       file,
+      (req.user as { sub?: string } | undefined)?.sub ?? null,
+    );
+  }
+
+  @Delete('tenants/:id/brand/login-bg')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PLATFORM_ADMIN')
+  clearLoginBg(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Req() req: Request,
+  ) {
+    return this.brandService.clearAsset(
+      id,
+      'login-bg',
       (req.user as { sub?: string } | undefined)?.sub ?? null,
     );
   }
@@ -473,7 +537,7 @@ export class BrandController {
     const asset = await this.brandService.servePublicLogo(slug, 'logo');
     res.setHeader('Content-Type', asset.mime);
     res.setHeader('Cache-Control', 'public, max-age=86400');
-    return res.sendFile(asset.absPath);
+    return res.send(asset.buffer);
   }
 
   @Get('public/tenants/:slug/login-bg')
@@ -484,7 +548,7 @@ export class BrandController {
     const asset = await this.brandService.servePublicLogo(slug, 'login-bg');
     res.setHeader('Content-Type', asset.mime);
     res.setHeader('Cache-Control', 'public, max-age=86400');
-    return res.sendFile(asset.absPath);
+    return res.send(asset.buffer);
   }
 
   @Get('public/brand-preview/:token')
@@ -497,6 +561,6 @@ export class BrandController {
     const asset = await this.brandService.servePreviewLogo(token);
     res.setHeader('Content-Type', asset.mime);
     res.setHeader('Cache-Control', 'public, max-age=3600');
-    return res.sendFile(asset.absPath);
+    return res.send(asset.buffer);
   }
 }

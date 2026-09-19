@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Script from "next/script";
 import { Suspense } from "react";
-import { Inter } from "next/font/google";
+import { Inter, Nunito, Roboto, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 import { getAuthToken, getEffectiveTenantSlug } from "@/lib/auth";
 import { fetchJson, getApiUrl } from "@/lib/api";
@@ -25,6 +25,19 @@ import { brandCssVars, type PolicyBrand } from "@/lib/brand-tokens";
 
 const inter = Inter({
   variable: "--font-inter",
+  subsets: ["latin"],
+});
+const sourceSans = Source_Sans_3({
+  variable: "--font-source-sans",
+  subsets: ["latin"],
+});
+const nunito = Nunito({
+  variable: "--font-nunito",
+  subsets: ["latin"],
+});
+const roboto = Roboto({
+  variable: "--font-roboto",
+  weight: ["400", "500", "700"],
   subsets: ["latin"],
 });
 
@@ -126,17 +139,27 @@ export default async function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <title>{pageTitle}</title>
+        {brand?.mode === "custom" && brand.logoUrl ? (
+          <>
+            <link rel="icon" href={brand.logoUrl} />
+            <link rel="apple-touch-icon" href={brand.logoUrl} />
+          </>
+        ) : null}
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('theme');var d=window.matchMedia('(prefers-color-scheme: dark)').matches;if(t==='dark'||(t!=='light'&&d)){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}}catch(e){}})();`,
           }}
         />
         {brandStyleTag ? (
-          <style dangerouslySetInnerHTML={{ __html: brandStyleTag }} />
+          <style
+            dangerouslySetInnerHTML={{
+              __html: `${brandStyleTag}body{font-family:var(--brand-font,var(--font-inter),ui-sans-serif,system-ui,sans-serif)}`,
+            }}
+          />
         ) : null}
       </head>
       <body
-        className={`${inter.variable} min-h-screen bg-[var(--background)] text-[var(--foreground)] antialiased overflow-x-hidden`}
+        className={`${inter.variable} ${sourceSans.variable} ${nunito.variable} ${roboto.variable} min-h-screen bg-[var(--background)] text-[var(--foreground)] antialiased overflow-x-hidden`}
       >
         {process.env.NEXT_PUBLIC_USERWAY_ACCOUNT_ID ? (
           <Script
@@ -193,7 +216,9 @@ export default async function RootLayout({
                         <div className="text-lg font-bold text-white truncate">
                           {tenantName || "VIT Tenant"}
                         </div>
-                        <div className="text-xs text-teal-400 font-medium">Admin Console</div>
+            <div className="text-xs text-teal-400 font-medium" style={{ color: 'var(--brand-accent, #2dd4bf)' }}>
+              Admin Console
+            </div>
                       </div>
                     </Link>
                   </div>

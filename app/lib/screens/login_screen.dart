@@ -3,8 +3,10 @@ import 'package:local_auth/local_auth.dart';
 import '../services/api_service.dart';
 import '../services/session.dart';
 import '../services/security_settings.dart';
+import '../services/brand_theme_controller.dart';
 import '../theme.dart';
 import '../utils/app_toast.dart';
+import '../widgets/brand_logo.dart';
 import 'home_screen.dart';
 import 'mfa_setup_screen.dart';
 import 'change_password_screen.dart';
@@ -35,6 +37,20 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     _chosenTenantSlug = Session.tenantId;
     _checkBiometricLogin();
+    _loadRememberedBrand();
+  }
+
+  Future<void> _loadRememberedBrand() async {
+    final slug = Session.tenantId;
+    if (slug == null || slug.isEmpty) return;
+    try {
+      final policy = await _api.fetchTenantPolicyPublic(slug);
+      if (!mounted) return;
+      BrandThemeController.instance.applyFromPolicy(policy);
+      setState(() {});
+    } catch (_) {
+      /* keep VIT */
+    }
   }
 
   @override
@@ -270,19 +286,37 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
+    return ListenableBuilder(
+      listenable: BrandThemeController.instance,
+      builder: (context, _) {
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+        final brand = BrandThemeController.instance;
+        final primary = brand.primaryColor ?? const Color(0xFF0d9488);
+        final bgUrl = brand.loginBackgroundUrl;
+        return Scaffold(
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Background image with gradient overlay
-          Image.asset(
-            'assets/images/bg.jpg',
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              color: isDarkMode ? AppTheme.darkBackground : const Color(0xFF0d9488),
+          if (bgUrl != null && bgUrl.isNotEmpty)
+            Image.network(
+              bgUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Image.asset(
+                'assets/images/bg.jpg',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: isDarkMode ? AppTheme.darkBackground : primary,
+                ),
+              ),
+            )
+          else
+            Image.asset(
+              'assets/images/bg.jpg',
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                color: isDarkMode ? AppTheme.darkBackground : primary,
+              ),
             ),
-          ),
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -290,7 +324,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.black.withOpacity(0.4),
-                  const Color(0xFF0d9488).withOpacity(0.7),
+                  primary.withOpacity(0.7),
                   Colors.black.withOpacity(0.85),
                 ],
               ),
@@ -302,6 +336,26 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.max,
                 children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 48, 24, 16),
+                    child: Column(
+                      children: [
+                        BrandLogo(size: 88),
+                        const SizedBox(height: 12),
+                        Text(
+                          brand.displayName?.isNotEmpty == true
+                              ? brand.displayName!
+                              : 'Vehicle Income Tracker',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.95),
+                            fontSize: 22,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
                   Padding(
                     padding: const EdgeInsets.only(top: 24, left: 20, right: 20, bottom: 24),
                     child: Container(
@@ -322,20 +376,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Center(
-                              child: Image.asset(
-                              'assets/images/vit_logo1.png',
-                              width: 220,
-                              height: 200,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => Icon(
-                                Icons.directions_car,
-                                size: 80,
-                                color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 24),
                           Text(
                             'Welcome Back',
                             style: TextStyle(
@@ -544,6 +584,8 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ],
     ),
+        );
+      },
     );
   }
 }

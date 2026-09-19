@@ -41,12 +41,33 @@ class VITApp extends StatelessWidget {
       builder: (context, _) {
         final brand = BrandThemeController.instance;
         return MaterialApp(
-          title: 'VIT',
-          theme: AppTheme.light(primaryColor: brand.primaryColor),
-          darkTheme: AppTheme.dark(primaryColor: brand.primaryColor),
+          title: brand.displayName?.isNotEmpty == true ? brand.displayName! : 'VIT',
+          theme: _themed(AppTheme.light(primaryColor: brand.primaryColor), brand),
+          darkTheme: _themed(
+            AppTheme.dark(primaryColor: brand.primaryDarkColor ?? brand.primaryColor),
+            brand,
+          ),
           home: const InitialRoute(),
         );
       },
+    );
+  }
+
+  static ThemeData _themed(ThemeData base, BrandThemeController brand) {
+    if (!brand.isCustom) return base;
+    final text = brand.textThemeFor(base.textTheme);
+    final r = brand.radiusValue;
+    return base.copyWith(
+      textTheme: text ?? base.textTheme,
+      cardTheme: base.cardTheme.copyWith(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(r)),
+      ),
+      inputDecorationTheme: base.inputDecorationTheme.copyWith(
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(r)),
+      ),
+      colorScheme: brand.accentColor != null
+          ? base.colorScheme.copyWith(secondary: brand.accentColor)
+          : base.colorScheme,
     );
   }
 }

@@ -152,8 +152,18 @@ body {
     @apply bg-teal-600 text-white shadow-md;
   }
 
+  /* Neutral sidebar style: zinc active chip instead of brand teal */
+  :root[style*="--brand-sidebar-style:neutral"] .sidebar-link-active,
+  html.brand-sidebar-neutral .sidebar-link-active {
+    @apply bg-zinc-700 text-white shadow-md ring-1 ring-zinc-500;
+  }
+
   .sidebar-link-inactive {
     @apply text-zinc-300 hover:bg-zinc-800 hover:text-white;
+  }
+
+  body {
+    font-family: var(--brand-font, var(--font-inter), ui-sans-serif, system-ui, sans-serif);
   }
 
   /* Readable page chrome */

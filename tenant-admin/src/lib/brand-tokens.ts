@@ -13,6 +13,7 @@ export function mixHex(a: string, b: string, t: number): string {
   return `#${ch(ar, br)}${ch(ag, bg)}${ch(ab, bb)}`;
 }
 
+/** Keep in sync with api brand.util + system-admin brand-tokens. */
 export function buildBrandTokens(primaryHex: string, accentHex?: string | null) {
   const primary = primaryHex.toLowerCase();
   const accent = (accentHex ?? mixHex(primary, "#000000", 0.35)).toLowerCase();
@@ -39,9 +40,27 @@ export type PolicyBrand = {
   displayName?: string;
   primaryColor?: string;
   accentColor?: string;
+  primaryDarkColor?: string;
   sidebarStyle?: "colored" | "neutral";
+  fontFamily?: "inter" | "source_sans_3" | "nunito" | "roboto" | "system";
+  borderRadius?: "sm" | "md" | "lg";
+  density?: "comfortable" | "compact";
   logoUrl?: string;
   loginBackgroundUrl?: string;
+};
+
+export const FONT_CSS: Record<NonNullable<PolicyBrand["fontFamily"]>, string> = {
+  inter: "var(--font-inter), ui-sans-serif, system-ui, sans-serif",
+  source_sans_3: "var(--font-source-sans), ui-sans-serif, sans-serif",
+  nunito: "var(--font-nunito), ui-sans-serif, sans-serif",
+  roboto: "var(--font-roboto), ui-sans-serif, sans-serif",
+  system: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+};
+
+export const RADIUS_PX: Record<NonNullable<PolicyBrand["borderRadius"]>, string> = {
+  sm: "0.5rem",
+  md: "0.75rem",
+  lg: "1.25rem",
 };
 
 export function brandCssVars(brand?: PolicyBrand | null): Record<string, string> {
@@ -49,7 +68,10 @@ export function brandCssVars(brand?: PolicyBrand | null): Record<string, string>
     return {};
   }
   const t = buildBrandTokens(brand.primaryColor, brand.accentColor);
-  return {
+  const font = brand.fontFamily || "inter";
+  const radius = brand.borderRadius || "md";
+  const density = brand.density || "comfortable";
+  const vars: Record<string, string> = {
     "--teal-50": t.primary50,
     "--teal-100": t.primary100,
     "--teal-200": t.primary200,
@@ -62,5 +84,22 @@ export function brandCssVars(brand?: PolicyBrand | null): Record<string, string>
     "--teal-900": t.primary900,
     "--teal-950": t.primary950,
     "--brand-accent": t.accent,
+    "--brand-font": FONT_CSS[font],
+    "--brand-radius": RADIUS_PX[radius],
+    "--brand-density-pad": density === "compact" ? "0.5rem" : "1rem",
+    "--brand-sidebar-style": brand.sidebarStyle === "neutral" ? "neutral" : "colored",
   };
+  if (brand.primaryDarkColor) {
+    vars["--brand-primary-dark"] = brand.primaryDarkColor;
+  }
+  return vars;
+}
+
+export function brandCssText(brand?: PolicyBrand | null): string {
+  const vars = brandCssVars(brand);
+  if (!Object.keys(vars).length) return "";
+  const body = Object.entries(vars)
+    .map(([k, v]) => `${k}:${v}`)
+    .join(";");
+  return `:root{${body}}body{font-family:var(--brand-font,var(--font-sans),ui-sans-serif,system-ui,sans-serif)}.rounded-brand{border-radius:var(--brand-radius,0.75rem)}`;
 }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../services/brand_theme_controller.dart';
+import '../widgets/brand_logo.dart';
 
 /// Full-screen splash shown while the app resolves session and route.
 class SplashScreen extends StatelessWidget {
@@ -6,47 +8,46 @@ class SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final brand = BrandThemeController.instance;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark
+        ? Colors.black
+        : (brand.primaryColor?.withOpacity(0.12) ?? Colors.black);
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        color: Colors.black,
+        color: isDark ? Colors.black : bg,
         child: SafeArea(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Spacer(flex: 2),
-              Image.asset(
-                'assets/images/vit_logo1.png',
-                width: 220,
-                height: 200,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => Icon(
-                  Icons.directions_car,
-                  size: 100,
-                  color: Colors.white.withOpacity(0.9),
-                ),
-              ),
+              BrandLogo(size: 120),
               const SizedBox(height: 24),
               Text(
-                'Vehicle Income Tracker',
+                brand.displayName?.isNotEmpty == true
+                    ? brand.displayName!
+                    : 'Vehicle Income Tracker',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.95),
+                  color: isDark
+                      ? Colors.white.withOpacity(0.95)
+                      : (brand.primaryColor ?? Colors.black87),
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
                 ),
                 textAlign: TextAlign.center,
               ),
               const Spacer(flex: 2),
-              const SizedBox(
-                width: 32,
-                height: 32,
+              SizedBox(
+                width: 28,
+                height: 28,
                 child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  strokeWidth: 2.5,
+                  color: brand.primaryColor ?? Colors.teal,
                 ),
               ),
-              const SizedBox(height: 48),
+              const Spacer(),
             ],
           ),
         ),
@@ -54,5 +55,3 @@ class SplashScreen extends StatelessWidget {
     );
   }
 }
-
-
