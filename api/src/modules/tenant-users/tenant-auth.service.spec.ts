@@ -12,16 +12,20 @@ import { RefreshToken } from '../../auth/refresh-token.entity';
 import { DeviceBinding } from '../../auth/device-binding.entity';
 import { AuditService } from '../audit/audit.service';
 import { EmailService } from '../email/email.service';
+import { DriverEmailIndexService } from './driver-email-index.service';
 
 describe('TenantAuthService', () => {
   let service: TenantAuthService;
-  let tenantContext: { getTenantId: jest.Mock };
+  let tenantContext: { getTenantId: jest.Mock; runAsync: jest.Mock };
   let mockRepo: { findOne: jest.Mock; save: jest.Mock };
   let tenantRepo: { findOne: jest.Mock };
   let emailService: { sendEmailOtp: jest.Mock };
 
   beforeEach(async () => {
-    tenantContext = { getTenantId: jest.fn().mockReturnValue('demo') };
+    tenantContext = {
+      getTenantId: jest.fn().mockReturnValue('demo'),
+      runAsync: jest.fn((_t: string, fn: () => Promise<unknown>) => fn()),
+    };
     mockRepo = { findOne: jest.fn(), save: jest.fn().mockImplementation((x) => Promise.resolve(x)) };
     tenantRepo = { findOne: jest.fn().mockResolvedValue({ name: 'Demo', slug: 'demo' }) };
     emailService = { sendEmailOtp: jest.fn().mockResolvedValue({ sent: true }) };
@@ -44,6 +48,10 @@ describe('TenantAuthService', () => {
         { provide: getRepositoryToken(DeviceBinding), useValue: {} },
         { provide: AuditService, useValue: { log: jest.fn() } },
         { provide: EmailService, useValue: emailService },
+        {
+          provide: DriverEmailIndexService,
+          useValue: { findTenantsByEmail: jest.fn().mockResolvedValue([]) },
+        },
       ],
     }).compile();
 

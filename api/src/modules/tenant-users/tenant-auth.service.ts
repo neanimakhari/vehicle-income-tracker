@@ -116,11 +116,15 @@ export class TenantAuthService {
       deviceName?: string;
       pushToken?: string;
     },
+    /** Only X-Tenant-Id — never host-derived context (vit-api subdomain). */
+    explicitTenantId?: string | null,
   ) {
-    const headerTenant = this.tenantContext.getTenantId()?.trim() || null;
+    const headerTenant = explicitTenantId?.trim() || null;
 
     if (headerTenant) {
-      return this.loginInTenant(headerTenant, email, password, mfaToken, context);
+      return this.tenantContext.runAsync(headerTenant, () =>
+        this.loginInTenant(headerTenant, email, password, mfaToken, context),
+      );
     }
 
     const indexed = await this.driverEmailIndex.findTenantsByEmail(email);
@@ -207,6 +211,11 @@ export class TenantAuthService {
         targetId: null,
         metadata: { email, tenant: tenantSlug },
       });
+      // Missing schema / DB errors must not surface as 500 to the mobile client
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/does not exist|relation|schema/i.test(msg)) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
       throw e;
     }
     try {

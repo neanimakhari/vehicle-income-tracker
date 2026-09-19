@@ -19,14 +19,26 @@ export class TenantAuthController {
   constructor(private readonly tenantAuthService: TenantAuthService) {}
 
   @Post('login')
-  async login(@Body() dto: TenantLoginDto, @Request() req: { ip?: string }) {
+  async login(
+    @Body() dto: TenantLoginDto,
+    @Request() req: { ip?: string; headers?: Record<string, string | string[] | undefined> },
+  ) {
     try {
-      return await this.tenantAuthService.login(dto.email, dto.password, dto.mfaToken, {
-        ip: req.ip,
-        deviceId: dto.deviceId,
-        deviceName: dto.deviceName,
-        pushToken: dto.pushToken,
-      });
+      const raw = req.headers?.['x-tenant-id'];
+      const explicitTenant =
+        (Array.isArray(raw) ? raw[0] : raw)?.trim() || null;
+      return await this.tenantAuthService.login(
+        dto.email,
+        dto.password,
+        dto.mfaToken,
+        {
+          ip: req.ip,
+          deviceId: dto.deviceId,
+          deviceName: dto.deviceName,
+          pushToken: dto.pushToken,
+        },
+        explicitTenant,
+      );
     } catch (error) {
       console.error('Login error:', error);
       throw error;
