@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getAuthToken } from "./auth";
+import { clearAuthToken, getAuthToken } from "./auth";
 import { getApiUrl as getApiUrlBase } from "./api-url";
 
 export const getApiUrl = getApiUrlBase;
@@ -33,8 +33,9 @@ export async function fetchJson<T>(path: string) {
     });
 
     if (!res.ok) {
-      // Token expired / invalid — redirect only (cookie clear is not allowed in RSC)
+      // Token expired / invalid — clear cookie first or middleware loops login↔home
       if (res.status === 401) {
+        await clearAuthToken();
         redirect("/login?error=expired");
       }
       // 403 = not entitled for this endpoint; do not wipe the session (SYS hits some admin-only routes)
