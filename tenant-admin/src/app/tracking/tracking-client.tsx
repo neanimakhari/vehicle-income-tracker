@@ -8,13 +8,17 @@ import type { MapPoint } from "./tracking-map";
 
 const TrackingMap = dynamic(
   () => import("./tracking-map").then((m) => m.TrackingMap),
-  { ssr: false, loading: () => <div className="h-[420px] animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" /> },
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full min-h-[360px] items-center justify-center bg-zinc-100 text-sm text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
+        Loading map…
+      </div>
+    ),
+  },
 );
 
-type TrackingPoint = MapPoint & {
-  ignitionOn?: boolean | null;
-  overspeed?: boolean | null;
-};
+export type TrackingPoint = MapPoint;
 
 type VehicleRow = { id: string; label: string; trackerImei?: string | null };
 type DeviceRow = {
@@ -26,6 +30,46 @@ type DeviceRow = {
 };
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
+
+function fmt(n: number | null | undefined, digits = 0, suffix = "") {
+  if (n == null || Number.isNaN(Number(n))) return "—";
+  return `${Number(n).toFixed(digits)}${suffix}`;
+}
+
+function ageLabel(iso: string | null | undefined) {
+  if (!iso) return "No signal";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms)) return "—";
+  if (ms < 60_000) return "Just now";
+  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ago`;
+  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h ago`;
+  return new Date(iso).toLocaleString();
+}
+
+function TelemetryCell({
+  label,
+  value,
+  warn,
+}: {
+  label: string;
+  value: string;
+  warn?: boolean;
+}) {
+  return (
+    <div className="rounded-md bg-zinc-50 px-2.5 py-2 dark:bg-zinc-950/60">
+      <div className="text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        {label}
+      </div>
+      <div
+        className={`mt-0.5 text-sm font-semibold tabular-nums ${
+          warn ? "text-rose-600 dark:text-rose-400" : "text-zinc-900 dark:text-zinc-50"
+        }`}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
 
 export function TrackingClient({
   initialHistory,
@@ -55,9 +99,9 @@ export function TrackingClient({
   const [devices, setDevices] = useState<DeviceRow[]>(initialDevices);
   const [connected, setConnected] = useState(false);
   const [popiaAck, setPopiaAck] = useState(false);
-  const [simVehicleId, setSimVehicleId] = useState(vehicles[0]?.id ?? "");
-  const [simProfile, setSimProfile] = useState<"basic" | "obd">("basic");
-  const [bindVehicleId, setBindVehicleId] = useState(vehicles[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialLatest[0]?.vehicleId ?? vehicles[0]?.id ?? null,
+  );
   const [bindImei, setBindImei] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -109,7 +153,11 @@ export function TrackingClient({
     const [lat, hist, devs] = await Promise.all([
       fetchJsonClient<TrackingPoint[]>("/api/proxy/tenant/tracking/latest"),
       hasHistory
-        ? fetchJsonClient<TrackingPoint[]>("/api/proxy/tenant/tracking/history?limit=100")
+        ? fetchJsonClient<TrackingPoint[]>(
+            `/api/proxy/tenant/tracking/history?limit=100${
+              selectedId ? `&vehicleId=${encodeURIComponent(selectedId)}` : ""
+            }`,
+          )
         : Promise.resolve([] as TrackingPoint[]),
       fetchJsonClient<DeviceRow[]>("/api/proxy/tenant/tracking/devices"),
     ]);
@@ -118,25 +166,26 @@ export function TrackingClient({
     if (Array.isArray(devs)) setDevices(devs);
   }
 
-  async function runSimulate() {
-    if (!simVehicleId) return;
-    setBusy("sim");
+  async function runFullSimulate(vehicleId: string) {
+    setBusy(`sim-${vehicleId}`);
     setMessage(null);
+    setSelectedId(vehicleId);
     try {
+      const profile = hasObd ? "obd" : "basic";
       const res = await fetch("/api/proxy/tenant/tracking/simulate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          vehicleId: simVehicleId,
-          profile: simProfile === "obd" && hasObd ? "obd" : "basic",
-          points: 24,
-        }),
+        body: JSON.stringify({ vehicleId, profile, points: 36 }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         setMessage(err?.message ?? `Simulate failed (${res.status})`);
       } else {
-        setMessage("Demo trail generated.");
+        setMessage(
+          hasObd
+            ? "Full OBD demo trail generated (GPS + RPM, fuel, voltage, coolant, load)."
+            : "GPS demo trail generated.",
+        );
         await refresh();
       }
     } finally {
@@ -145,11 +194,11 @@ export function TrackingClient({
   }
 
   async function bindDevice() {
-    if (!bindVehicleId || !bindImei.trim()) return;
+    if (!selectedId || !bindImei.trim()) return;
     setBusy("bind");
     setMessage(null);
     try {
-      const res = await fetch(`/api/proxy/tenant/tracking/devices/${bindVehicleId}/bind`, {
+      const res = await fetch(`/api/proxy/tenant/tracking/devices/${selectedId}/bind`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imei: bindImei.trim() }),
@@ -158,7 +207,7 @@ export function TrackingClient({
         const err = await res.json().catch(() => ({}));
         setMessage(err?.message ?? `Bind failed (${res.status})`);
       } else {
-        setMessage("IMEI bound.");
+        setMessage("IMEI bound to selected vehicle.");
         setBindImei("");
         await refresh();
       }
@@ -186,8 +235,38 @@ export function TrackingClient({
     setPopiaAck(true);
   }
 
+  const latestByVehicle = useMemo(() => {
+    const map = new Map<string, TrackingPoint>();
+    for (const p of latest) {
+      const id = p.vehicleId ?? p.vehicleLabel ?? p.id;
+      if (id) map.set(String(id), p);
+    }
+    return map;
+  }, [latest]);
+
+  const fleetRows = useMemo(() => {
+    return vehicles.map((v) => {
+      const point = latestByVehicle.get(v.id);
+      const device = devices.find((d) => d.vehicleId === v.id);
+      return { vehicle: v, point, device };
+    });
+  }, [vehicles, latestByVehicle, devices]);
+
+  const selected = fleetRows.find((r) => r.vehicle.id === selectedId) ?? fleetRows[0];
+  const selectedPoint = selected?.point ?? null;
+
+  const trail = useMemo(() => {
+    if (!hasHistory) return [] as TrackingPoint[];
+    const vid = selected?.vehicle.id;
+    if (!vid) return history.slice(0, 80);
+    return history.filter((p) => p.vehicleId === vid).slice(0, 80);
+  }, [history, hasHistory, selected?.vehicle.id]);
+
   const latestSorted = useMemo(
-    () => [...latest].sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime()),
+    () =>
+      [...latest].sort(
+        (a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime(),
+      ),
     [latest],
   );
 
@@ -195,11 +274,11 @@ export function TrackingClient({
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Live Tracking</h1>
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+        <div className="rounded-xl border border-amber-200/80 bg-amber-50 p-5 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
           <p className="font-medium">Live tracking is not on your plan.</p>
-          <p className="mt-1">
-            Upgrade to include <code className="text-xs">tracking_live</code> (and optional history / OBD
-            add-ons) to see the map, bind trackers, and run demos. Contact support to enable.
+          <p className="mt-1 opacity-90">
+            Enable <code className="text-xs">tracking_live</code> (and optional history / OBD) to use the
+            fleet map.
           </p>
         </div>
       </div>
@@ -208,17 +287,26 @@ export function TrackingClient({
 
   if (!popiaAck) {
     return (
-      <div className="mx-auto max-w-lg space-y-4 py-8">
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Live Tracking</h1>
-        <div className="rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-700 dark:bg-zinc-900">
-          <h2 className="font-semibold text-zinc-900 dark:text-zinc-50">Location data notice (POPIA)</h2>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
-            Live tracking processes personal information (vehicle location and related telemetry). Use it only
-            for legitimate fleet operations, inform drivers where required, and keep access limited to authorised
-            staff. Map views are audited.
+      <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center gap-5 px-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700 dark:text-teal-300">
+            Fleet map
           </p>
-          <button type="button" className="btn btn-primary mt-4" onClick={ackPopia}>
-            I understand — open map
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Live Tracking
+          </h1>
+        </div>
+        <div className="rounded-2xl border border-zinc-200/80 bg-white/90 p-6 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/90">
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+            Location data notice (POPIA)
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+            Live tracking processes personal information (vehicle location and related telemetry). Use it
+            only for legitimate fleet operations, inform drivers where required, and keep access limited to
+            authorised staff. Map views are audited.
+          </p>
+          <button type="button" className="btn btn-primary mt-5 w-full sm:w-auto" onClick={ackPopia}>
+            I understand — open fleet map
           </button>
         </div>
       </div>
@@ -226,219 +314,330 @@ export function TrackingClient({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Live Tracking</h1>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
-            OSM map, device bind, and optional OBD demo. Ingest is private (IMEI → tenant).
+    <div className="-mx-1 space-y-4 sm:mx-0">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700 dark:text-teal-300">
+            Fleet map
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Live Tracking
+          </h1>
+          <p className="mt-1 max-w-xl text-sm text-zinc-600 dark:text-zinc-300">
+            All tenant vehicles with a signal appear on the map. Select one for full telemetry and trail.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
           <span
-            className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
               connected
-                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200"
-                : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
+                : "bg-zinc-200/80 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
             }`}
           >
-            {connected ? "Live connected" : "Disconnected"}
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-emerald-500" : "bg-zinc-400"}`}
+            />
+            {connected ? "Live" : "Polling"}
           </span>
           <button type="button" className="btn btn-secondary" onClick={refresh}>
             Refresh
           </button>
+          {selected && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={busy?.startsWith("sim")}
+              onClick={() => runFullSimulate(selected.vehicle.id)}
+            >
+              {busy === `sim-${selected.vehicle.id}`
+                ? "Simulating…"
+                : hasObd
+                  ? "Simulate full OBD"
+                  : "Simulate GPS"}
+            </button>
+          )}
         </div>
       </div>
 
       {message && (
-        <p className="text-sm text-zinc-700 dark:text-zinc-200" role="status">
+        <p
+          className="rounded-lg border border-teal-200/70 bg-teal-50 px-3 py-2 text-sm text-teal-950 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-100"
+          role="status"
+        >
           {message}
         </p>
       )}
 
-      <TrackingMap points={latestSorted} trail={hasHistory ? history.slice(0, 80) : []} />
-
-      {!hasHistory && (
-        <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-100">
-          History playback is an add-on (<code className="text-xs">tracking_history</code>). Enable it to show
-          breadcrumbs on the map and the history table.
-        </div>
-      )}
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="card p-4 space-y-3">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Demo simulator</h2>
-          <p className="text-sm text-zinc-600 dark:text-zinc-300">
-            Generates a short trail without hardware. OBD profile requires the OBD module.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <select
-              className="input"
-              value={simVehicleId}
-              onChange={(e) => setSimVehicleId(e.target.value)}
-            >
-              {vehicles.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.label}
-                </option>
-              ))}
-            </select>
-            <select
-              className="input"
-              value={simProfile}
-              onChange={(e) => setSimProfile(e.target.value as "basic" | "obd")}
-            >
-              <option value="basic">Basic GPS</option>
-              <option value="obd" disabled={!hasObd}>
-                OBD{!hasObd ? " (locked)" : ""}
-              </option>
-            </select>
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!simVehicleId || busy === "sim"}
-              onClick={runSimulate}
-            >
-              {busy === "sim" ? "Running…" : "Simulate"}
-            </button>
-          </div>
-          {!hasObd && (
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Upsell: enable <code>tracking_obd</code> for RPM, fuel rate, and voltage on the map.
-            </p>
-          )}
-        </div>
-
-        <div className="card p-4 space-y-3">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Bind tracker IMEI</h2>
-          <p className="text-sm text-zinc-600 dark:text-zinc-300">
-            Platform registry maps IMEI → this tenant + vehicle. Inactive devices are rejected at ingest.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <select
-              className="input"
-              value={bindVehicleId}
-              onChange={(e) => setBindVehicleId(e.target.value)}
-            >
-              {vehicles.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.label}
-                  {v.trackerImei ? ` (${v.trackerImei})` : ""}
-                </option>
-              ))}
-            </select>
-            <input
-              className="input"
-              placeholder="IMEI"
-              value={bindImei}
-              onChange={(e) => setBindImei(e.target.value)}
+      <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="relative min-h-[420px] border-b border-zinc-200/80 lg:border-b-0 lg:border-r dark:border-zinc-700">
+            <TrackingMap
+              points={latestSorted}
+              trail={trail}
+              selectedVehicleId={selected?.vehicle.id}
+              onSelectVehicle={setSelectedId}
             />
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={busy === "bind"}
-              onClick={bindDevice}
-            >
-              Bind
-            </button>
+            <div className="pointer-events-none absolute bottom-3 left-3 flex flex-wrap gap-2">
+              <span className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-medium text-zinc-700 shadow dark:bg-zinc-950/80 dark:text-zinc-200">
+                <span className="mr-1 inline-block h-2 w-2 rounded-full bg-teal-600" /> Moving
+              </span>
+              <span className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-medium text-zinc-700 shadow dark:bg-zinc-950/80 dark:text-zinc-200">
+                <span className="mr-1 inline-block h-2 w-2 rounded-full bg-zinc-500" /> Idle
+              </span>
+              <span className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-medium text-zinc-700 shadow dark:bg-zinc-950/80 dark:text-zinc-200">
+                <span className="mr-1 inline-block h-2 w-2 rounded-full bg-rose-600" /> Overspeed
+              </span>
+            </div>
           </div>
-          <ul className="space-y-2 text-sm">
-            {devices.map((d) => (
-              <li
-                key={d.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded border border-zinc-200 px-3 py-2 dark:border-zinc-700"
-              >
-                <span>
-                  <span className="font-mono">{d.imei}</span>
-                  <span className="ml-2 text-zinc-500">
-                    {d.isActive ? "active" : "inactive"}
-                    {d.lastSeenAt ? ` · seen ${new Date(d.lastSeenAt).toLocaleString()}` : ""}
-                  </span>
-                </span>
+
+          <div className="flex max-h-[560px] flex-col">
+            <div className="border-b border-zinc-200/80 px-4 py-3 dark:border-zinc-700">
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Fleet · {fleetRows.length} vehicle{fleetRows.length === 1 ? "" : "s"}
+              </div>
+            </div>
+            <div className="flex-1 space-y-2 overflow-y-auto p-3">
+              {fleetRows.map(({ vehicle, point, device }) => {
+                const active = selected?.vehicle.id === vehicle.id;
+                const moving = (point?.speedKph ?? 0) > 3;
+                return (
+                  <button
+                    key={vehicle.id}
+                    type="button"
+                    onClick={() => setSelectedId(vehicle.id)}
+                    className={`w-full rounded-xl border px-3 py-3 text-left transition ${
+                      active
+                        ? "border-teal-500/70 bg-teal-50/80 ring-1 ring-teal-500/30 dark:border-teal-500/50 dark:bg-teal-950/30"
+                        : "border-zinc-200/80 bg-zinc-50/50 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-950/40 dark:hover:border-zinc-600"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold text-zinc-900 dark:text-zinc-50">
+                          {vehicle.label}
+                        </div>
+                        <div className="mt-0.5 text-xs text-zinc-500">
+                          {device ? (
+                            <span className="font-mono">{device.imei}</span>
+                          ) : (
+                            "No IMEI bound"
+                          )}
+                        </div>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                          !point
+                            ? "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                            : point.overspeed
+                              ? "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
+                              : moving
+                                ? "bg-teal-100 text-teal-800 dark:bg-teal-950/50 dark:text-teal-200"
+                                : "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                        }`}
+                      >
+                        {!point ? "Offline" : point.overspeed ? "Alert" : moving ? "Moving" : "Idle"}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-600 dark:text-zinc-300">
+                      <span>{fmt(point?.speedKph, 0, " km/h")}</span>
+                      {hasObd && <span>{fmt(point?.engineRpm, 0, " rpm")}</span>}
+                      <span className="text-zinc-400">{ageLabel(point?.recordedAt)}</span>
+                    </div>
+                  </button>
+                );
+              })}
+              {fleetRows.length === 0 && (
+                <p className="px-2 py-6 text-center text-sm text-zinc-500">No vehicles yet.</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {selected && (
+          <div className="border-t border-zinc-200/80 bg-zinc-50/60 px-4 py-4 dark:border-zinc-700 dark:bg-zinc-950/40">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
+                  {selected.vehicle.label}
+                </h2>
+                <p className="text-xs text-zinc-500">
+                  {selectedPoint
+                    ? `${Number(selectedPoint.latitude).toFixed(5)}, ${Number(selectedPoint.longitude).toFixed(5)} · ${ageLabel(selectedPoint.recordedAt)}`
+                    : "No position yet — run a full simulation or wait for ingest."}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  className="btn btn-secondary text-xs"
-                  disabled={busy === `unbind-${d.vehicleId}`}
-                  onClick={() => unbindDevice(d.vehicleId)}
+                  className="btn btn-primary text-sm"
+                  disabled={busy?.startsWith("sim")}
+                  onClick={() => runFullSimulate(selected.vehicle.id)}
                 >
-                  Unbind
+                  {busy === `sim-${selected.vehicle.id}` ? "Running…" : "Simulate everything"}
                 </button>
-              </li>
-            ))}
-            {devices.length === 0 && (
-              <li className="text-zinc-500 dark:text-zinc-400">No devices bound yet.</li>
-            )}
-          </ul>
-        </div>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="card p-4">
-          <h2 className="mb-3 text-lg font-semibold text-zinc-900 dark:text-zinc-50">Latest positions</h2>
-          <div className="space-y-2">
-            {latestSorted.map((point) => (
-              <div key={point.id} className="rounded border border-zinc-200 p-3 text-sm dark:border-zinc-700">
-                <div className="font-medium text-zinc-900 dark:text-zinc-50">
-                  {point.vehicleLabel ?? "Unknown vehicle"}
-                </div>
-                <div className="text-zinc-600 dark:text-zinc-300">
-                  Lat/Lng: {Number(point.latitude).toFixed(6)}, {Number(point.longitude).toFixed(6)}
-                </div>
-                <div className="text-zinc-600 dark:text-zinc-300">
-                  Speed: {point.speedKph != null ? `${Number(point.speedKph).toFixed(1)} km/h` : "—"}
-                  {hasObd && point.engineRpm != null
-                    ? ` · RPM ${Number(point.engineRpm).toFixed(0)}`
-                    : ""}
-                </div>
-                <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {new Date(point.recordedAt).toLocaleString()}
-                </div>
               </div>
-            ))}
-            {latestSorted.length === 0 && (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                No points yet — run Simulate or bind a tracker.
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+              <TelemetryCell label="Speed" value={fmt(selectedPoint?.speedKph, 1, " km/h")} />
+              <TelemetryCell label="Heading" value={fmt(selectedPoint?.heading, 0, "°")} />
+              <TelemetryCell
+                label="Ignition"
+                value={
+                  selectedPoint?.ignitionOn == null
+                    ? "—"
+                    : selectedPoint.ignitionOn
+                      ? "On"
+                      : "Off"
+                }
+              />
+              <TelemetryCell
+                label="GPS"
+                value={
+                  selectedPoint?.gpsFixOk == null
+                    ? "—"
+                    : selectedPoint.gpsFixOk
+                      ? `OK · ${fmt(selectedPoint.satellites, 0)} sats`
+                      : "No fix"
+                }
+              />
+              <TelemetryCell
+                label="Backup batt."
+                value={fmt(selectedPoint?.backupBatteryLevel, 0, "%")}
+              />
+              <TelemetryCell
+                label="Status"
+                value={
+                  selectedPoint?.overspeed
+                    ? "Overspeed"
+                    : (selectedPoint?.speedKph ?? 0) > 3
+                      ? "Moving"
+                      : selectedPoint
+                        ? "Idle"
+                        : "Offline"
+                }
+                warn={Boolean(selectedPoint?.overspeed)}
+              />
+            </div>
+
+            {hasObd ? (
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                <TelemetryCell label="Engine RPM" value={fmt(selectedPoint?.engineRpm, 0)} />
+                <TelemetryCell label="Fuel rate" value={fmt(selectedPoint?.fuelRateLph, 1, " L/h")} />
+                <TelemetryCell label="Fuel level" value={fmt(selectedPoint?.fuelLevelPercent, 0, "%")} />
+                <TelemetryCell label="Voltage" value={fmt(selectedPoint?.externalVoltage, 1, " V")} />
+                <TelemetryCell label="Coolant" value={fmt(selectedPoint?.coolantC, 0, "°C")} />
+                <TelemetryCell label="Engine load" value={fmt(selectedPoint?.engineLoadPercent, 0, "%")} />
+                <TelemetryCell
+                  label="Odometer"
+                  value={fmt(selectedPoint?.odometerKm, 1, " km")}
+                />
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-zinc-500">
+                OBD metrics locked — enable <code className="text-[11px]">tracking_obd</code> for RPM, fuel,
+                voltage, coolant, and load.
               </p>
             )}
+
+            <div className="mt-4 flex flex-col gap-2 border-t border-zinc-200/70 pt-4 dark:border-zinc-700 sm:flex-row sm:items-end">
+              <div className="min-w-0 flex-1">
+                <label className="text-xs font-medium text-zinc-500">Bind IMEI to this vehicle</label>
+                <input
+                  className="input mt-1 w-full"
+                  placeholder="e.g. 356938035643809"
+                  value={bindImei}
+                  onChange={(e) => setBindImei(e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={busy === "bind"}
+                onClick={bindDevice}
+              >
+                Bind
+              </button>
+              {selected.device && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={busy === `unbind-${selected.vehicle.id}`}
+                  onClick={() => unbindDevice(selected.vehicle.id)}
+                >
+                  Unbind {selected.device.imei}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {hasHistory && (
+        <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+          <div className="flex items-center justify-between border-b border-zinc-200/80 px-4 py-3 dark:border-zinc-700">
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+              Trail · {selected?.vehicle.label ?? "All"}
+            </h2>
+            <span className="text-xs text-zinc-500">{trail.length} points</span>
+          </div>
+          <div className="max-h-[280px] overflow-auto">
+            <table className="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-800">
+              <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-950">
+                <tr className="text-left text-[11px] uppercase tracking-wide text-zinc-500">
+                  <th className="px-3 py-2 font-semibold">Time</th>
+                  <th className="px-3 py-2 font-semibold">Coords</th>
+                  <th className="px-3 py-2 font-semibold">Speed</th>
+                  {hasObd && (
+                    <>
+                      <th className="px-3 py-2 font-semibold">RPM</th>
+                      <th className="px-3 py-2 font-semibold">Fuel</th>
+                      <th className="px-3 py-2 font-semibold">V</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                {trail.map((point) => (
+                  <tr key={point.id} className="tabular-nums">
+                    <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-300">
+                      {new Date(point.recordedAt).toLocaleTimeString()}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-300">
+                      {Number(point.latitude).toFixed(5)}, {Number(point.longitude).toFixed(5)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2">
+                      {fmt(point.speedKph, 1)}
+                    </td>
+                    {hasObd && (
+                      <>
+                        <td className="whitespace-nowrap px-3 py-2">{fmt(point.engineRpm, 0)}</td>
+                        <td className="whitespace-nowrap px-3 py-2">
+                          {fmt(point.fuelLevelPercent, 0, "%")}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2">
+                          {fmt(point.externalVoltage, 1)}
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+                {trail.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={hasObd ? 6 : 3}
+                      className="px-3 py-8 text-center text-zinc-500"
+                    >
+                      No trail yet — simulate everything on a vehicle.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-
-        <div className="card p-4">
-          <h2 className="mb-3 text-lg font-semibold text-zinc-900 dark:text-zinc-50">Recent history</h2>
-          {!hasHistory ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Module not entitled.</p>
-          ) : (
-            <div className="max-h-[420px] overflow-auto">
-              <table className="min-w-[32rem] w-full divide-y divide-zinc-200 dark:divide-zinc-800">
-                <thead className="bg-zinc-50 dark:bg-zinc-900 sticky top-0">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">Vehicle</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">Coordinates</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">Speed</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">Recorded</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                  {history.map((point) => (
-                    <tr key={point.id}>
-                      <td className="px-3 py-2 text-sm whitespace-nowrap">{point.vehicleLabel ?? "—"}</td>
-                      <td className="px-3 py-2 text-sm whitespace-nowrap">
-                        {Number(point.latitude).toFixed(6)}, {Number(point.longitude).toFixed(6)}
-                      </td>
-                      <td className="px-3 py-2 text-sm whitespace-nowrap">
-                        {point.speedKph != null ? Number(point.speedKph).toFixed(1) : "—"}
-                      </td>
-                      <td className="px-3 py-2 text-sm whitespace-nowrap">
-                        {new Date(point.recordedAt).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   );
 }

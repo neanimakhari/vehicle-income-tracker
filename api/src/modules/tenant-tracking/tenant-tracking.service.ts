@@ -110,6 +110,10 @@ export class TenantTrackingService {
       heading: heading != null ? Number(heading) : null,
       ignitionOn: pick('ignitionOn', 'ignition_on') ?? null,
       gpsFixOk: pick('gpsFixOk', 'gps_fix_ok') ?? null,
+      satellites: pick('satellites', 'satellites') ?? null,
+      backupBatteryLevel:
+        pick('backupBatteryLevel', 'backup_battery_level') ?? null,
+      overspeed: pick('overspeed', 'overspeed') ?? null,
       recordedAt,
     };
     if (includeObd) {
@@ -131,9 +135,6 @@ export class TenantTrackingService {
       );
       base.externalVoltage =
         externalVoltage != null ? Number(externalVoltage) : null;
-      base.backupBatteryLevel =
-        pick('backupBatteryLevel', 'backup_battery_level') ?? null;
-      base.satellites = pick('satellites', 'satellites') ?? null;
       base.engineRpm = engineRpm != null ? Number(engineRpm) : null;
       base.fuelRateLph = fuelRateLph != null ? Number(fuelRateLph) : null;
       base.fuelLevelPercent =
@@ -142,7 +143,6 @@ export class TenantTrackingService {
       base.coolantC = coolantC != null ? Number(coolantC) : null;
       base.engineLoadPercent =
         engineLoadPercent != null ? Number(engineLoadPercent) : null;
-      base.overspeed = pick('overspeed', 'overspeed') ?? null;
     }
     return base;
   }
@@ -352,12 +352,13 @@ export class TenantTrackingService {
 
     for (let i = 0; i < count; i++) {
       const heading = (i * 25) % 360;
-      const speed = 15 + Math.random() * 45;
+      const speed = 25 + Math.random() * 55;
       const rad = (heading * Math.PI) / 180;
-      lat += Math.cos(rad) * 0.00025;
-      lng += Math.sin(rad) * 0.00025;
-      fuel = Math.max(5, fuel - 0.15 - Math.random() * 0.1);
-      const ignitionOn = i < count - 2;
+      lat += Math.cos(rad) * 0.00028;
+      lng += Math.sin(rad) * 0.00028;
+      fuel = Math.max(8, fuel - 0.12 - Math.random() * 0.08);
+      // Keep the demo "live" — last point stays moving with full telemetry
+      const ignitionOn = true;
       const input: InsertPointInput = {
         vehicleId: vehicle.id,
         vehicleLabel: vehicle.label,
@@ -365,7 +366,7 @@ export class TenantTrackingService {
         source: 'simulate',
         latitude: lat,
         longitude: lng,
-        speedKph: ignitionOn ? speed : 0,
+        speedKph: speed,
         heading,
         ignitionOn,
         gpsFixOk: true,
@@ -373,15 +374,17 @@ export class TenantTrackingService {
         recordedAt: new Date(start + i * intervalMs),
         rawPayload: JSON.stringify({ profile: opts.profile, i }),
       };
+      // Full GPS quality fields always; OBD block when profile=obd
+      input.backupBatteryLevel = 70 + Math.floor(Math.random() * 25);
       if (opts.profile === 'obd') {
-        input.engineRpm = ignitionOn ? 1200 + Math.random() * 1800 : 0;
-        input.fuelRateLph = ignitionOn ? 2 + Math.random() * 6 : 0;
+        input.engineRpm = 1400 + Math.random() * 2200;
+        input.fuelRateLph = 2.5 + Math.random() * 7;
         input.fuelLevelPercent = fuel;
-        input.externalVoltage = 13.2 + Math.random() * 0.8;
-        input.odometerKm = 50000 + i * 0.05;
-        input.coolantC = 85 + Math.random() * 10;
-        input.engineLoadPercent = ignitionOn ? 20 + Math.random() * 50 : 0;
-        input.overspeed = speed > 55;
+        input.externalVoltage = 13.1 + Math.random() * 1.1;
+        input.odometerKm = 52000 + i * 0.08 + Math.random() * 0.02;
+        input.coolantC = 82 + Math.random() * 14;
+        input.engineLoadPercent = 18 + Math.random() * 55;
+        input.overspeed = speed > 60;
       }
       created.push(await this.insertPoint(input, { skipRateLimit: true }));
     }
