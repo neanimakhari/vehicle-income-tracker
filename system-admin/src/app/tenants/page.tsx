@@ -60,7 +60,9 @@ export default async function TenantsPage() {
     fetchTenantUsage(),
   ]);
 
-  async function createTenant(formData: FormData): Promise<{ success: boolean; error?: string }> {
+  async function createTenant(
+    formData: FormData,
+  ): Promise<{ success: boolean; error?: string; slug?: string }> {
     "use server";
     const name = String(formData.get("name") ?? "").trim();
     const slug = String(formData.get("slug") ?? "").trim();
@@ -89,7 +91,7 @@ export default async function TenantsPage() {
         return { success: false, error: (err as { message?: string }).message ?? "Failed to create tenant" };
       }
       revalidatePath("/tenants");
-      return { success: true };
+      return { success: true, slug };
     } catch (e) {
       console.error(e);
       return { success: false, error: "Request failed" };

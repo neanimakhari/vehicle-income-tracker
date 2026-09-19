@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
+import { CopyLinkRow } from "@/components/CopyLinkRow";
+import { tenantAdminLoginUrl, vitAppDownloadUrl } from "@/lib/tenant-urls";
 
 type Tenant = {
   id: string;
@@ -120,6 +122,10 @@ export function EditTenantModal({ tenant, onClose, updateTenant }: EditTenantMod
           <div>
             <label className="mb-1 block text-sm font-medium text-zinc-500 dark:text-zinc-400">Slug</label>
             <p className="text-sm text-zinc-600 dark:text-zinc-400">{tenant.slug}</p>
+          </div>
+          <div className="space-y-2">
+            <CopyLinkRow label="Tenant admin login" url={tenantAdminLoginUrl(tenant.slug)} />
+            <CopyLinkRow label="Driver app download" url={vitAppDownloadUrl(tenant.slug)} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Contact name</label>
