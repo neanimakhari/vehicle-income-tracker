@@ -11,15 +11,25 @@ export type MapPoint = {
   speedKph: number | null;
   heading: number | null;
   recordedAt: string;
+  ignitionOn?: boolean | null;
+  gpsFixOk?: boolean | null;
+  satellites?: number | null;
   engineRpm?: number | null;
   fuelRateLph?: number | null;
+  fuelLevelPercent?: number | null;
   externalVoltage?: number | null;
+  backupBatteryLevel?: number | null;
+  odometerKm?: number | null;
+  coolantC?: number | null;
+  engineLoadPercent?: number | null;
+  overspeed?: boolean | null;
 };
 
 type LeafletNS = {
   map: (el: HTMLElement) => LeafletMap;
   tileLayer: (url: string, opts: Record<string, unknown>) => { addTo: (m: LeafletMap) => void };
-  marker: (latLng: [number, number]) => LeafletMarker;
+  divIcon: (opts: Record<string, unknown>) => unknown;
+  marker: (latLng: [number, number], opts?: Record<string, unknown>) => LeafletMarker;
   polyline: (
     latlngs: [number, number][],
     opts: Record<string, unknown>,
@@ -38,6 +48,7 @@ type LeafletMarker = {
   addTo: (m: LeafletMap) => LeafletMarker;
   setLatLng: (ll: [number, number]) => void;
   bindPopup: (html: string) => void;
+  setIcon?: (icon: unknown) => void;
 };
 
 type LeafletPolyline = {
@@ -86,12 +97,38 @@ function loadLeaflet(): Promise<LeafletNS> {
   });
 }
 
+function popupHtml(p: MapPoint) {
+  const rows = [
+    ["Speed", p.speedKph != null ? `${Number(p.speedKph).toFixed(1)} km/h` : "—"],
+    ["Heading", p.heading != null ? `${Number(p.heading).toFixed(0)}°` : "—"],
+    ["Ignition", p.ignitionOn == null ? "—" : p.ignitionOn ? "On" : "Off"],
+    ["GPS", p.gpsFixOk == null ? "—" : p.gpsFixOk ? `Fix · ${p.satellites ?? "—"} sats` : "No fix"],
+    ["RPM", p.engineRpm != null ? Number(p.engineRpm).toFixed(0) : null],
+    ["Fuel rate", p.fuelRateLph != null ? `${Number(p.fuelRateLph).toFixed(1)} L/h` : null],
+    ["Fuel", p.fuelLevelPercent != null ? `${Number(p.fuelLevelPercent).toFixed(0)}%` : null],
+    ["Voltage", p.externalVoltage != null ? `${Number(p.externalVoltage).toFixed(1)} V` : null],
+    ["Coolant", p.coolantC != null ? `${Number(p.coolantC).toFixed(0)}°C` : null],
+    ["Load", p.engineLoadPercent != null ? `${Number(p.engineLoadPercent).toFixed(0)}%` : null],
+    ["Odo", p.odometerKm != null ? `${Number(p.odometerKm).toFixed(1)} km` : null],
+  ].filter(([, v]) => v != null);
+
+  return `<div style="min-width:160px;font:12px/1.4 system-ui,sans-serif">
+    <div style="font-weight:700;margin-bottom:6px">${p.vehicleLabel ?? "Vehicle"}</div>
+    ${rows.map(([k, v]) => `<div style="display:flex;justify-content:space-between;gap:12px"><span style="opacity:.65">${k}</span><span>${v}</span></div>`).join("")}
+    <div style="margin-top:6px;opacity:.55;font-size:11px">${new Date(p.recordedAt).toLocaleString()}</div>
+  </div>`;
+}
+
 export function TrackingMap({
   points,
   trail,
+  selectedVehicleId,
+  onSelectVehicle,
 }: {
   points: MapPoint[];
   trail: MapPoint[];
+  selectedVehicleId?: string | null;
+  onSelectVehicle?: (vehicleId: string | null) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
@@ -108,11 +145,12 @@ export function TrackingMap({
         const L = await loadLeaflet();
         if (cancelled || !containerRef.current) return;
         LRef.current = L;
-        const map = L.map(containerRef.current).setView([-26.2041, 28.0473], 11);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        const map = L.map(containerRef.current).setView([-26.2041, 28.0473], 12);
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
           attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
           maxZoom: 19,
+          subdomains: "abcd",
         }).addTo(map);
         mapRef.current = map;
         setMapReady(true);
@@ -140,23 +178,24 @@ export function TrackingMap({
       const key = String(p.vehicleId ?? p.vehicleLabel ?? p.id);
       seen.add(key);
       const latLng: [number, number] = [Number(p.latitude), Number(p.longitude)];
+      const selected = selectedVehicleId != null && key === selectedVehicleId;
+      const moving = (p.speedKph ?? 0) > 3;
+      const color = p.overspeed ? "#dc2626" : moving ? "#0d9488" : "#64748b";
+      const icon = L.divIcon({
+        className: "",
+        html: `<div style="width:${selected ? 18 : 14}px;height:${selected ? 18 : 14}px;border-radius:999px;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)"></div>`,
+        iconSize: [selected ? 18 : 14, selected ? 18 : 14],
+        iconAnchor: [selected ? 9 : 7, selected ? 9 : 7],
+      });
       let marker = markersRef.current.get(key);
-      const popup = [
-        `<strong>${p.vehicleLabel ?? "Vehicle"}</strong>`,
-        `Speed: ${p.speedKph != null ? `${Number(p.speedKph).toFixed(1)} km/h` : "—"}`,
-        p.engineRpm != null ? `RPM: ${Number(p.engineRpm).toFixed(0)}` : null,
-        p.fuelRateLph != null ? `Fuel: ${Number(p.fuelRateLph).toFixed(1)} L/h` : null,
-        new Date(p.recordedAt).toLocaleString(),
-      ]
-        .filter(Boolean)
-        .join("<br/>");
       if (!marker) {
-        marker = L.marker(latLng).addTo(map);
+        marker = L.marker(latLng, { icon }).addTo(map);
         markersRef.current.set(key, marker);
       } else {
         marker.setLatLng(latLng);
+        marker.setIcon?.(icon);
       }
-      marker.bindPopup(popup);
+      marker.bindPopup(popupHtml(p));
     }
     for (const [key, marker] of markersRef.current) {
       if (!seen.has(key)) {
@@ -174,8 +213,8 @@ export function TrackingMap({
       } else {
         trailRef.current = L.polyline(latlngs, {
           color: "#0f766e",
-          weight: 3,
-          opacity: 0.7,
+          weight: 4,
+          opacity: 0.75,
         }).addTo(map);
       }
     } else if (trailRef.current) {
@@ -183,18 +222,22 @@ export function TrackingMap({
       trailRef.current = null;
     }
 
-    if (points.length > 0) {
+    const focus = points.filter((p) =>
+      selectedVehicleId ? String(p.vehicleId) === selectedVehicleId : true,
+    );
+    const boundsPts = focus.length ? focus : points;
+    if (boundsPts.length > 0) {
       const bounds = L.latLngBounds(
-        points.map((p) => [Number(p.latitude), Number(p.longitude)] as [number, number]),
+        boundsPts.map((p) => [Number(p.latitude), Number(p.longitude)] as [number, number]),
       );
-      map.fitBounds(bounds.pad(0.2));
+      map.fitBounds(bounds.pad(0.35));
     }
-  }, [points, trail, mapReady]);
+  }, [points, trail, mapReady, selectedVehicleId, onSelectVehicle]);
 
   return (
     <div
       ref={containerRef}
-      className="h-[420px] w-full rounded-lg border border-zinc-200 dark:border-zinc-700 z-0"
+      className="h-full min-h-[360px] w-full z-0"
       role="img"
       aria-label="Live vehicle map"
     />

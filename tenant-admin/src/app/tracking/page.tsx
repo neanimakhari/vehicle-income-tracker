@@ -11,9 +11,18 @@ type TrackingPoint = {
   speedKph: number | null;
   heading: number | null;
   recordedAt: string;
+  ignitionOn?: boolean | null;
+  gpsFixOk?: boolean | null;
+  satellites?: number | null;
   engineRpm?: number | null;
   fuelRateLph?: number | null;
+  fuelLevelPercent?: number | null;
   externalVoltage?: number | null;
+  backupBatteryLevel?: number | null;
+  odometerKm?: number | null;
+  coolantC?: number | null;
+  engineLoadPercent?: number | null;
+  overspeed?: boolean | null;
 };
 
 type VehicleRow = { id: string; label: string; trackerImei?: string | null };
