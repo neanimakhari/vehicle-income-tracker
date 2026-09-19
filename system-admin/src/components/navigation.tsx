@@ -11,12 +11,14 @@ import {
   Activity,
   Settings,
   Bell,
+  Package,
 } from "lucide-react";
 
 const ALL_NAV = [
   { href: "/", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/health", icon: Activity, label: "Health" },
   { href: "/tenants", icon: Building2, label: "Tenants" },
+  { href: "/brand-kits", icon: Package, label: "Brand kits", adminOnly: true },
   { href: "/plans", icon: FileText, label: "Plans", adminOnly: true },
   { href: "/announcement", icon: Bell, label: "Announcement", adminOnly: true },
   { href: "/platform-admins", icon: Users, label: "Platform Admins", adminOnly: true },

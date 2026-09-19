@@ -20,6 +20,8 @@ import {
   Bell,
 } from "lucide-react";
 import Image from "next/image";
+import { BrandStyleApplier } from "@/components/brand-style-applier";
+import { brandCssVars, type PolicyBrand } from "@/lib/brand-tokens";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -40,6 +42,8 @@ export default async function RootLayout({
   const isAuthenticated = Boolean(token);
   let pendingMfaUsers: number | null = null;
   let tenantName: string | null = null;
+  let brand: PolicyBrand | null = null;
+  let logoSrc = "/vit-logo.png";
   let entitlements: string[] | null = null;
   let platformAnnouncement: {
     enabled?: boolean;
@@ -55,6 +59,7 @@ export default async function RootLayout({
           tenantName?: string;
           entitlements?: string[];
           featureFlags?: string[];
+          brand?: PolicyBrand;
         }>("/tenant/policy", { tolerate401: true }),
         fetchJson<Array<{ mfaEnabled?: boolean }>>("/tenant/users", { tolerate401: true }),
         fetchJson<{
@@ -67,7 +72,11 @@ export default async function RootLayout({
       if (policy?.requireMfaUsers) {
         pendingMfaUsers = (drivers ?? []).filter(driver => !driver.mfaEnabled).length;
       }
-      tenantName = policy?.tenantName ?? null;
+      tenantName = policy?.brand?.displayName || policy?.tenantName || null;
+      brand = policy?.brand ?? null;
+      if (brand?.mode === "custom" && brand.logoUrl) {
+        logoSrc = brand.logoUrl;
+      }
       entitlements = policy?.entitlements ?? policy?.featureFlags ?? null;
       platformAnnouncement = announcement;
     } catch (err) {
@@ -75,6 +84,14 @@ export default async function RootLayout({
       tenantName = null;
     }
   }
+  const brandVars = brandCssVars(brand);
+  const brandStyleTag =
+    Object.keys(brandVars).length > 0
+      ? `:root{${Object.entries(brandVars)
+          .map(([k, v]) => `${k}:${v}`)
+          .join(";")}}`
+      : null;
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -83,6 +100,9 @@ export default async function RootLayout({
             __html: `(function(){try{var t=localStorage.getItem('theme');var d=window.matchMedia('(prefers-color-scheme: dark)').matches;if(t==='dark'||(t!=='light'&&d)){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}}catch(e){}})();`,
           }}
         />
+        {brandStyleTag ? (
+          <style dangerouslySetInnerHTML={{ __html: brandStyleTag }} />
+        ) : null}
       </head>
       <body
         className={`${inter.variable} min-h-screen bg-[var(--background)] text-[var(--foreground)] antialiased overflow-x-hidden`}
@@ -101,26 +121,42 @@ export default async function RootLayout({
           Skip to main content
         </a>
         <ThemeProvider>
+          <BrandStyleApplier brand={brand} />
           {isAuthenticated ? (
             <>
               <PlatformAnnouncementBanner announcement={platformAnnouncement} />
               <SysImpersonationBanner />
               <AuthChecker />
-              <MobileSidebarWrapper tenantName={tenantName} entitlements={entitlements} />
+              <MobileSidebarWrapper
+                tenantName={tenantName}
+                entitlements={entitlements}
+                logoSrc={logoSrc}
+              />
               <div className="min-h-screen">
                 {/* Desktop Sidebar */}
                 <aside className="hidden lg:flex lg:flex-col fixed inset-y-0 left-0 z-40 w-72 bg-gradient-to-b from-zinc-900 via-zinc-900 to-zinc-950 border-r border-zinc-800 shadow-2xl">
                   <div className="flex h-20 shrink-0 items-center px-6 border-b border-zinc-800">
                     <Link href="/" className="flex items-center gap-3 group w-full">
                       <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 shadow-lg group-hover:shadow-teal-500/50 transition-all group-hover:scale-105 overflow-hidden flex-shrink-0">
-                        <Image 
-                          src="/vit-logo.png" 
-                          alt="VIT Logo" 
-                          width={48}
-                          height={48}
-                          className="object-contain p-1"
-                          priority
-                        />
+                        {logoSrc.startsWith("http") ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={logoSrc}
+                            alt=""
+                            width={48}
+                            height={48}
+                            className="object-contain p-1 w-12 h-12"
+                          />
+                        ) : (
+                          <Image
+                            src={logoSrc}
+                            alt="Logo"
+                            width={48}
+                            height={48}
+                            className="object-contain p-1"
+                            priority
+                          />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-lg font-bold text-white truncate">

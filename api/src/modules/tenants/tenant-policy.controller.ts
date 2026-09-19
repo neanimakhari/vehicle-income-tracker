@@ -18,6 +18,7 @@ import {
   Min,
 } from 'class-validator';
 import { CommercialService } from '../commercial/commercial.service';
+import { BrandService } from './brand.service';
 
 class UpdateTenantReminderPolicyDto {
   @IsBoolean()
@@ -57,6 +58,7 @@ export class TenantPolicyController {
     private readonly tenantsService: TenantsService,
     private readonly tenantContext: TenantContextService,
     private readonly moduleRef: ModuleRef,
+    private readonly brandService: BrandService,
   ) {}
 
   private async resolveEntitlements(slug: string): Promise<string[]> {
@@ -105,6 +107,7 @@ export class TenantPolicyController {
         : null,
       tenantSlug: tenant.slug,
       tenantName: tenant.name,
+      brand: await this.brandService.policyForSlug(slug),
     };
   }
 
@@ -157,6 +160,7 @@ export class TenantPolicyController {
         : null,
       tenantSlug: tenant.slug,
       tenantName: tenant.name,
+      brand: await this.brandService.policyForSlug(slug),
     };
   }
 }

@@ -102,6 +102,43 @@ export class Tenant {
   @Column({ name: 'allow_sys_enter', default: true })
   allowSysEnter: boolean;
 
+  /** Live brand: vit_default | custom */
+  @Column({ name: 'brand_mode', default: 'vit_default' })
+  brandMode: string;
+
+  @Column({ name: 'brand_display_name', type: 'varchar', nullable: true })
+  brandDisplayName: string | null;
+
+  @Column({ name: 'brand_primary_hex', type: 'varchar', length: 7, nullable: true })
+  brandPrimaryHex: string | null;
+
+  @Column({ name: 'brand_accent_hex', type: 'varchar', length: 7, nullable: true })
+  brandAccentHex: string | null;
+
+  @Column({ name: 'brand_sidebar_style', default: 'colored' })
+  brandSidebarStyle: string;
+
+  @Column({ name: 'brand_logo_path', type: 'varchar', nullable: true })
+  brandLogoPath: string | null;
+
+  @Column({ name: 'brand_logo_mime', type: 'varchar', nullable: true })
+  brandLogoMime: string | null;
+
+  @Column({ name: 'brand_login_bg_path', type: 'varchar', nullable: true })
+  brandLoginBgPath: string | null;
+
+  @Column({ name: 'brand_login_bg_mime', type: 'varchar', nullable: true })
+  brandLoginBgMime: string | null;
+
+  @Column({ name: 'brand_draft_json', type: 'jsonb', nullable: true })
+  brandDraftJson: Record<string, unknown> | null;
+
+  @Column({ name: 'brand_kit_id', type: 'uuid', nullable: true })
+  brandKitId: string | null;
+
+  @Column({ name: 'brand_updated_at', type: 'timestamptz', nullable: true })
+  brandUpdatedAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

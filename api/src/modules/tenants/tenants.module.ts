@@ -4,9 +4,14 @@ import { Tenant } from './tenant.entity';
 import { TenantSlaDocument } from './tenant-sla-document.entity';
 import { TenantReportRecipient } from './tenant-report-recipient.entity';
 import { DailyTargetRule } from './daily-target-rule.entity';
+import { BrandKit } from './brand-kit.entity';
+import { TenantBrandSnapshot } from './tenant-brand-snapshot.entity';
+import { TenantBrandPreviewToken } from './tenant-brand-preview-token.entity';
 import { TenantsController } from './tenants.controller';
 import { TenantPolicyController } from './tenant-policy.controller';
+import { BrandController } from './brand.controller';
 import { TenantsService } from './tenants.service';
+import { BrandService } from './brand.service';
 import { TenantSchemasService } from './tenants.schemas.service';
 import { AuditModule } from '../audit/audit.module';
 import { EmailModule } from '../email/email.module';
@@ -25,6 +30,9 @@ import { CommercialModule } from '../commercial/commercial.module';
       TenantSlaDocument,
       TenantReportRecipient,
       DailyTargetRule,
+      BrandKit,
+      TenantBrandSnapshot,
+      TenantBrandPreviewToken,
     ]),
     AuditModule,
     EmailModule,
@@ -34,22 +42,24 @@ import { CommercialModule } from '../commercial/commercial.module';
   controllers: [
     TenantsController,
     TenantPolicyController,
+    BrandController,
     PublicTenantsController,
     TenantReportRecipientsController,
     DailyTargetRulesController,
   ],
   providers: [
     TenantsService,
+    BrandService,
     TenantSchemasService,
     TenantReportRecipientsService,
     DailyTargetRulesService,
   ],
   exports: [
     TenantsService,
+    BrandService,
     TenantSchemasService,
     TenantReportRecipientsService,
     DailyTargetRulesService,
   ],
 })
 export class TenantsModule {}
-

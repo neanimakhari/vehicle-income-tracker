@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../services/security_settings.dart';
 import '../services/offline_queue.dart';
 import '../theme.dart';
+import '../services/brand_theme_controller.dart';
 import '../widgets/confirmation_dialog.dart';
 import '../screens/login_screen.dart';
 import '../screens/vehicle_insights_screen.dart';
@@ -30,6 +31,7 @@ Future<void> _performLogout(BuildContext context) async {
   await Session.clearForLogout();
   await SecuritySettings.clear();
   await OfflineQueue.clearQueue();
+  BrandThemeController.instance.resetToVit();
   navigator.pushAndRemoveUntil(
     MaterialPageRoute(builder: (_) => const LoginScreen()),
     (_) => false,
@@ -233,7 +235,9 @@ class AppSidebar extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          Session.tenantName ?? _formatTenantDisplay(Session.tenantId),
+                          BrandThemeController.instance.displayName ??
+                              Session.tenantName ??
+                              _formatTenantDisplay(Session.tenantId),
                           style: textTheme.bodySmall?.copyWith(color: _MenuColors.textSecondary),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

@@ -22,7 +22,8 @@ class AppTheme {
   /// Subtle border for dark inputs/cards so edges are visible.
   static const Color darkBorder = Color(0xFF1F1F1F);
 
-  static ThemeData light() {
+  static ThemeData light({Color? primaryColor}) {
+    final seed = primaryColor ?? primary;
     final base = ThemeData(
       useMaterial3: true,
       textTheme: const TextTheme(
@@ -34,8 +35,8 @@ class AppTheme {
         titleSmall: TextStyle(fontSize: 14),
       ),
       colorScheme: ColorScheme.fromSeed(
-        seedColor: primary,
-        primary: primary,
+        seedColor: seed,
+        primary: seed,
         surface: lightSurface,
         background: lightBackground,
         brightness: Brightness.light,
@@ -112,7 +113,8 @@ class AppTheme {
     );
   }
 
-  static ThemeData dark() {
+  static ThemeData dark({Color? primaryColor}) {
+    final seed = primaryColor ?? primary;
     final base = ThemeData(
       useMaterial3: true,
       textTheme: const TextTheme(
@@ -124,8 +126,8 @@ class AppTheme {
         titleSmall: TextStyle(fontSize: 14),
       ),
       colorScheme: ColorScheme.fromSeed(
-        seedColor: primary,
-        primary: primary,
+        seedColor: seed,
+        primary: seed,
         surface: darkSurface,
         background: darkBackground,
         brightness: Brightness.dark,
@@ -158,7 +160,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(radius),
-          borderSide: const BorderSide(color: primary, width: 1.5),
+          borderSide: BorderSide(color: seed, width: 1.5),
         ),
         filled: true,
         fillColor: darkSurface,

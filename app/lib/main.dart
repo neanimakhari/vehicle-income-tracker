@@ -19,6 +19,7 @@ import 'screens/splash_screen.dart';
 import 'screens/change_password_screen.dart';
 import 'theme.dart';
 import 'widgets/app_update_prompt.dart';
+import 'services/brand_theme_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,11 +36,17 @@ class VITApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'VIT',
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
-      home: const InitialRoute(),
+    return ListenableBuilder(
+      listenable: BrandThemeController.instance,
+      builder: (context, _) {
+        final brand = BrandThemeController.instance;
+        return MaterialApp(
+          title: 'VIT',
+          theme: AppTheme.light(primaryColor: brand.primaryColor),
+          darkTheme: AppTheme.dark(primaryColor: brand.primaryColor),
+          home: const InitialRoute(),
+        );
+      },
     );
   }
 }
@@ -212,6 +219,7 @@ class _HomeGateState extends State<HomeGate> with WidgetsBindingObserver {
   Future<void> _resolveGateWithApi() async {
     final api = ApiService();
     final policy = await api.fetchTenantPolicy();
+    BrandThemeController.instance.applyFromPolicy(policy);
     final requireMfaUsers = policy['requireMfaUsers'] == true;
     Session.requireBiometrics = policy['requireBiometrics'] == true;
     Session.sessionTimeoutMinutes = policy['sessionTimeoutMinutes'] is int
@@ -259,6 +267,7 @@ class _HomeGateState extends State<HomeGate> with WidgetsBindingObserver {
       return const SecurityBlockedScreen();
     }
     if (Session.accessToken == null) {
+      BrandThemeController.instance.resetToVit();
       return const LoginScreen();
     }
     if (_requiresMfa) {

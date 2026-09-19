@@ -12,9 +12,11 @@ import { logoutAction } from "@/lib/auth-actions";
 export function MobileSidebarWrapper({
   tenantName,
   entitlements,
+  logoSrc = "/vit-logo.png",
 }: {
   tenantName: string | null;
   entitlements?: string[] | null;
+  logoSrc?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
@@ -43,14 +45,25 @@ export function MobileSidebarWrapper({
             onClick={() => setIsOpen(false)}
           >
             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/20 bg-white/10 shadow-lg backdrop-blur-sm transition-all group-hover:scale-105 group-hover:shadow-teal-500/50">
-              <Image
-                src="/vit-logo.png"
-                alt="VIT Logo"
-                width={40}
-                height={40}
-                className="object-contain p-1"
-                priority
-              />
+              {logoSrc.startsWith("http") ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoSrc}
+                  alt=""
+                  width={40}
+                  height={40}
+                  className="object-contain p-1 h-10 w-10"
+                />
+              ) : (
+                <Image
+                  src={logoSrc}
+                  alt="Logo"
+                  width={40}
+                  height={40}
+                  className="object-contain p-1"
+                  priority
+                />
+              )}
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-base font-bold text-white">
