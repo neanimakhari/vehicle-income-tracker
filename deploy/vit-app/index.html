@@ -36,7 +36,7 @@
       h1 { font-size: 1.5rem; margin: 0 0 0.35rem; }
       .sub { color: var(--muted); font-size: 0.95rem; margin: 0 0 1.25rem; line-height: 1.45; }
       label { display: block; font-size: 0.8rem; font-weight: 600; margin: 0.85rem 0 0.35rem; color: #d4d4d8; }
-      input, select {
+      input {
         width: 100%;
         min-height: 2.75rem;
         border-radius: 0.5rem;
@@ -76,24 +76,42 @@
       .meta { margin-top: 1rem; font-size: 0.9rem; color: var(--muted); line-height: 1.5; }
       ol { margin: 0.5rem 0 0; padding-left: 1.2rem; color: var(--muted); font-size: 0.9rem; }
       .hidden { display: none !important; }
+      .company {
+        margin-bottom: 0.75rem;
+        padding: 0.65rem 0.75rem;
+        border-radius: 0.5rem;
+        border: 1px solid var(--border);
+        background: #18181b;
+        font-size: 0.9rem;
+        color: #d4d4d8;
+      }
+      .company strong { color: var(--text); }
+      .choice { margin-top: 0.75rem; }
+      .choice button {
+        margin-top: 0.4rem;
+        background: #3f3f46;
+        font-weight: 600;
+      }
     </style>
   </head>
   <body>
     <main>
       <h1>VIT for Android</h1>
-      <p class="sub">Sign in with your driver account to download the app.</p>
+      <p class="sub" id="subtitle">Sign in with your driver account to download the app.</p>
 
       <div id="loginPanel">
-        <label for="tenant">Company</label>
-        <select id="tenant" required>
-          <option value="">Loading…</option>
-        </select>
+        <div id="companyBanner" class="company hidden"></div>
+        <p id="bareHint" class="sub hidden">
+          Use the download link from your fleet admin (it includes your company in the URL),
+          or sign in with email and password below.
+        </p>
         <label for="email">Email</label>
         <input id="email" type="email" autocomplete="username" required placeholder="your email" />
         <label for="password">Password</label>
         <input id="password" type="password" autocomplete="current-password" required />
         <label for="mfa" class="hidden" id="mfaLabel">Authenticator code</label>
         <input id="mfa" class="hidden" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" />
+        <div id="tenantChoice" class="choice hidden"></div>
         <button type="button" id="signInBtn">Sign in</button>
         <div class="err" id="err"></div>
       </div>
@@ -113,30 +131,42 @@
     </main>
     <script>
       const API = "https://vit-api.vehinc.co.za/v1";
+      const RESERVED = new Set([
+        "", "releases", "favicon.ico", "robots.txt", "index.html",
+      ]);
+      const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/i;
+
+      function pathSlug() {
+        const parts = location.pathname.split("/").filter(Boolean);
+        const first = parts[0] || "";
+        if (!first || RESERVED.has(first.toLowerCase())) return null;
+        if (!SLUG_RE.test(first) || first.length > 64) return null;
+        return first.toLowerCase();
+      }
+
       const params = new URLSearchParams(location.search);
       const invite = params.get("invite");
       let token = null;
-      let tenantSlug = null;
+      let tenantSlug = pathSlug();
+      let pendingChoice = null;
 
       const err = (el, msg) => {
         el.textContent = msg || "";
         el.classList.toggle("show", !!msg);
       };
 
-      async function loadTenants() {
-        const sel = document.getElementById("tenant");
-        try {
-          const res = await fetch(API + "/public/tenants", { cache: "no-store" });
-          const list = await res.json();
-          sel.innerHTML = '<option value="">Select your company</option>';
-          (Array.isArray(list) ? list : []).forEach((t) => {
-            const o = document.createElement("option");
-            o.value = t.slug;
-            o.textContent = t.name || t.slug;
-            sel.appendChild(o);
-          });
-        } catch {
-          sel.innerHTML = '<option value="">Could not load companies</option>';
+      function setupCompanyUi() {
+        const banner = document.getElementById("companyBanner");
+        const bare = document.getElementById("bareHint");
+        if (tenantSlug) {
+          bare.classList.add("hidden");
+          banner.classList.remove("hidden");
+          banner.innerHTML = "Company: <strong>" + tenantSlug + "</strong>";
+          document.getElementById("subtitle").textContent =
+            "Sign in with your driver email and password to download the app.";
+        } else {
+          banner.classList.add("hidden");
+          bare.classList.remove("hidden");
         }
       }
 
@@ -147,38 +177,31 @@
         return d;
       }
 
-      if (invite) {
-        fetch(API + "/tenant/mobile-app/invite/" + encodeURIComponent(invite))
-          .then((r) => r.json())
-          .then((d) => {
-            if (d.tenantId) {
-              document.getElementById("tenant").value = d.tenantId;
-              document.getElementById("email").value = d.email || "";
-            }
-          })
-          .catch(() => {});
+      function showSignedIn() {
+        document.getElementById("loginPanel").classList.add("hidden");
+        document.getElementById("okPanel").classList.add("show");
+        document.getElementById("welcome").textContent = "You're signed in. Download the app below.";
       }
 
-      document.getElementById("signInBtn").onclick = async () => {
+      async function doLogin(forceTenant) {
         const e1 = document.getElementById("err");
         err(e1, "");
-        tenantSlug = document.getElementById("tenant").value.trim();
         const email = document.getElementById("email").value.trim();
         const password = document.getElementById("password").value;
         const mfaToken = document.getElementById("mfa").value.trim() || undefined;
-        if (!tenantSlug || !email || !password) {
-          err(e1, "Company, email and password are required.");
+        if (!email || !password) {
+          err(e1, "Email and password are required.");
           return;
         }
+        const slug = (forceTenant || tenantSlug || "").trim() || null;
         const btn = document.getElementById("signInBtn");
         btn.disabled = true;
         try {
+          const headers = { "Content-Type": "application/json" };
+          if (slug) headers["x-tenant-id"] = slug;
           const res = await fetch(API + "/tenant/auth/login", {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-tenant-id": tenantSlug,
-            },
+            headers,
             body: JSON.stringify({ email, password, mfaToken }),
           });
           const data = await res.json().catch(() => ({}));
@@ -190,22 +213,59 @@
             }
             throw new Error(msg);
           }
+          if (data.needTenantChoice && Array.isArray(data.tenants)) {
+            pendingChoice = data.tenants;
+            const box = document.getElementById("tenantChoice");
+            box.classList.remove("hidden");
+            box.innerHTML = "<p class=\"sub\" style=\"margin:0 0 0.35rem\">Choose your company:</p>";
+            data.tenants.forEach((t) => {
+              const b = document.createElement("button");
+              b.type = "button";
+              b.textContent = t.name || t.slug;
+              b.onclick = () => {
+                tenantSlug = t.slug;
+                setupCompanyUi();
+                doLogin(t.slug);
+              };
+              box.appendChild(b);
+            });
+            return;
+          }
           token = data.accessToken;
+          tenantSlug = (data.user && data.user.tenantId) || slug || tenantSlug;
           if (!token) throw new Error("No access token returned");
-          document.getElementById("loginPanel").classList.add("hidden");
-          document.getElementById("okPanel").classList.add("show");
-          document.getElementById("welcome").textContent = "You're signed in. Download the app below.";
+          document.getElementById("tenantChoice").classList.add("hidden");
+          showSignedIn();
           await loadLatest();
         } catch (ex) {
           err(e1, ex.message || "Login failed");
         } finally {
           btn.disabled = false;
         }
-      };
+      }
+
+      if (invite) {
+        fetch(API + "/tenant/mobile-app/invite/" + encodeURIComponent(invite))
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.tenantId) {
+              tenantSlug = d.tenantId;
+              setupCompanyUi();
+              if (d.email) document.getElementById("email").value = d.email;
+            }
+          })
+          .catch(() => {});
+      }
+
+      document.getElementById("signInBtn").onclick = () => doLogin();
 
       document.getElementById("dlBtn").onclick = async () => {
         const e2 = document.getElementById("err2");
         err(e2, "");
+        if (!tenantSlug) {
+          err(e2, "Missing company context. Open your company download link and try again.");
+          return;
+        }
         const btn = document.getElementById("dlBtn");
         btn.disabled = true;
         btn.textContent = "Preparing…";
@@ -233,8 +293,7 @@
       };
 
       document.getElementById("outBtn").onclick = () => location.reload();
-
-      loadTenants();
+      setupCompanyUi();
     </script>
   </body>
 </html>

@@ -24,7 +24,7 @@ async function fetchPolicy() {
 }
 
 export default async function DriversPage() {
-  await requireAuth();
+  const { tenant } = await requireAuth();
   let drivers: Array<{ id: string; firstName: string; lastName: string; email: string; isActive: boolean; mfaEnabled?: boolean; dailyTargetAmount?: number | null }> = [];
   let policy: { requireMfaUsers?: boolean } | null = null;
   
@@ -225,7 +225,7 @@ export default async function DriversPage() {
       </div>
 
       <div className="mt-6">
-        <VitAppQrCard />
+        <VitAppQrCard tenantSlug={tenant} />
       </div>
 
       <DriversTableBulk

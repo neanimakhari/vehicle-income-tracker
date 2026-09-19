@@ -2,6 +2,8 @@
 
 Public download page + APK hosting for sideloaded Android builds and in-app update checks.
 
+Drivers use a **per-tenant path**: `https://vit-app.vehinc.co.za/{slug}` (same idea as tenant-admin). There is no company dropdown on the page.
+
 ## DNS
 
 Create an **A** record:
@@ -27,7 +29,7 @@ server {
   index index.html;
 
   location / {
-    try_files $uri $uri/ =404;
+    try_files $uri $uri/ /index.html;
   }
 
   location /releases/ {

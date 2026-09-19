@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { AlertCircle, Pencil, Plus, Download, Search, Mail, LogIn, Package } from "lucide-react";
+import { AlertCircle, Pencil, Plus, Download, Search, Mail, LogIn, Package, Link2, Smartphone } from "lucide-react";
 import { CreateTenantModal } from "@/components/CreateTenantModal";
 import { EditTenantModal } from "@/components/EditTenantModal";
 import { TenantBillingModal } from "@/components/TenantBillingModal";
 import { ReportRecipientsModal } from "@/components/ReportRecipientsModal";
 import { TenantEntitlementsModal } from "@/components/TenantEntitlementsModal";
+import { tenantAdminLoginUrl, vitAppDownloadUrl } from "@/lib/tenant-urls";
 import Link from "next/link";
 
 type Tenant = {
@@ -44,7 +45,9 @@ type TenantsClientProps = {
   tenants: Tenant[];
   admins: TenantAdmin[];
   usage: UsageItem[];
-  createTenant: (formData: FormData) => Promise<{ success: boolean; error?: string }>;
+  createTenant: (
+    formData: FormData,
+  ) => Promise<{ success: boolean; error?: string; slug?: string }>;
   updateTenant: (formData: FormData) => Promise<{ success: boolean; error?: string }>;
   toggleTenant: (formData: FormData) => void;
   toggleMfa: (formData: FormData) => void;
@@ -411,6 +414,36 @@ export function TenantsClient({
                       </td>
                       <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                         <div className="flex items-center justify-end gap-3">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(tenantAdminLoginUrl(tenant.slug));
+                              } catch {
+                                /* ignore */
+                              }
+                            }}
+                            className="text-teal-600 hover:text-teal-700 dark:text-teal-400"
+                            title="Copy tenant admin login link"
+                            aria-label="Copy tenant admin login link"
+                          >
+                            <Link2 className="h-4 w-4" aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(vitAppDownloadUrl(tenant.slug));
+                              } catch {
+                                /* ignore */
+                              }
+                            }}
+                            className="text-teal-600 hover:text-teal-700 dark:text-teal-400"
+                            title="Copy driver app download link"
+                            aria-label="Copy driver app download link"
+                          >
+                            <Smartphone className="h-4 w-4" aria-hidden />
+                          </button>
                           <button
                             type="button"
                             onClick={async () => {

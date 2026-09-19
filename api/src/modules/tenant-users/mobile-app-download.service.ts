@@ -271,7 +271,7 @@ export class MobileAppDownloadService {
       this.config.get<string>('ops.vitAppUrl') ??
       process.env.VIT_APP_URL ??
       'https://vit-app.vehinc.co.za';
-    const inviteUrl = `${appBase.replace(/\/$/, '')}/?invite=${encodeURIComponent(token)}`;
+    const inviteUrl = `${appBase.replace(/\/$/, '')}/${encodeURIComponent(admin.tenantId)}/?invite=${encodeURIComponent(token)}`;
 
     await this.email.sendAppInstallInvite(user.email, tenant.name, inviteUrl);
     await this.audit.log({

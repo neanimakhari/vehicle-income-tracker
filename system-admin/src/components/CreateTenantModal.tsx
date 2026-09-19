@@ -3,23 +3,29 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
+import { CopyLinkRow } from "@/components/CopyLinkRow";
+import { tenantAdminLoginUrl, vitAppDownloadUrl } from "@/lib/tenant-urls";
 
 type CreateTenantModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  createTenant: (formData: FormData) => Promise<{ success: boolean; error?: string }>;
+  createTenant: (
+    formData: FormData,
+  ) => Promise<{ success: boolean; error?: string; slug?: string }>;
 };
 
 export function CreateTenantModal({ isOpen, onClose, createTenant }: CreateTenantModalProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [slugPreview, setSlugPreview] = useState("");
+  const [createdSlug, setCreatedSlug] = useState<string | null>(null);
 
   async function handleSubmit(formData: FormData) {
     setError(null);
     const result = await createTenant(formData);
     if (result?.success) {
-      handleClose();
-      router.push("/tenants?success=" + encodeURIComponent("Tenant created"));
+      const slug = (result.slug || String(formData.get("slug") ?? "")).trim();
+      setCreatedSlug(slug || null);
       router.refresh();
     } else if (result?.error) {
       setError(result.error);
@@ -31,11 +37,17 @@ export function CreateTenantModal({ isOpen, onClose, createTenant }: CreateTenan
   const titleId = "create-tenant-modal-title";
 
   useEffect(() => {
-    if (isOpen) previousActiveRef.current = document.activeElement as HTMLElement | null;
+    if (isOpen) {
+      previousActiveRef.current = document.activeElement as HTMLElement | null;
+      setCreatedSlug(null);
+      setSlugPreview("");
+      setError(null);
+    }
   }, [isOpen]);
 
   const handleClose = () => {
     previousActiveRef.current?.focus();
+    setCreatedSlug(null);
     onClose();
   };
 
@@ -43,7 +55,7 @@ export function CreateTenantModal({ isOpen, onClose, createTenant }: CreateTenan
     if (!isOpen || !dialogRef.current) return;
     const dialog = dialogRef.current;
     const focusables = dialog.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
     );
     const first = focusables[0];
     const last = focusables[focusables.length - 1];
@@ -64,17 +76,23 @@ export function CreateTenantModal({ isOpen, onClose, createTenant }: CreateTenan
     }
     dialog.addEventListener("keydown", onKeyDown);
     return () => dialog.removeEventListener("keydown", onKeyDown);
-  }, [isOpen]);
+  }, [isOpen, createdSlug]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={dialogRef}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      ref={dialogRef}
+    >
       <div className="absolute inset-0 bg-zinc-900/60 dark:bg-zinc-950/70" onClick={handleClose} aria-hidden />
-      <div className="relative w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mb-4 flex items-center justify-between">
           <h2 id={titleId} className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            Create from template
+            {createdSlug ? "Tenant created — share these links" : "Create from template"}
           </h2>
           <button
             type="button"
@@ -85,74 +103,131 @@ export function CreateTenantModal({ isOpen, onClose, createTenant }: CreateTenan
             <X className="h-5 w-5" aria-hidden />
           </button>
         </div>
-        <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
-          Applies platform new-tenant defaults (MFA hints, limits, default plan) automatically.
-        </p>
-        <form action={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">
-              {error}
-            </div>
-          )}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Name</label>
-            <input
-              name="name"
-              required
-              className="input w-full px-3 py-2 text-sm"
-              placeholder="e.g. Acme Transport"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Slug</label>
-            <input
-              name="slug"
-              required
-              pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-              title="Lowercase letters, numbers, and hyphens only"
-              className="input w-full px-3 py-2 text-sm"
-              placeholder="e.g. nei-m"
-            />
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              Admin URL:{" "}
-              <span className="font-mono text-teal-700 dark:text-teal-400">
-                https://vit-admin.vehinc.co.za/&lt;slug&gt;
-              </span>
+
+        {createdSlug ? (
+          <div className="space-y-3">
+            <p className="text-sm text-zinc-600 dark:text-zinc-300">
+              Send these to the tenant admin. Paths use slug{" "}
+              <span className="font-mono font-medium">{createdSlug}</span>.
             </p>
+            <CopyLinkRow label="Tenant admin login" url={tenantAdminLoginUrl(createdSlug)} />
+            <CopyLinkRow label="Driver app download" url={vitAppDownloadUrl(createdSlug)} />
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={handleClose}
+                className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+              >
+                Done
+              </button>
+            </div>
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Contact name</label>
-            <input name="contactName" className="input w-full px-3 py-2 text-sm" placeholder="Optional" />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Contact email</label>
-            <input name="contactEmail" type="email" className="input w-full px-3 py-2 text-sm" placeholder="Optional" />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Contact phone</label>
-            <input name="contactPhone" className="input w-full px-3 py-2 text-sm" placeholder="Optional" />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              First admin email (optional)
-            </label>
-            <input name="adminEmail" type="email" className="input w-full px-3 py-2 text-sm" placeholder="admin@fleet.co.za" />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              First admin password (optional)
-            </label>
-            <input name="adminPassword" type="password" className="input w-full px-3 py-2 text-sm" placeholder="Min 8 chars, upper/lower/symbol" />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={handleClose} className="btn-secondary px-4 py-2 text-sm">
-              Cancel
-            </button>
-            <button type="submit" className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600">
-              Create tenant
-            </button>
-          </div>
-        </form>
+        ) : (
+          <>
+            <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
+              Applies platform new-tenant defaults (MFA hints, limits, default plan) automatically.
+            </p>
+            <form action={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">
+                  {error}
+                </div>
+              )}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Name
+                </label>
+                <input
+                  name="name"
+                  required
+                  className="input w-full px-3 py-2 text-sm"
+                  placeholder="e.g. Acme Transport"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Slug
+                </label>
+                <input
+                  name="slug"
+                  required
+                  pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                  title="Lowercase letters, numbers, and hyphens only"
+                  className="input w-full px-3 py-2 text-sm"
+                  placeholder="e.g. nei-m"
+                  value={slugPreview}
+                  onChange={(e) => setSlugPreview(e.target.value.trim().toLowerCase())}
+                />
+                {slugPreview ? (
+                  <div className="mt-2 space-y-2">
+                    <CopyLinkRow label="Tenant admin login" url={tenantAdminLoginUrl(slugPreview)} />
+                    <CopyLinkRow label="Driver app download" url={vitAppDownloadUrl(slugPreview)} />
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    Links appear here once you enter a slug.
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Contact name
+                </label>
+                <input name="contactName" className="input w-full px-3 py-2 text-sm" placeholder="Optional" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Contact email
+                </label>
+                <input
+                  name="contactEmail"
+                  type="email"
+                  className="input w-full px-3 py-2 text-sm"
+                  placeholder="Optional"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Contact phone
+                </label>
+                <input name="contactPhone" className="input w-full px-3 py-2 text-sm" placeholder="Optional" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  First admin email (optional)
+                </label>
+                <input
+                  name="adminEmail"
+                  type="email"
+                  className="input w-full px-3 py-2 text-sm"
+                  placeholder="admin@fleet.co.za"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  First admin password (optional)
+                </label>
+                <input
+                  name="adminPassword"
+                  type="password"
+                  className="input w-full px-3 py-2 text-sm"
+                  placeholder="Min 8 chars, upper/lower/symbol"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={handleClose} className="btn-secondary px-4 py-2 text-sm">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600"
+                >
+                  Create tenant
+                </button>
+              </div>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );
