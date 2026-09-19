@@ -146,11 +146,10 @@ export function TrackingMap({
         if (cancelled || !containerRef.current) return;
         LRef.current = L;
         const map = L.map(containerRef.current).setView([-26.2041, 28.0473], 12);
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
           attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
           maxZoom: 19,
-          subdomains: "abcd",
         }).addTo(map);
         mapRef.current = map;
         setMapReady(true);
