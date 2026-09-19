@@ -1,10 +1,10 @@
 {
   "platform": "android",
   "channel": "prod",
-  "versionName": "1.0.3",
-  "versionCode": 4,
+  "versionName": "1.0.4",
+  "versionCode": 5,
   "minSupportedVersionCode": 1,
-  "sha256": "9f95224aeadd3a6da0886d78bd242b47dd12d3c7d4efdf629a6cfa3ca144eaeb",
-  "releaseNotes": "White-label branding theme after login.",
-  "publishedAt": "2026-09-19T08:10:00.000Z"
+  "sha256": "a322b0147de19a3878950a5aae77d2a0b16c9ce48558a3f722483d57af953a49",
+  "releaseNotes": "Deep brand theme across app surfaces, logo in sidebar.",
+  "publishedAt": "2026-09-19T08:30:00.000Z"
 }
