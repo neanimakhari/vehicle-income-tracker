@@ -11,6 +11,8 @@ import { TenantTrackingController } from './tenant-tracking.controller';
 import { TrackingIngestController } from './tracking-ingest.controller';
 import { TenantTrackingService } from './tenant-tracking.service';
 import { TrackingGateway } from './tracking.gateway';
+import { TrackingAnalyticsService } from './tracking-analytics.service';
+import { TrackingAnalyticsScheduler } from './tracking-analytics.scheduler';
 
 @Module({
   imports: [
@@ -27,7 +29,12 @@ import { TrackingGateway } from './tracking.gateway';
     }),
   ],
   controllers: [TenantTrackingController, TrackingIngestController],
-  providers: [TenantTrackingService, TrackingGateway],
-  exports: [TenantTrackingService],
+  providers: [
+    TenantTrackingService,
+    TrackingGateway,
+    TrackingAnalyticsService,
+    TrackingAnalyticsScheduler,
+  ],
+  exports: [TenantTrackingService, TrackingAnalyticsService],
 })
 export class TenantTrackingModule {}

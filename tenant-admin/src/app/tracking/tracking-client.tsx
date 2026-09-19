@@ -326,6 +326,20 @@ export function TrackingClient({
           <p className="mt-1 max-w-xl text-sm text-zinc-600 dark:text-zinc-300">
             All tenant vehicles with a signal appear on the map. Select one for full telemetry and trail.
           </p>
+          <p className="mt-2 flex flex-wrap gap-3 text-sm">
+            <a
+              href="/tracking/analytics"
+              className="font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300"
+            >
+              Tracker analytics
+            </a>
+            <a
+              href="/tracking/reconciliation"
+              className="font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300"
+            >
+              Day reconciliation
+            </a>
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span

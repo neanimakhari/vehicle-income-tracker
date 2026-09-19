@@ -30,6 +30,10 @@ import { TenantAccessGuard } from '../../tenancy/guards/tenant-access.guard';
 import { ModuleEntitlementGuard } from '../commercial/module-entitlement.guard';
 import { RequiresModule } from '../commercial/requires-module.decorator';
 import { TenantTrackingService } from './tenant-tracking.service';
+import { TrackingAnalyticsService } from './tracking-analytics.service';
+import {
+  johannesburgToday,
+} from './tracking-analytics.formulas';
 
 class SimulateDto {
   @IsUUID()
@@ -57,6 +61,20 @@ class DeviceActiveDto {
   isActive: boolean;
 }
 
+class RecalculateDto {
+  @IsOptional()
+  @IsString()
+  day?: string;
+
+  @IsOptional()
+  @IsUUID()
+  vehicleId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  includeSimulate?: boolean;
+}
+
 @Controller('tenant/tracking')
 @ApiTags('tenant-tracking')
 @RequiresModule('tracking_live')
@@ -68,7 +86,10 @@ class DeviceActiveDto {
   ModuleEntitlementGuard,
 )
 export class TenantTrackingController {
-  constructor(private readonly tracking: TenantTrackingService) {}
+  constructor(
+    private readonly tracking: TenantTrackingService,
+    private readonly trackingAnalytics: TrackingAnalyticsService,
+  ) {}
 
   @Get('latest')
   @Roles('TENANT_ADMIN', 'TENANT_USER')
@@ -104,6 +125,42 @@ export class TenantTrackingController {
     @Query('vehicleId') vehicleId?: string,
   ) {
     return this.tracking.metricsSummary({ from, to, vehicleId });
+  }
+
+  @Get('analytics')
+  @Roles('TENANT_ADMIN', 'TENANT_USER')
+  listAnalytics(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('vehicleId') vehicleId?: string,
+  ) {
+    return this.trackingAnalytics.listAnalytics({ from, to, vehicleId });
+  }
+
+  @Get('reconciliation')
+  @Roles('TENANT_ADMIN', 'TENANT_USER')
+  listReconciliation(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('vehicleId') vehicleId?: string,
+  ) {
+    return this.trackingAnalytics.listReconciliation({ from, to, vehicleId });
+  }
+
+  @Post('analytics/recalculate')
+  @Roles('TENANT_ADMIN')
+  async recalculate(@Body() dto: RecalculateDto) {
+    const day = dto.day ?? johannesburgToday();
+    if (dto.vehicleId) {
+      return this.trackingAnalytics.recomputeVehicleDay({
+        day,
+        vehicleId: dto.vehicleId,
+        includeSimulate: dto.includeSimulate,
+      });
+    }
+    return this.trackingAnalytics.recomputeDayForTenant(day, {
+      includeSimulate: dto.includeSimulate,
+    });
   }
 
   @Post('simulate')

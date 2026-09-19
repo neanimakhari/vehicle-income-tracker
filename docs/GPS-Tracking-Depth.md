@@ -22,3 +22,37 @@ Branch: `feature/gps-tracking-postgis-timescale`
 1. Enable modules for tenant (pro plan includes them after migration).
 2. Open Live Tracking → POPIA → Simulate.
 3. Optional: `cd gps-ingest && GPS_INGEST_SECRET=... node src/server.js` then `IMEI=... npm run simulate`.
+
+## Tracker analytics + day reconciliation
+
+Split surfaces (do not mix in one endpoint):
+
+1. **Tracker analytics** (`GET /tenant/tracking/analytics`) — GPS/OBD-only daily KPIs from `vehicle_tracking_daily` (distance, idle %, utilisation, L/100km when OBD entitled, overspeed, voltage, confidence).
+2. **Day reconciliation** (`GET /tenant/tracking/reconciliation`) — income log vs tracker for the same Johannesburg calendar day (km/fuel gaps, R/km, R/ignition-hour, idle waste, flags).
+
+Heavy math runs offline:
+
+- Nest cron hourly (`:15`) refreshes **today**; nightly (~23:20 UTC) finalizes **yesterday**.
+- `POST /tenant/tracking/analytics/recalculate` recomputes one day (optional `vehicleId`, `includeSimulate`).
+- Live map / income submit paths stay insert-only.
+
+UI: `/tracking/analytics`, `/tracking/reconciliation` (nav under Live Tracking). Simulated points excluded unless `includeSimulate=true`.
+
+**Next (not built):** per-vehicle geofence corridors under `tracking_geofence`.
+
+## Tracker analytics + day reconciliation
+
+Split surfaces (do not mix in one endpoint):
+
+1. **Tracker analytics** (`GET /tenant/tracking/analytics`) — GPS/OBD-only daily KPIs from `vehicle_tracking_daily` (distance, idle %, utilisation, L/100km when OBD entitled, overspeed, voltage, confidence).
+2. **Day reconciliation** (`GET /tenant/tracking/reconciliation`) — income log vs tracker for the same Johannesburg calendar day (km/fuel gaps, R/km, R/ignition-hour, idle waste, flags).
+
+Heavy math runs offline:
+
+- Nest cron hourly (`:15`) refreshes **today**; nightly (~23:20 UTC) finalizes **yesterday**.
+- `POST /tenant/tracking/analytics/recalculate` recomputes one day (optional `vehicleId`, `includeSimulate`).
+- Live map / income submit paths stay insert-only.
+
+UI: `/tracking/analytics`, `/tracking/reconciliation` (nav under Live Tracking). Simulated points excluded unless `includeSimulate=true`.
+
+**Next (not built):** per-vehicle geofence corridors under `tracking_geofence`.

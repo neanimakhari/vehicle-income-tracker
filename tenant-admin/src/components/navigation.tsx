@@ -20,6 +20,8 @@ import {
   GraduationCap,
   MapPinned,
   CalendarDays,
+  Activity,
+  Scale,
 } from "lucide-react";
 
 const MODULE_NAV: Record<string, string> = {
@@ -27,6 +29,8 @@ const MODULE_NAV: Record<string, string> = {
   "/scholar-payments": "scholar_payments",
   "/transport": "scholar_payments",
   "/tracking": "tracking_live",
+  "/tracking/analytics": "tracking_live",
+  "/tracking/reconciliation": "tracking_live",
   "/notifications": "notifications",
   "/target-calendar": "target_calendar",
 };
@@ -53,6 +57,12 @@ export function Navigation({
     { href: "/trips", icon: Route, label: "Trips" },
     { href: "/transport", icon: GraduationCap, label: "Scholar & staff" },
     { href: "/tracking", icon: MapPinned, label: "Live Tracking" },
+    { href: "/tracking/analytics", icon: Activity, label: "Tracker analytics" },
+    {
+      href: "/tracking/reconciliation",
+      icon: Scale,
+      label: "Day reconciliation",
+    },
     { href: "/reports", icon: BarChart3, label: "Reports" },
     { href: "/target-calendar", icon: CalendarDays, label: "Target calendar" },
     { href: "/audit", icon: FileText, label: "Audit Trail" },
@@ -73,7 +83,9 @@ export function Navigation({
         const Icon = item.icon;
         const isActive =
           pathname === item.href ||
-          (item.href !== "/" && pathname.startsWith(item.href));
+          (item.href !== "/" &&
+            item.href !== "/tracking" &&
+            pathname.startsWith(`${item.href}/`));
 
         return (
           <Link
