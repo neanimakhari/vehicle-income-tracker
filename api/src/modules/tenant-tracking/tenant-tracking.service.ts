@@ -110,6 +110,10 @@ export class TenantTrackingService {
       heading: heading != null ? Number(heading) : null,
       ignitionOn: pick('ignitionOn', 'ignition_on') ?? null,
       gpsFixOk: pick('gpsFixOk', 'gps_fix_ok') ?? null,
+      satellites: pick('satellites', 'satellites') ?? null,
+      backupBatteryLevel:
+        pick('backupBatteryLevel', 'backup_battery_level') ?? null,
+      overspeed: pick('overspeed', 'overspeed') ?? null,
       recordedAt,
     };
     if (includeObd) {
@@ -131,9 +135,6 @@ export class TenantTrackingService {
       );
       base.externalVoltage =
         externalVoltage != null ? Number(externalVoltage) : null;
-      base.backupBatteryLevel =
-        pick('backupBatteryLevel', 'backup_battery_level') ?? null;
-      base.satellites = pick('satellites', 'satellites') ?? null;
       base.engineRpm = engineRpm != null ? Number(engineRpm) : null;
       base.fuelRateLph = fuelRateLph != null ? Number(fuelRateLph) : null;
       base.fuelLevelPercent =
@@ -142,7 +143,6 @@ export class TenantTrackingService {
       base.coolantC = coolantC != null ? Number(coolantC) : null;
       base.engineLoadPercent =
         engineLoadPercent != null ? Number(engineLoadPercent) : null;
-      base.overspeed = pick('overspeed', 'overspeed') ?? null;
     }
     return base;
   }
