@@ -23,6 +23,16 @@ export async function getTenantSlug(): Promise<string | null> {
   return cookieStore.get(TENANT_COOKIE)?.value ?? null;
 }
 
+/** Session tenant, or path vanity slug (/{slug}/login) before auth. */
+export async function getEffectiveTenantSlug(): Promise<string | null> {
+  const cookieStore = await cookies();
+  return (
+    cookieStore.get(TENANT_COOKIE)?.value ??
+    cookieStore.get("vit_path_tenant")?.value ??
+    null
+  );
+}
+
 const REMEMBER_ME_DAYS = 30;
 const SESSION_COOKIE_DAYS = 1;
 

@@ -45,6 +45,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);
+  /* Brandable primary + teal (most UI uses teal-*) */
   --color-primary-50: var(--teal-50);
   --color-primary-100: var(--teal-100);
   --color-primary-200: var(--teal-200);
@@ -56,12 +57,23 @@
   --color-primary-800: var(--teal-800);
   --color-primary-900: var(--teal-900);
   --color-primary-950: var(--teal-950);
+  --color-teal-50: var(--teal-50);
+  --color-teal-100: var(--teal-100);
+  --color-teal-200: var(--teal-200);
+  --color-teal-300: var(--teal-300);
+  --color-teal-400: var(--teal-400);
+  --color-teal-500: var(--teal-500);
+  --color-teal-600: var(--teal-600);
+  --color-teal-700: var(--teal-700);
+  --color-teal-800: var(--teal-800);
+  --color-teal-900: var(--teal-900);
+  --color-teal-950: var(--teal-950);
 }
 
 body {
   background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(13, 148, 136, 0.12), transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, rgba(15, 118, 110, 0.08), transparent 50%),
+    radial-gradient(1200px 600px at 10% -10%, color-mix(in srgb, var(--teal-600) 14%, transparent), transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, color-mix(in srgb, var(--teal-700) 10%, transparent), transparent 50%),
     var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;

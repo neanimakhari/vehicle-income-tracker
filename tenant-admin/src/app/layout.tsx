@@ -4,8 +4,8 @@ import Script from "next/script";
 import { Suspense } from "react";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { getAuthToken } from "@/lib/auth";
-import { fetchJson } from "@/lib/api";
+import { getAuthToken, getEffectiveTenantSlug } from "@/lib/auth";
+import { fetchJson, getApiUrl } from "@/lib/api";
 import { logoutAction } from "@/lib/auth-actions";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -82,6 +82,30 @@ export default async function RootLayout({
     } catch (err) {
       pendingMfaUsers = null;
       tenantName = null;
+    }
+  } else {
+    // Path login (/{slug}/login): apply brand before auth via public policy
+    const slug = await getEffectiveTenantSlug();
+    if (slug) {
+      try {
+        const res = await fetch(`${getApiUrl()}/tenant/policy/public`, {
+          cache: "no-store",
+          headers: { "X-Tenant-Id": slug },
+        });
+        if (res.ok) {
+          const policy = (await res.json()) as {
+            tenantName?: string;
+            brand?: PolicyBrand;
+          };
+          brand = policy.brand ?? null;
+          tenantName = policy.brand?.displayName || policy.tenantName || null;
+          if (brand?.mode === "custom" && brand.logoUrl) {
+            logoSrc = brand.logoUrl;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
     }
   }
   const brandVars = brandCssVars(brand);
