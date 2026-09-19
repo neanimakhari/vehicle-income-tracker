@@ -81,38 +81,68 @@ export class TenantTrackingService {
     return slug;
   }
 
-  private toDto(p: GpsTrackingPoint, includeObd: boolean) {
+  private toDto(p: GpsTrackingPoint | Record<string, unknown>, includeObd: boolean) {
+    const row = p as Record<string, unknown>;
+    const pick = <T = unknown>(camel: string, snake: string): T | undefined =>
+      (row[camel] !== undefined ? row[camel] : row[snake]) as T | undefined;
+
+    const recordedRaw = pick<Date | string>('recordedAt', 'recorded_at');
+    let recordedAt: string | null = null;
+    if (recordedRaw instanceof Date) recordedAt = recordedRaw.toISOString();
+    else if (recordedRaw != null && String(recordedRaw) !== 'undefined') {
+      recordedAt = String(recordedRaw);
+    }
+
+    const lat = pick<number | string>('latitude', 'latitude');
+    const lng = pick<number | string>('longitude', 'longitude');
+    const speed = pick<number | string>('speedKph', 'speed_kph');
+    const heading = pick<number | string>('heading', 'heading');
+
     const base: Record<string, unknown> = {
-      id: p.id,
-      vehicleId: p.vehicleId,
-      vehicleLabel: p.vehicleLabel,
-      deviceId: p.deviceId,
-      source: p.source,
-      latitude: Number(p.latitude),
-      longitude: Number(p.longitude),
-      speedKph: p.speedKph != null ? Number(p.speedKph) : null,
-      heading: p.heading != null ? Number(p.heading) : null,
-      ignitionOn: p.ignitionOn,
-      gpsFixOk: p.gpsFixOk,
-      recordedAt:
-        p.recordedAt instanceof Date
-          ? p.recordedAt.toISOString()
-          : String(p.recordedAt),
+      id: pick('id', 'id'),
+      vehicleId: pick('vehicleId', 'vehicle_id') ?? null,
+      vehicleLabel: pick('vehicleLabel', 'vehicle_label') ?? null,
+      deviceId: pick('deviceId', 'device_id') ?? null,
+      source: pick('source', 'source') ?? null,
+      latitude: lat != null ? Number(lat) : null,
+      longitude: lng != null ? Number(lng) : null,
+      speedKph: speed != null ? Number(speed) : null,
+      heading: heading != null ? Number(heading) : null,
+      ignitionOn: pick('ignitionOn', 'ignition_on') ?? null,
+      gpsFixOk: pick('gpsFixOk', 'gps_fix_ok') ?? null,
+      recordedAt,
     };
     if (includeObd) {
+      const externalVoltage = pick<number | string>(
+        'externalVoltage',
+        'external_voltage',
+      );
+      const engineRpm = pick<number | string>('engineRpm', 'engine_rpm');
+      const fuelRateLph = pick<number | string>('fuelRateLph', 'fuel_rate_lph');
+      const fuelLevelPercent = pick<number | string>(
+        'fuelLevelPercent',
+        'fuel_level_percent',
+      );
+      const odometerKm = pick<number | string>('odometerKm', 'odometer_km');
+      const coolantC = pick<number | string>('coolantC', 'coolant_c');
+      const engineLoadPercent = pick<number | string>(
+        'engineLoadPercent',
+        'engine_load_percent',
+      );
       base.externalVoltage =
-        p.externalVoltage != null ? Number(p.externalVoltage) : null;
-      base.backupBatteryLevel = p.backupBatteryLevel;
-      base.satellites = p.satellites;
-      base.engineRpm = p.engineRpm != null ? Number(p.engineRpm) : null;
-      base.fuelRateLph = p.fuelRateLph != null ? Number(p.fuelRateLph) : null;
+        externalVoltage != null ? Number(externalVoltage) : null;
+      base.backupBatteryLevel =
+        pick('backupBatteryLevel', 'backup_battery_level') ?? null;
+      base.satellites = pick('satellites', 'satellites') ?? null;
+      base.engineRpm = engineRpm != null ? Number(engineRpm) : null;
+      base.fuelRateLph = fuelRateLph != null ? Number(fuelRateLph) : null;
       base.fuelLevelPercent =
-        p.fuelLevelPercent != null ? Number(p.fuelLevelPercent) : null;
-      base.odometerKm = p.odometerKm != null ? Number(p.odometerKm) : null;
-      base.coolantC = p.coolantC != null ? Number(p.coolantC) : null;
+        fuelLevelPercent != null ? Number(fuelLevelPercent) : null;
+      base.odometerKm = odometerKm != null ? Number(odometerKm) : null;
+      base.coolantC = coolantC != null ? Number(coolantC) : null;
       base.engineLoadPercent =
-        p.engineLoadPercent != null ? Number(p.engineLoadPercent) : null;
-      base.overspeed = p.overspeed;
+        engineLoadPercent != null ? Number(engineLoadPercent) : null;
+      base.overspeed = pick('overspeed', 'overspeed') ?? null;
     }
     return base;
   }
