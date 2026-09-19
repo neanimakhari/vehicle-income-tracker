@@ -16,6 +16,7 @@ ARG NEXT_PUBLIC_APP_VERSION=1.0.0
 ENV NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+ENV NODE_OPTIONS=--max-old-space-size=512
 RUN npm run build
 
 FROM node:20-alpine
