@@ -697,7 +697,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                         label: Text(_submittingExpiry ? 'Submitting...' : 'Submit expiry dates for approval'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Theme.of(context).colorScheme.primary,
-                          side: const BorderSide(color: Theme.of(context).colorScheme.primary),
+                          side: BorderSide(color: Theme.of(context).colorScheme.primary),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -892,7 +892,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppTheme.radius),
-            borderSide: const BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5),
+            borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5),
           ),
         ),
       ),
@@ -933,7 +933,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppTheme.radius),
-                borderSide: const BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5),
+                borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5),
               ),
             ),
           ),

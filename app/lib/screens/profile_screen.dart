@@ -287,7 +287,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ? MemoryImage(Uint8List.fromList(_profilePictureBytes!))
                             : null,
                         child: _profilePictureBytes == null
-                            ? const Icon(Icons.person, size: 60, color: Theme.of(context).colorScheme.primary)
+                            ? Icon(Icons.person, size: 60, color: Theme.of(context).colorScheme.primary)
                             : null,
                       ),
                       const SizedBox(height: 16),

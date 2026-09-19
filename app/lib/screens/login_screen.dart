@@ -376,7 +376,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       contentPadding: EdgeInsets.zero,
                                       title: Text(name, style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87)),
                                       trailing: _chosenTenantSlug == slug
-                                          ? const Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                                          ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
                                           : null,
                                       onTap: () => setState(() => _chosenTenantSlug = slug),
                                     );
@@ -398,7 +398,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                           labelStyle: TextStyle(
                                             color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                                           ),
-                                          floatingLabelStyle: const TextStyle(color: Theme.of(context).colorScheme.primary),
+                                          floatingLabelStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
                                           hintText: 'Enter your email',
                                           hintStyle: TextStyle(
                                             color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
@@ -432,7 +432,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                           labelStyle: TextStyle(
                                             color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                                           ),
-                                          floatingLabelStyle: const TextStyle(color: Theme.of(context).colorScheme.primary),
+                                          floatingLabelStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
                                           hintText: 'Enter your password...',
                                           hintStyle: TextStyle(
                                             color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
@@ -470,7 +470,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                           labelStyle: TextStyle(
                                             color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                                           ),
-                                          floatingLabelStyle: const TextStyle(color: Theme.of(context).colorScheme.primary),
+                                          floatingLabelStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
                                           hintText: '123456',
                                           hintStyle: TextStyle(
                                             color: isDarkMode ? Colors.grey[600] : Colors.grey[400],

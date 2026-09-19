@@ -18,7 +18,7 @@ class PlatformAnnouncementBanner extends StatelessWidget {
     final message = announcement['message']?.toString().trim() ?? '';
     if (message.isEmpty) return const SizedBox.shrink();
     final blockWrites = announcement['blockWrites'] == true;
-    final bg = maintenance ? const Color(0xFFD97706) : Theme.of(context).colorScheme.primaryDark;
+    final bg = maintenance ? Color(0xFFD97706) : Theme.of(context).colorScheme.primary;
 
     return Material(
       color: bg,

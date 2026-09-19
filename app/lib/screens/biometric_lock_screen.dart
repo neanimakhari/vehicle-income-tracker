@@ -59,7 +59,7 @@ class _BiometricLockScreenState extends State<BiometricLockScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.lock_outline, size: 64, color: Theme.of(context).colorScheme.primary),
+              Icon(Icons.lock_outline, size: 64, color: Theme.of(context).colorScheme.primary),
               const SizedBox(height: 16),
               Text(
                 'App Locked',

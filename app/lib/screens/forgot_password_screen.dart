@@ -139,7 +139,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(AppTheme.radius),
-                          borderSide: const BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5),
+                          borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5),
                         ),
                       ),
                       validator: _needsTenant
@@ -170,7 +170,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(AppTheme.radius),
-                        borderSide: const BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5),
+                        borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5),
                       ),
                     ),
                     validator: (value) {

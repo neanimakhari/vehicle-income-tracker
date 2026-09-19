@@ -460,7 +460,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                             color: Theme.of(context).colorScheme.primary.withOpacity(0.15),
                                             shape: BoxShape.circle,
                                           ),
-                                          child: const Icon(
+                                          child: Icon(
                                             Icons.directions_car,
                                             color: Theme.of(context).colorScheme.primary,
                                             size: 24,
@@ -841,7 +841,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   color: isDarkMode ? Colors.white : Colors.black87,
                   fontSize: 16,
                 ),
-                icon: const Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
+                icon: Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
                 items: [
                   const DropdownMenuItem<String?>(value: null, child: Text('All Vehicles')),
                   ...vehicles.map((vehicle) {
@@ -886,7 +886,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   color: isDarkMode ? Colors.white : Colors.black87,
                   fontSize: 16,
                 ),
-                icon: const Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
+                icon: Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.primary),
                 items: _sortOptions.map((option) {
                   return DropdownMenuItem<String?>(value: option, child: Text(option));
                 }).toList(),

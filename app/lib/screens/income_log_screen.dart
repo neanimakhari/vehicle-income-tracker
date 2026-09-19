@@ -184,7 +184,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.camera_alt, color: Theme.of(context).colorScheme.primary),
+              leading: Icon(Icons.camera_alt, color: Theme.of(context).colorScheme.primary),
               title: const Text('Take photo'),
               onTap: () {
                 Navigator.pop(context);
@@ -195,7 +195,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: Theme.of(context).colorScheme.primary),
+              leading: Icon(Icons.photo_library, color: Theme.of(context).colorScheme.primary),
               title: const Text('Choose from gallery'),
               onTap: () {
                 Navigator.pop(context);
@@ -1049,7 +1049,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: Theme.of(context).colorScheme.primary,
@@ -1154,7 +1154,7 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
                       ),
                     ),
                   ),
-                  const Icon(Icons.arrow_forward_ios, size: 14, color: Theme.of(context).colorScheme.primary),
+                  Icon(Icons.arrow_forward_ios, size: 14, color: Theme.of(context).colorScheme.primary),
                 ],
               ),
             )
