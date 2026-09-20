@@ -75,4 +75,10 @@ export class TrackingGateway
   emitPoint(tenantSlug: string, point: Record<string, unknown>) {
     this.server?.to(`tenant:${tenantSlug}`).emit('tracking:update', point);
   }
+
+  emitGeofenceEvent(tenantSlug: string, event: Record<string, unknown>) {
+    this.server
+      ?.to(`tenant:${tenantSlug}`)
+      .emit('tracking:geofence', event);
+  }
 }

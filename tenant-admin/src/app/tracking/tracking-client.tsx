@@ -339,6 +339,18 @@ export function TrackingClient({
             >
               Day reconciliation
             </a>
+            <a
+              href="/tracking/geofences"
+              className="font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300"
+            >
+              Geofences
+            </a>
+            <a
+              href="/tracking/alerts"
+              className="font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300"
+            >
+              Alerts
+            </a>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

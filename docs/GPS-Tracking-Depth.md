@@ -1,6 +1,6 @@
 # GPS tracking depth (PostGIS + Timescale + OBD + commercial submodules)
 
-Branch: `feature/gps-tracking-postgis-timescale`
+Branch: `feature/gps-tracking-postgis-timescale` (merged); geofencing on `feature/tracking-geofence`.
 
 ## What shipped
 
@@ -8,6 +8,8 @@ Branch: `feature/gps-tracking-postgis-timescale`
 - Nest `TenantTrackingModule`: latest/history/metrics, simulate (basic|obd), IMEI bind/unbind/active, WS `/tracking`, internal ingest
 - Tenant-admin `/tracking`: Leaflet+OSM map, POPIA ack, simulate, IMEI bind, submodule upsell
 - `gps-ingest/` TCP sidecar + mock simulator (localhost-bound in compose)
+- Migration `1700000000040`: `vehicle_tracking_daily` + `vehicle_day_reconciliation`
+- Migration `1700000000041`: geofences, assignments, events, state, daily geofence rollups, alert rules
 
 ## Deploy notes
 
@@ -27,32 +29,21 @@ Branch: `feature/gps-tracking-postgis-timescale`
 
 Split surfaces (do not mix in one endpoint):
 
-1. **Tracker analytics** (`GET /tenant/tracking/analytics`) — GPS/OBD-only daily KPIs from `vehicle_tracking_daily` (distance, idle %, utilisation, L/100km when OBD entitled, overspeed, voltage, confidence).
-2. **Day reconciliation** (`GET /tenant/tracking/reconciliation`) — income log vs tracker for the same Johannesburg calendar day (km/fuel gaps, R/km, R/ignition-hour, idle waste, flags).
+1. **Tracker analytics** (`GET /tenant/tracking/analytics`) — GPS/OBD-only daily KPIs from `vehicle_tracking_daily`.
+2. **Day reconciliation** (`GET /tenant/tracking/reconciliation`) — income log vs tracker for the same Johannesburg calendar day.
 
-Heavy math runs offline:
+Heavy math runs offline via Nest cron; live map / income submit stay insert-only.
 
-- Nest cron hourly (`:15`) refreshes **today**; nightly (~23:20 UTC) finalizes **yesterday**.
-- `POST /tenant/tracking/analytics/recalculate` recomputes one day (optional `vehicleId`, `includeSimulate`).
-- Live map / income submit paths stay insert-only.
+UI: `/tracking/analytics`, `/tracking/reconciliation`.
 
-UI: `/tracking/analytics`, `/tracking/reconciliation` (nav under Live Tracking). Simulated points excluded unless `includeSimulate=true`.
+## Geofencing
 
-**Next (not built):** per-vehicle geofence corridors under `tracking_geofence`.
+Modules: `tracking_geofence`, `tracking_alerts` (parent `tracking_live`).
 
-## Tracker analytics + day reconciliation
+- Zone types: rank, depot, fuel, forbidden, custom, corridor (polyline + buffer)
+- Assign per vehicle (different routes get different corridors)
+- Enter/exit evaluation on ingest with hysteresis; WS event `tracking:geofence`
+- Daily `vehicle_geofence_daily` (rank dwell, off-corridor km, after-hours outside home)
+- Alert rules + fires under `/tenant/tracking/alert-rules`
 
-Split surfaces (do not mix in one endpoint):
-
-1. **Tracker analytics** (`GET /tenant/tracking/analytics`) — GPS/OBD-only daily KPIs from `vehicle_tracking_daily` (distance, idle %, utilisation, L/100km when OBD entitled, overspeed, voltage, confidence).
-2. **Day reconciliation** (`GET /tenant/tracking/reconciliation`) — income log vs tracker for the same Johannesburg calendar day (km/fuel gaps, R/km, R/ignition-hour, idle waste, flags).
-
-Heavy math runs offline:
-
-- Nest cron hourly (`:15`) refreshes **today**; nightly (~23:20 UTC) finalizes **yesterday**.
-- `POST /tenant/tracking/analytics/recalculate` recomputes one day (optional `vehicleId`, `includeSimulate`).
-- Live map / income submit paths stay insert-only.
-
-UI: `/tracking/analytics`, `/tracking/reconciliation` (nav under Live Tracking). Simulated points excluded unless `includeSimulate=true`.
-
-**Next (not built):** per-vehicle geofence corridors under `tracking_geofence`.
+UI: `/tracking/geofences`, `/tracking/geofences/events`, `/tracking/alerts`.

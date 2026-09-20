@@ -318,6 +318,43 @@ export class TenantSchemasService {
         PRIMARY KEY ("day", "vehicle_id")
       )
     `);
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS "${schemaName}"."geofences" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "name" varchar NOT NULL,
+        "type" varchar NOT NULL,
+        "geojson" jsonb NOT NULL,
+        "center_lat" numeric NULL,
+        "center_lng" numeric NULL,
+        "radius_m" numeric NULL,
+        "buffer_m" numeric NULL DEFAULT 200,
+        "color" varchar NULL DEFAULT '#0d9488',
+        "is_active" boolean NOT NULL DEFAULT true,
+        "metadata" jsonb NOT NULL DEFAULT '{}'::jsonb,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "updated_at" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS "${schemaName}"."vehicle_geofences" (
+        "vehicle_id" uuid NOT NULL,
+        "geofence_id" uuid NOT NULL,
+        "role" varchar NOT NULL DEFAULT 'watch',
+        "is_required_corridor" boolean NOT NULL DEFAULT false,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY ("vehicle_id", "geofence_id")
+      )
+    `);
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS "${schemaName}"."tenant_tracking_settings" (
+        "id" int PRIMARY KEY DEFAULT 1,
+        "work_window_start" time NOT NULL DEFAULT '04:00',
+        "work_window_end" time NOT NULL DEFAULT '22:00',
+        "default_corridor_buffer_m" int NOT NULL DEFAULT 200,
+        "geofence_hysteresis_samples" int NOT NULL DEFAULT 2,
+        "updated_at" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
     await this.dataSource.query(
       `CREATE TABLE IF NOT EXISTS "${schemaName}"."vehicles" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),

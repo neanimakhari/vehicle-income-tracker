@@ -44,6 +44,7 @@ import { AddTenantBranding1700000000037 } from './migrations/1700000000037-add-t
 import { BrandDepthUpgrade1700000000038 } from './migrations/1700000000038-brand-depth-upgrade';
 import { AddGpsTrackingDepth1700000000039 } from './migrations/1700000000039-add-gps-tracking-depth';
 import { AddTrackingAnalyticsDaily1700000000040 } from './migrations/1700000000040-add-tracking-analytics-daily';
+import { AddTrackingGeofences1700000000041 } from './migrations/1700000000041-add-tracking-geofences';
 
 export default new DataSource({
   type: 'postgres',
@@ -96,5 +97,6 @@ export default new DataSource({
     BrandDepthUpgrade1700000000038,
     AddGpsTrackingDepth1700000000039,
     AddTrackingAnalyticsDaily1700000000040,
+    AddTrackingGeofences1700000000041,
   ],
 });

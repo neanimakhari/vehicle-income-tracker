@@ -22,6 +22,9 @@ import {
   CalendarDays,
   Activity,
   Scale,
+  Pentagon,
+  BellRing,
+  ListTree,
 } from "lucide-react";
 
 const MODULE_NAV: Record<string, string> = {
@@ -31,6 +34,9 @@ const MODULE_NAV: Record<string, string> = {
   "/tracking": "tracking_live",
   "/tracking/analytics": "tracking_live",
   "/tracking/reconciliation": "tracking_live",
+  "/tracking/geofences": "tracking_geofence",
+  "/tracking/geofences/events": "tracking_geofence",
+  "/tracking/alerts": "tracking_alerts",
   "/notifications": "notifications",
   "/target-calendar": "target_calendar",
 };
@@ -63,6 +69,13 @@ export function Navigation({
       icon: Scale,
       label: "Day reconciliation",
     },
+    { href: "/tracking/geofences", icon: Pentagon, label: "Geofences" },
+    {
+      href: "/tracking/geofences/events",
+      icon: ListTree,
+      label: "Geofence events",
+    },
+    { href: "/tracking/alerts", icon: BellRing, label: "Tracking alerts" },
     { href: "/reports", icon: BarChart3, label: "Reports" },
     { href: "/target-calendar", icon: CalendarDays, label: "Target calendar" },
     { href: "/audit", icon: FileText, label: "Audit Trail" },

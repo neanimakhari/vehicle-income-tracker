@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TenancyModule } from '../../tenancy/tenancy.module';
 import { AuditModule } from '../audit/audit.module';
 import { CommercialModule } from '../commercial/commercial.module';
+import { EmailModule } from '../email/email.module';
 import { GpsTrackingPoint } from './gps-tracking-point.entity';
 import { TrackerDevice } from './tracker-device.entity';
 import { TenantTrackingController } from './tenant-tracking.controller';
@@ -13,12 +14,19 @@ import { TenantTrackingService } from './tenant-tracking.service';
 import { TrackingGateway } from './tracking.gateway';
 import { TrackingAnalyticsService } from './tracking-analytics.service';
 import { TrackingAnalyticsScheduler } from './tracking-analytics.scheduler';
+import { GeofenceService } from './geofence.service';
+import { GeofenceScheduler } from './geofence.scheduler';
+import {
+  GeofenceAlertController,
+  GeofenceController,
+} from './geofence.controller';
 
 @Module({
   imports: [
     TenancyModule,
     AuditModule,
     CommercialModule,
+    EmailModule,
     TypeOrmModule.forFeature([GpsTrackingPoint, TrackerDevice]),
     ConfigModule,
     JwtModule.registerAsync({
@@ -28,13 +36,20 @@ import { TrackingAnalyticsScheduler } from './tracking-analytics.scheduler';
       }),
     }),
   ],
-  controllers: [TenantTrackingController, TrackingIngestController],
+  controllers: [
+    TenantTrackingController,
+    TrackingIngestController,
+    GeofenceController,
+    GeofenceAlertController,
+  ],
   providers: [
     TenantTrackingService,
     TrackingGateway,
     TrackingAnalyticsService,
     TrackingAnalyticsScheduler,
+    GeofenceService,
+    GeofenceScheduler,
   ],
-  exports: [TenantTrackingService, TrackingAnalyticsService],
+  exports: [TenantTrackingService, TrackingAnalyticsService, GeofenceService],
 })
 export class TenantTrackingModule {}

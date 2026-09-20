@@ -15,6 +15,7 @@ import { TenantVehicle } from '../tenant-vehicles/tenant-vehicle.entity';
 import { GpsTrackingPoint } from './gps-tracking-point.entity';
 import { TrackerDevice } from './tracker-device.entity';
 import { TrackingGateway } from './tracking.gateway';
+import { GeofenceService } from './geofence.service';
 
 export type InsertPointInput = {
   vehicleId?: string | null;
@@ -55,6 +56,7 @@ export class TenantTrackingService {
     private readonly commercial: CommercialService,
     private readonly audit: AuditService,
     private readonly gateway: TrackingGateway,
+    private readonly geofences: GeofenceService,
     @InjectRepository(TrackerDevice)
     private readonly devicesRepo: Repository<TrackerDevice>,
   ) {}
@@ -316,6 +318,23 @@ export class TenantTrackingService {
     const includeObd = await this.commercial.hasModule(slug, 'tracking_obd');
     const dto = this.toDto(saved, includeObd);
     this.gateway.emitPoint(slug, dto);
+
+    if (saved.vehicleId) {
+      try {
+        await this.geofences.evaluatePoint({
+          vehicleId: saved.vehicleId,
+          pointId: saved.id,
+          latitude: Number(saved.latitude),
+          longitude: Number(saved.longitude),
+          speedKph: saved.speedKph != null ? Number(saved.speedKph) : null,
+          recordedAt: saved.recordedAt,
+          source: saved.source,
+        });
+      } catch {
+        /* geofence eval must not break ingest */
+      }
+    }
+
     return dto;
   }
 
