@@ -1,12 +1,13 @@
 {
   "name": "gps-ingest",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "Private TCP GPS ingest sidecar for VIT (mock + brand-agnostic OBD lines)",
+  "description": "TCP GPS ingest sidecar for VIT — text mocks + Micodus/Huabao binary",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "simulate": "node src/mock-simulator.js",
+    "test": "node --test test/**/*.test.js",
     "health": "node -e \"fetch('http://127.0.0.1:'+(process.env.HEALTH_PORT||9088)+'/health').then(r=>r.json()).then(console.log)\""
   },
   "engines": {

@@ -58,6 +58,34 @@ class IngestPointDto {
   externalVoltage?: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  coolantC?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  odometerKm?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  engineLoadPercent?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  satellites?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  gpsFixOk?: boolean;
+
+  @IsOptional()
+  @IsString()
+  recordedAt?: string;
+
+  @IsOptional()
   @IsString()
   source?: string;
 
@@ -82,6 +110,10 @@ export class TrackingIngestController {
     if (!expected || secret !== expected) {
       throw new UnauthorizedException('Invalid ingest secret');
     }
+    const recordedAt =
+      dto.recordedAt != null && dto.recordedAt !== ''
+        ? new Date(dto.recordedAt)
+        : undefined;
     return this.tracking.ingestByImei(dto.imei, {
       latitude: dto.latitude,
       longitude: dto.longitude,
@@ -92,9 +124,17 @@ export class TrackingIngestController {
       fuelRateLph: dto.fuelRateLph,
       fuelLevelPercent: dto.fuelLevelPercent,
       externalVoltage: dto.externalVoltage,
+      coolantC: dto.coolantC,
+      odometerKm: dto.odometerKm,
+      engineLoadPercent: dto.engineLoadPercent,
+      satellites: dto.satellites,
       source: dto.source ?? 'obd',
       rawPayload: dto.rawPayload,
-      gpsFixOk: true,
+      gpsFixOk: dto.gpsFixOk ?? true,
+      recordedAt:
+        recordedAt && !Number.isNaN(recordedAt.getTime())
+          ? recordedAt
+          : undefined,
     });
   }
 }

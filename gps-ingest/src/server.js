@@ -1,21 +1,27 @@
 /**
  * Private TCP GPS ingest sidecar.
- * Listens on TRACKING_TCP_PORT (default 5023), parses brand-agnostic lines,
- * POSTs to Nest /v1/internal/tracking/ingest with GPS_INGEST_SECRET.
  *
- * Line formats accepted:
- *   JSON: {"imei":"...","lat":-26.2,"lng":28.0,"speed":42,"heading":90,...}
- *   CSV:  imei,lat,lng,speed,heading,ignition,rpm,fuelRate,fuelPct,voltage
+ * - Text TCP (TRACKING_TCP_PORT, default 5023): brand-agnostic JSON/CSV lines (mocks)
+ * - Micodus TCP (MICODUS_TCP_PORT, default 7700): Huabao/JT808 binary + ACK-first coalesce
+ *
+ * Both forward to Nest POST /v1/internal/tracking/ingest with GPS_INGEST_SECRET.
  */
 
 const net = require("net");
 const http = require("http");
+const { extractFrames, parsePacket } = require("./micodus/frame");
+const { decodePacket } = require("./micodus/decoder");
+const { buildGeneralAck, buildRegisterAck } = require("./micodus/ack");
+const { MicodusSession } = require("./micodus/session");
+const { createForwarder } = require("./forwarder");
 
 const TCP_PORT = Number(process.env.TRACKING_TCP_PORT ?? 5023);
+const MICODUS_PORT = Number(process.env.MICODUS_TCP_PORT ?? 7700);
 const HEALTH_PORT = Number(process.env.HEALTH_PORT ?? 9088);
 const API_BASE = (process.env.API_BASE_URL ?? "http://127.0.0.1:3000").replace(/\/$/, "");
 const INGEST_SECRET = process.env.GPS_INGEST_SECRET ?? process.env.TRACKING_INGEST_SECRET ?? "";
 const BIND_HOST = process.env.TRACKING_TCP_BIND ?? "127.0.0.1";
+const MICODUS_BIND = process.env.MICODUS_TCP_BIND ?? BIND_HOST;
 
 const stats = {
   startedAt: new Date().toISOString(),
@@ -25,7 +31,46 @@ const stats = {
   ingestFail: 0,
   lastError: null,
   lastIngestAt: null,
+  micodusConnections: 0,
+  micodusActive: 0,
+  micodusFrames: 0,
+  micodusUnknown: 0,
+  lastMicodusAt: null,
 };
+
+async function postIngest(body) {
+  if (!INGEST_SECRET) {
+    throw new Error("GPS_INGEST_SECRET not set");
+  }
+  const res = await fetch(`${API_BASE}/v1/internal/tracking/ingest`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-ingest-secret": INGEST_SECRET,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`ingest ${res.status}: ${text.slice(0, 200)}`);
+  }
+  stats.ingestOk += 1;
+  stats.lastIngestAt = new Date().toISOString();
+  stats.lastError = null;
+  return res.json();
+}
+
+const forwarder = createForwarder({
+  postIngest: async (point) => {
+    try {
+      await postIngest(point);
+    } catch (err) {
+      stats.ingestFail += 1;
+      stats.lastError = String(err?.message ?? err);
+      throw err;
+    }
+  },
+});
 
 function parseLine(raw) {
   const line = String(raw).trim();
@@ -73,26 +118,7 @@ function parseLine(raw) {
   };
 }
 
-async function postIngest(body) {
-  if (!INGEST_SECRET) {
-    throw new Error("GPS_INGEST_SECRET not set");
-  }
-  const res = await fetch(`${API_BASE}/v1/internal/tracking/ingest`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-ingest-secret": INGEST_SECRET,
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`ingest ${res.status}: ${text.slice(0, 200)}`);
-  }
-  return res.json();
-}
-
-function handleSocket(socket) {
+function handleTextSocket(socket) {
   stats.tcpAccepted += 1;
   let buf = "";
   socket.setEncoding("utf8");
@@ -106,9 +132,6 @@ function handleSocket(socket) {
         if (!point) continue;
         stats.linesParsed += 1;
         await postIngest(point);
-        stats.ingestOk += 1;
-        stats.lastIngestAt = new Date().toISOString();
-        stats.lastError = null;
         socket.write("OK\n");
       } catch (err) {
         stats.ingestFail += 1;
@@ -122,10 +145,69 @@ function handleSocket(socket) {
   });
 }
 
-const tcpServer = net.createServer(handleSocket);
-tcpServer.listen(TCP_PORT, BIND_HOST, () => {
-  console.log(`[gps-ingest] TCP listening on ${BIND_HOST}:${TCP_PORT}`);
+function handleMicodusSocket(socket) {
+  stats.micodusConnections += 1;
+  stats.micodusActive += 1;
+  const session = new MicodusSession();
+  let buf = Buffer.alloc(0);
+
+  socket.on("data", (chunk) => {
+    buf = Buffer.concat([buf, chunk]);
+    const { frames, rest } = extractFrames(buf);
+    buf = Buffer.from(rest);
+
+    for (const raw of frames) {
+      stats.micodusFrames += 1;
+      stats.lastMicodusAt = new Date().toISOString();
+      try {
+        const packet = parsePacket(raw);
+        if (!packet) {
+          stats.micodusUnknown += 1;
+          console.warn(`[micodus] bad frame ${raw.toString("hex").slice(0, 64)}`);
+          continue;
+        }
+        const decoded = decodePacket(packet);
+        session.note(decoded);
+
+        // ACK immediately — never wait on Nest
+        if (decoded.kind === "register") {
+          socket.write(buildRegisterAck(packet.terminalId, packet.serial, 0));
+        } else if (decoded.kind === "heartbeat" || decoded.kind === "auth" || decoded.kind === "location") {
+          socket.write(buildGeneralAck(packet.terminalId, packet.serial, packet.msgId, 0));
+        } else {
+          stats.micodusUnknown += 1;
+          console.warn(`[micodus] unknown msgId=0x${packet.msgId.toString(16)} hex=${packet.rawHex.slice(0, 80)}`);
+          socket.write(buildGeneralAck(packet.terminalId, packet.serial, packet.msgId, 0));
+        }
+
+        if (decoded.kind === "location" && decoded.point) {
+          const imei = session.deviceImei() || decoded.point.imei;
+          forwarder.enqueue({ ...decoded.point, imei });
+        }
+      } catch (err) {
+        stats.lastError = String(err?.message ?? err);
+        console.error("[micodus] frame error", stats.lastError);
+      }
+    }
+  });
+
+  socket.on("error", (err) => {
+    stats.lastError = String(err?.message ?? err);
+  });
+  socket.on("close", () => {
+    stats.micodusActive = Math.max(0, stats.micodusActive - 1);
+  });
+}
+
+const textServer = net.createServer(handleTextSocket);
+textServer.listen(TCP_PORT, BIND_HOST, () => {
+  console.log(`[gps-ingest] text TCP on ${BIND_HOST}:${TCP_PORT}`);
   console.log(`[gps-ingest] API ${API_BASE}/v1/internal/tracking/ingest`);
+});
+
+const micodusServer = net.createServer(handleMicodusSocket);
+micodusServer.listen(MICODUS_PORT, MICODUS_BIND, () => {
+  console.log(`[gps-ingest] Micodus TCP on ${MICODUS_BIND}:${MICODUS_PORT}`);
 });
 
 const healthServer = http.createServer((req, res) => {
@@ -134,9 +216,12 @@ const healthServer = http.createServer((req, res) => {
     res.end(
       JSON.stringify({
         ok: true,
-        bind: `${BIND_HOST}:${TCP_PORT}`,
+        textBind: `${BIND_HOST}:${TCP_PORT}`,
+        micodusBind: `${MICODUS_BIND}:${MICODUS_PORT}`,
         apiBase: API_BASE,
         secretConfigured: Boolean(INGEST_SECRET),
+        queueDepth: forwarder.queueDepth(),
+        coalesce: forwarder.stats,
         ...stats,
       }),
     );
@@ -149,8 +234,18 @@ healthServer.listen(HEALTH_PORT, BIND_HOST, () => {
   console.log(`[gps-ingest] health on ${BIND_HOST}:${HEALTH_PORT}/health`);
 });
 
-process.on("SIGTERM", () => {
-  tcpServer.close();
+process.on("SIGTERM", async () => {
+  forwarder.stop();
+  await forwarder.flushSync().catch(() => {});
+  textServer.close();
+  micodusServer.close();
   healthServer.close();
   process.exit(0);
 });
+
+module.exports = {
+  parseLine,
+  postIngest,
+  forwarder,
+  stats,
+};

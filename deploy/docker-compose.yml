@@ -47,11 +47,16 @@ services:
       GPS_INGEST_SECRET: ${GPS_INGEST_SECRET:-}
       TRACKING_TCP_BIND: 0.0.0.0
       TRACKING_TCP_PORT: 5023
+      MICODUS_TCP_BIND: 0.0.0.0
+      MICODUS_TCP_PORT: 7700
       HEALTH_PORT: 9088
-    # Private only — do not publish TCP on public interfaces
+      INGEST_FLUSH_MS: ${INGEST_FLUSH_MS:-5000}
+      INGEST_MAX_INFLIGHT: ${INGEST_MAX_INFLIGHT:-20}
+    # 5023 + health: localhost only. 7700: public for cellular Micodus units.
     ports:
       - "127.0.0.1:${GPS_INGEST_HEALTH_PORT:-9088}:9088"
       - "127.0.0.1:${GPS_INGEST_TCP_PORT:-5023}:5023"
+      - "${MICODUS_PUBLIC_BIND:-0.0.0.0}:${MICODUS_TCP_PORT:-7700}:7700"
     depends_on:
       - api
 

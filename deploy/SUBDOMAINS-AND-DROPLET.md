@@ -317,6 +317,19 @@ The API will connect to the DB droplet. You can remove the old Docker volume lat
 | **Nginx** | Listens on 80/443 for the three hostnames, proxies to 127.0.0.1:4000, 4001, 4002. |
 | **HTTPS** | Certbot + the config above so https://vit-api.vehinc.co.za etc. work. |
 
+## Micodus GPS TCP (when trackers go live)
+
+`gps-ingest` listens on **TCP 7700** (Huabao/JT808). Text mock port **5023** stays localhost-only.
+
+On the app droplet when ready:
+
+```bash
+ufw allow 7700/tcp comment 'Micodus GPS ingest'
+ufw status
+```
+
+Point devices: `SERVER,0,104.248.42.192,7700#` (or your public IP). Do **not** put 7700 behind HTTPS nginx — trackers speak raw TCP.
+
 After DNS has propagated and Nginx is configured, both of these work:
 
 - **By IP:** `http://104.248.42.192:4000`, `:4001`, `:4002`  
