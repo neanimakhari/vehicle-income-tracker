@@ -28,18 +28,13 @@ type FenceTemplate = {
 };
 
 type Vehicle = { id: string; label: string };
+type DrawShape = "road" | "area" | "circle";
+type LatLng = { lat: number; lng: number };
 
-const TYPES = ["rank", "depot", "fuel", "forbidden", "custom", "corridor"] as const;
+const CIRCLE_TYPES = ["rank", "depot", "fuel", "forbidden"] as const;
 const CLOSE_SNAP_M = 30;
 
-function isCircleType(t: string) {
-  return t === "rank" || t === "depot" || t === "fuel" || t === "forbidden";
-}
-
-function haversineM(
-  a: { lat: number; lng: number },
-  b: { lat: number; lng: number },
-) {
+function haversineM(a: LatLng, b: LatLng) {
   const toRad = (d: number) => (d * Math.PI) / 180;
   const R = 6371000;
   const dLat = toRad(b.lat - a.lat);
@@ -48,6 +43,41 @@ function haversineM(
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(x)));
+}
+
+/** Rough road buffer outline for map preview (matches API idea). */
+function previewRoadBuffer(path: LatLng[], bufferM: number): [number, number][] {
+  if (path.length < 2) return [];
+  const left: [number, number][] = [];
+  const right: [number, number][] = [];
+  for (let i = 0; i < path.length; i++) {
+    const prev = path[Math.max(0, i - 1)];
+    const next = path[Math.min(path.length - 1, i + 1)];
+    const bearing = Math.atan2(next.lng - prev.lng, next.lat - prev.lat);
+    const perp = bearing + Math.PI / 2;
+    const latRad = (path[i].lat * Math.PI) / 180;
+    const mPerDegLat = 111320;
+    const mPerDegLng = Math.max(1e-6, 111320 * Math.cos(latRad));
+    const dLat = (bufferM * Math.cos(perp)) / mPerDegLat;
+    const dLng = (bufferM * Math.sin(perp)) / mPerDegLng;
+    left.push([path[i].lat + dLat, path[i].lng + dLng]);
+    right.push([path[i].lat - dLat, path[i].lng - dLng]);
+  }
+  return [...left, ...right.reverse(), left[0]];
+}
+
+function numberedMarkerIcon(L: any, n: number, accent = false) {
+  const bg = accent ? "#f59e0b" : "#0d9488";
+  return L.divIcon({
+    className: "vit-gf-road-marker",
+    html: `<div style="
+      width:26px;height:26px;border-radius:999px;background:${bg};color:#fff;
+      display:flex;align-items:center;justify-content:center;
+      font:700 12px/1 system-ui,sans-serif;border:2px solid #fff;
+      box-shadow:0 1px 4px rgba(0,0,0,.45)">${n}</div>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  });
 }
 
 export function GeofencesClient({
@@ -61,13 +91,15 @@ export function GeofencesClient({
 }) {
   const [fences, setFences] = useState(initial);
   const [templates, setTemplates] = useState(initialTemplates);
-  const [name, setName] = useState("New zone");
-  const [type, setType] = useState<(typeof TYPES)[number]>("custom");
-  const [bufferM, setBufferM] = useState(200);
+  const [name, setName] = useState("New road");
+  const [drawShape, setDrawShape] = useState<DrawShape>("road");
+  const [circleType, setCircleType] =
+    useState<(typeof CIRCLE_TYPES)[number]>("depot");
+  const [bufferM, setBufferM] = useState(80);
   const [radiusM, setRadiusM] = useState(250);
-  const [path, setPath] = useState<Array<{ lat: number; lng: number }>>([]);
+  const [path, setPath] = useState<LatLng[]>([]);
   const [pathClosed, setPathClosed] = useState(false);
-  const [center, setCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [center, setCenter] = useState<LatLng | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -76,44 +108,44 @@ export function GeofencesClient({
   const [applyName, setApplyName] = useState("");
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletRef = useRef<any>(null);
-  const typeRef = useRef(type);
+  const drawShapeRef = useRef(drawShape);
   const pathRef = useRef(path);
   const pathClosedRef = useRef(pathClosed);
 
-  typeRef.current = type;
+  drawShapeRef.current = drawShape;
   pathRef.current = path;
   pathClosedRef.current = pathClosed;
 
-  const drawMode = useMemo(() => {
-    if (type === "corridor") return "corridor" as const;
-    if (type === "custom") return "polygon" as const;
-    return "circle" as const;
-  }, [type]);
+  const fenceType =
+    drawShape === "road" ? "corridor" : drawShape === "area" ? "custom" : circleType;
 
-  const pathLabel = useMemo(() => {
-    if (drawMode === "circle") {
-      return center ? "Center set — adjust radius and save" : "Click map for center";
+  const helpText = useMemo(() => {
+    if (drawShape === "circle") {
+      return center
+        ? "Center set — adjust radius, then Save zone"
+        : "Click the map once to place the circle center";
     }
-    if (drawMode === "corridor") {
-      return path.length
-        ? `${path.length} points — click to extend, then Save zone`
-        : "Click map to draw corridor path";
+    if (drawShape === "road") {
+      if (!path.length) {
+        return "Click along the road to drop numbered markers (2+). Buffer = road width each side.";
+      }
+      return `${path.length} marker${path.length === 1 ? "" : "s"} — keep clicking the road, Undo if needed, then Save. No need to close.`;
     }
-    if (pathClosed) return `Closed polygon (${path.length} vertices) — ready to save`;
+    if (pathClosed) return `Closed area (${path.length} corners) — ready to save`;
     if (path.length >= 3) {
-      return `${path.length} points — click near first point (or Close shape) to finish`;
+      return `${path.length} corners — click near #1 (or Close shape) to finish`;
     }
     return path.length
-      ? `${path.length} points — keep clicking`
-      : "Click map to start polygon (min 3 points)";
-  }, [drawMode, path, pathClosed, center]);
+      ? `${path.length} corners — keep clicking around the area`
+      : "Click map corners to outline an area (min 3), then close it";
+  }, [drawShape, path, pathClosed, center]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const L = await loadLeaflet();
       if (cancelled || !mapRef.current) return;
-      const map = L.map(mapRef.current).setView([-26.2041, 28.0473], 12);
+      const map = L.map(mapRef.current).setView([-26.2041, 28.0473], 13);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "&copy; OpenStreetMap",
       }).addTo(map);
@@ -123,8 +155,8 @@ export function GeofencesClient({
 
       map.on("click", (e: { latlng: { lat: number; lng: number } }) => {
         const p = { lat: e.latlng.lat, lng: e.latlng.lng };
-        const t = typeRef.current;
-        if (isCircleType(t)) {
+        const mode = drawShapeRef.current;
+        if (mode === "circle") {
           setCenter(p);
           setPath([]);
           setPathClosed(false);
@@ -132,9 +164,8 @@ export function GeofencesClient({
         }
         if (pathClosedRef.current) return;
         const prev = pathRef.current;
-        if (t === "custom" && prev.length >= 3) {
-          const d = haversineM(prev[0], p);
-          if (d <= CLOSE_SNAP_M) {
+        if (mode === "area" && prev.length >= 3) {
+          if (haversineM(prev[0], p) <= CLOSE_SNAP_M) {
             setPathClosed(true);
             return;
           }
@@ -184,44 +215,69 @@ export function GeofencesClient({
       draftLayerRef.current = null;
     }
     const group = L.layerGroup();
-    if (drawMode === "corridor" && path.length >= 2) {
-      L.polyline(
-        path.map((p) => [p.lat, p.lng]),
-        { color: "#f59e0b", weight: 3 },
-      ).addTo(group);
-    } else if (drawMode === "polygon" && path.length >= 1) {
+
+    if (drawShape === "road" && path.length >= 1) {
       if (path.length >= 2) {
-        const pts = pathClosed
-          ? [...path.map((p) => [p.lat, p.lng] as [number, number]), [path[0].lat, path[0].lng]]
-          : path.map((p) => [p.lat, p.lng] as [number, number]);
-        if (pathClosed || path.length >= 3) {
-          L.polygon(path.map((p) => [p.lat, p.lng]), {
-            color: "#0d9488",
-            weight: 2,
-            fillOpacity: pathClosed ? 0.25 : 0.1,
-            dashArray: pathClosed ? undefined : "6 4",
+        const bufRing = previewRoadBuffer(path, bufferM);
+        if (bufRing.length) {
+          L.polygon(bufRing, {
+            color: "#f59e0b",
+            weight: 1,
+            fillColor: "#f59e0b",
+            fillOpacity: 0.18,
+            dashArray: "4 4",
           }).addTo(group);
+        }
+        L.polyline(
+          path.map((p) => [p.lat, p.lng]),
+          { color: "#0f766e", weight: 4 },
+        ).addTo(group);
+      }
+      path.forEach((p, i) => {
+        L.marker([p.lat, p.lng], {
+          icon: numberedMarkerIcon(L, i + 1, i === 0),
+          interactive: false,
+        }).addTo(group);
+      });
+    } else if (drawShape === "area" && path.length >= 1) {
+      if (path.length >= 2) {
+        if (pathClosed || path.length >= 3) {
+          L.polygon(
+            path.map((p) => [p.lat, p.lng]),
+            {
+              color: "#0d9488",
+              weight: 2,
+              fillOpacity: pathClosed ? 0.25 : 0.1,
+              dashArray: pathClosed ? undefined : "6 4",
+            },
+          ).addTo(group);
         } else {
-          L.polyline(pts, { color: "#0d9488", weight: 2, dashArray: "6 4" }).addTo(group);
+          L.polyline(
+            path.map((p) => [p.lat, p.lng]),
+            { color: "#0d9488", weight: 2, dashArray: "6 4" },
+          ).addTo(group);
         }
       }
-      for (let i = 0; i < path.length; i++) {
-        L.circleMarker([path[i].lat, path[i].lng], {
-          radius: i === 0 ? 7 : 4,
-          color: i === 0 ? "#f59e0b" : "#0d9488",
-          fillColor: i === 0 ? "#f59e0b" : "#0d9488",
-          fillOpacity: 1,
+      path.forEach((p, i) => {
+        L.marker([p.lat, p.lng], {
+          icon: numberedMarkerIcon(L, i + 1, i === 0),
+          interactive: false,
         }).addTo(group);
-      }
-    } else if (drawMode === "circle" && center) {
+      });
+    } else if (drawShape === "circle" && center) {
       L.circle([center.lat, center.lng], {
         radius: radiusM,
         color: "#0d9488",
       }).addTo(group);
+      L.marker([center.lat, center.lng], {
+        icon: numberedMarkerIcon(L, 1, true),
+        interactive: false,
+      }).addTo(group);
     }
+
     group.addTo(map);
     draftLayerRef.current = group;
-  }, [path, pathClosed, center, drawMode, radiusM]);
+  }, [path, pathClosed, center, drawShape, radiusM, bufferM]);
 
   function clearDraft() {
     setPath([]);
@@ -229,18 +285,59 @@ export function GeofencesClient({
     setCenter(null);
   }
 
+  function undoLastMarker() {
+    if (pathClosed) {
+      setPathClosed(false);
+      return;
+    }
+    setPath((prev) => prev.slice(0, -1));
+  }
+
+  function switchShape(next: DrawShape) {
+    setDrawShape(next);
+    clearDraft();
+    if (next === "road") setName((n) => (n === "New zone" || n === "New area" ? "New road" : n));
+    if (next === "area") setName((n) => (n === "New road" || n === "New zone" ? "New area" : n));
+  }
+
+  function addFenceToMap(fence: Fence) {
+    const api = leafletRef.current;
+    if (!api || fence.geojson?.type !== "Polygon") return;
+    const coords = (fence.geojson.coordinates as number[][][])[0]?.map(
+      (c: number[]) => [c[1], c[0]] as [number, number],
+    );
+    if (!coords?.length) return;
+    api.L.polygon(coords, {
+      color: fence.color || "#0d9488",
+      weight: 2,
+      fillOpacity: 0.15,
+    })
+      .bindPopup(`${fence.name} (${fence.type})`)
+      .addTo(api.layer);
+  }
+
   async function createFence() {
     setBusy(true);
     setError(null);
     setMessage(null);
     try {
-      const body: Record<string, unknown> = { name, type, bufferM, color: "#0d9488" };
-      if (type === "corridor") {
-        if (path.length < 2) throw new Error("Draw at least 2 corridor points");
+      const body: Record<string, unknown> = {
+        name,
+        type: fenceType,
+        bufferM,
+        color: drawShape === "road" ? "#f59e0b" : "#0d9488",
+      };
+      if (drawShape === "road") {
+        if (path.length < 2) {
+          throw new Error("Drop at least 2 markers along the road");
+        }
         body.path = path;
-      } else if (type === "custom") {
-        if (path.length < 3) throw new Error("Draw at least 3 polygon points");
-        if (!pathClosed) throw new Error("Close the shape (click near first point or Close shape)");
+        body.bufferM = bufferM;
+      } else if (drawShape === "area") {
+        if (path.length < 3) throw new Error("Need at least 3 corners");
+        if (!pathClosed) {
+          throw new Error("Close the area (click near marker #1 or Close shape)");
+        }
         body.path = path;
       } else if (center) {
         body.centerLat = center.lat;
@@ -255,26 +352,16 @@ export function GeofencesClient({
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(`Create failed (${res.status})`);
-      const fence = await res.json();
+      const markerCount = path.length;
+      const fence = (await res.json()) as Fence;
       setFences((prev) => [...prev, fence]);
       clearDraft();
-      setMessage(`Saved zone “${fence.name}”.`);
-      // redraw library layer by adding polygon
-      const api = leafletRef.current;
-      if (api && fence.geojson?.type === "Polygon") {
-        const coords = (fence.geojson.coordinates as number[][][])[0]?.map(
-          (c: number[]) => [c[1], c[0]] as [number, number],
-        );
-        if (coords?.length) {
-          api.L.polygon(coords, {
-            color: fence.color || "#0d9488",
-            weight: 2,
-            fillOpacity: 0.15,
-          })
-            .bindPopup(`${fence.name} (${fence.type})`)
-            .addTo(api.layer);
-        }
-      }
+      setMessage(
+        drawShape === "road"
+          ? `Road geofence “${fence.name}” saved (${markerCount} markers, ${bufferM}m buffer each side).`
+          : `Saved zone “${fence.name}”.`,
+      );
+      addFenceToMap(fence);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -289,18 +376,16 @@ export function GeofencesClient({
     try {
       const body: Record<string, unknown> = {
         name: name || "Template",
-        defaultFenceType: type,
-        kind: type === "corridor" ? "corridor" : type === "custom" ? "polygon" : "circle",
-        color: "#0d9488",
+        defaultFenceType: fenceType,
+        kind: drawShape === "road" ? "corridor" : drawShape === "area" ? "polygon" : "circle",
+        color: drawShape === "road" ? "#f59e0b" : "#0d9488",
         bufferM,
       };
-      if (type === "corridor") {
-        if (path.length < 2) throw new Error("Draw a corridor path first");
+      if (drawShape === "road") {
+        if (path.length < 2) throw new Error("Drop road markers first");
         body.path = path;
-      } else if (type === "custom") {
-        if (path.length < 3 || !pathClosed) {
-          throw new Error("Close a polygon first (min 3 points)");
-        }
+      } else if (drawShape === "area") {
+        if (path.length < 3 || !pathClosed) throw new Error("Close an area first");
         body.path = path;
       } else if (center) {
         body.centerLat = center.lat;
@@ -317,7 +402,7 @@ export function GeofencesClient({
       if (!res.ok) throw new Error(`Save template failed (${res.status})`);
       const tpl = await res.json();
       setTemplates((prev) => [...prev, tpl]);
-      setMessage(`Template “${tpl.name}” saved — apply it anywhere in this tenant.`);
+      setMessage(`Template “${tpl.name}” saved — Apply it anywhere in this tenant.`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -343,25 +428,11 @@ export function GeofencesClient({
         },
       );
       if (!res.ok) throw new Error(`Apply failed (${res.status})`);
-      const fence = await res.json();
+      const fence = (await res.json()) as Fence;
       setFences((prev) => [...prev, fence]);
       setApplyName("");
-      setMessage(`Applied template as “${fence.name}” in your library.`);
-      const api = leafletRef.current;
-      if (api && fence.geojson?.type === "Polygon") {
-        const coords = (fence.geojson.coordinates as number[][][])[0]?.map(
-          (c: number[]) => [c[1], c[0]] as [number, number],
-        );
-        if (coords?.length) {
-          api.L.polygon(coords, {
-            color: fence.color || "#0d9488",
-            weight: 2,
-            fillOpacity: 0.15,
-          })
-            .bindPopup(`${fence.name} (${fence.type})`)
-            .addTo(api.layer);
-        }
-      }
+      setMessage(`Applied template as “${fence.name}”.`);
+      addFenceToMap(fence);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -455,8 +526,8 @@ export function GeofencesClient({
         <p className="text-xs uppercase tracking-wide text-zinc-500">Geofences</p>
         <h1 className="text-2xl font-semibold">Zones & corridors</h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Draw circles, corridors, or closed polygons. Save templates and apply them anywhere in
-          this tenant.
+          Drop numbered markers along a road, outline an area, or place a circle. Save templates and
+          apply them anywhere in this tenant.
         </p>
       </div>
 
@@ -474,6 +545,33 @@ export function GeofencesClient({
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
           <h2 className="font-medium">Create</h2>
+
+          <div>
+            <p className="mb-1.5 text-sm font-medium">What are you drawing?</p>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["road", "Road (markers)"],
+                  ["area", "Closed area"],
+                  ["circle", "Circle"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => switchShape(id)}
+                  className={`rounded-md px-3 py-2 text-sm font-medium ${
+                    drawShape === id
+                      ? "bg-teal-700 text-white"
+                      : "border border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-900"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <label className="block text-sm">
             Name
             <input
@@ -482,34 +580,44 @@ export function GeofencesClient({
               onChange={(e) => setName(e.target.value)}
             />
           </label>
-          <label className="block text-sm">
-            Type
-            <select
-              className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
-              value={type}
-              onChange={(e) => {
-                setType(e.target.value as (typeof TYPES)[number]);
-                clearDraft();
-              }}
-            >
-              {TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t === "custom" ? "custom (polygon)" : t}
-                </option>
-              ))}
-            </select>
-          </label>
-          {type === "corridor" ? (
+
+          {drawShape === "circle" ? (
             <label className="block text-sm">
-              Buffer (m)
+              Zone type
+              <select
+                className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+                value={circleType}
+                onChange={(e) =>
+                  setCircleType(e.target.value as (typeof CIRCLE_TYPES)[number])
+                }
+              >
+                {CIRCLE_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
+          {drawShape === "road" ? (
+            <label className="block text-sm">
+              Road buffer each side (m)
               <input
                 type="number"
+                min={10}
+                max={500}
                 className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
                 value={bufferM}
                 onChange={(e) => setBufferM(Number(e.target.value))}
               />
+              <span className="mt-1 block text-xs text-zinc-500">
+                How wide the geofence is beside the road (e.g. 50–100 m for a taxi corridor).
+              </span>
             </label>
-          ) : type !== "custom" ? (
+          ) : null}
+
+          {drawShape === "circle" ? (
             <label className="block text-sm">
               Radius (m)
               <input
@@ -520,15 +628,28 @@ export function GeofencesClient({
               />
             </label>
           ) : null}
-          <p className="text-xs text-zinc-500">{pathLabel}</p>
+
+          <p className="rounded-md bg-zinc-100 px-3 py-2 text-xs text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+            {helpText}
+          </p>
+
           <div className="flex flex-wrap gap-2">
-            {type === "custom" && path.length >= 3 && !pathClosed ? (
+            {drawShape === "area" && path.length >= 3 && !pathClosed ? (
               <button
                 type="button"
                 className="rounded-md border border-teal-600 px-3 py-2 text-sm text-teal-700 dark:text-teal-300"
                 onClick={() => setPathClosed(true)}
               >
                 Close shape
+              </button>
+            ) : null}
+            {(drawShape === "road" || drawShape === "area") && path.length > 0 ? (
+              <button
+                type="button"
+                className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700"
+                onClick={undoLastMarker}
+              >
+                Undo last marker
               </button>
             ) : null}
             <button
@@ -559,14 +680,14 @@ export function GeofencesClient({
 
         <div
           ref={mapRef}
-          className="min-h-[360px] overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800"
+          className="min-h-[420px] overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800"
         />
       </div>
 
       <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
         <h2 className="mb-1 font-medium">Reusable templates</h2>
         <p className="mb-3 text-xs text-zinc-500">
-          Saved shapes you can apply into the library anytime (same geometry, new zone name).
+          Saved roads/areas you can Apply into the library anytime.
         </p>
         <div className="mb-3 flex flex-wrap gap-2">
           <input
@@ -592,10 +713,10 @@ export function GeofencesClient({
                   <td className="py-2 pr-3">
                     {t.kind} → {t.defaultFenceType}
                   </td>
-                  <td className="py-2 space-x-3">
+                  <td className="space-x-3 py-2">
                     <button
                       type="button"
-                      className="text-teal-700 text-xs dark:text-teal-300"
+                      className="text-xs text-teal-700 dark:text-teal-300"
                       disabled={busy}
                       onClick={() => void applyTemplate(t.id)}
                     >
@@ -603,7 +724,7 @@ export function GeofencesClient({
                     </button>
                     <button
                       type="button"
-                      className="text-red-600 text-xs"
+                      className="text-xs text-red-600"
                       disabled={busy}
                       onClick={() => void removeTemplate(t.id)}
                     >
@@ -615,7 +736,7 @@ export function GeofencesClient({
               {!templates.length ? (
                 <tr>
                   <td colSpan={3} className="py-6 text-center text-zinc-500">
-                    No templates yet — draw a zone and click Save as template.
+                    No templates yet — draw a road/area and click Save as template.
                   </td>
                 </tr>
               ) : null}
@@ -645,7 +766,7 @@ export function GeofencesClient({
                   <td className="py-2">
                     <button
                       type="button"
-                      className="text-red-600 text-xs"
+                      className="text-xs text-red-600"
                       onClick={() => void removeFence(f.id)}
                     >
                       Delete
@@ -656,7 +777,7 @@ export function GeofencesClient({
               {!fences.length ? (
                 <tr>
                   <td colSpan={4} className="py-6 text-center text-zinc-500">
-                    No geofences yet — draw one on the map.
+                    No geofences yet — draw a road with markers on the map.
                   </td>
                 </tr>
               ) : null}
