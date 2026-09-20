@@ -38,11 +38,7 @@ export function GeofencesClient({
   const [selectedVehicle, setSelectedVehicle] = useState(vehicles[0]?.id ?? "");
   const [assignIds, setAssignIds] = useState<string[]>([]);
   const mapRef = useRef<HTMLDivElement>(null);
-  const leafletRef = useRef<{
-    map: { on: Function; remove: Function; removeLayer: Function };
-    layer: unknown;
-    L: any;
-  } | null>(null);
+  const leafletRef = useRef<any>(null);
 
   const pathLabel = useMemo(
     () => (path.length ? `${path.length} points` : "Click map to draw"),
