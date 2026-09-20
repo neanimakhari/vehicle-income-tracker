@@ -15,6 +15,7 @@ import {
   LatLng,
   normalizeGeoJsonForStorage,
   pointInFence,
+  shiftGeoJson,
 } from './geofence.geometry';
 import {
   johannesburgDayBounds,
@@ -87,6 +88,21 @@ export class GeofenceService {
         "name" varchar NOT NULL,
         "description" text NULL,
         "geofence_id" uuid NOT NULL REFERENCES "${s}"."geofences"("id") ON DELETE CASCADE,
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "updated_at" timestamptz NOT NULL DEFAULT now()
+      )`);
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS "${s}"."fence_templates" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "name" varchar NOT NULL,
+        "description" text NULL,
+        "kind" varchar NOT NULL DEFAULT 'polygon',
+        "default_fence_type" varchar NOT NULL DEFAULT 'custom',
+        "geojson" jsonb NOT NULL,
+        "buffer_m" numeric NULL,
+        "radius_m" numeric NULL,
+        "color" varchar NULL DEFAULT '#0d9488',
+        "metadata" jsonb NOT NULL DEFAULT '{}'::jsonb,
         "created_at" timestamptz NOT NULL DEFAULT now(),
         "updated_at" timestamptz NOT NULL DEFAULT now()
       )`);
@@ -453,6 +469,130 @@ export class GeofenceService {
        JOIN "${this.schema()}"."geofences" g ON g."id" = rt."geofence_id"
        ORDER BY rt."name" ASC`,
     );
+  }
+
+  async listFenceTemplates() {
+    await this.ensureTables();
+    const rows = await this.dataSource.query(
+      `SELECT * FROM "${this.schema()}"."fence_templates" ORDER BY "name" ASC`,
+    );
+    return rows.map((r: Record<string, unknown>) => this.mapFenceTemplate(r));
+  }
+
+  async createFenceTemplate(body: {
+    name: string;
+    description?: string;
+    kind?: string;
+    defaultFenceType?: string;
+    geojson?: FenceGeoJson;
+    path?: LatLng[];
+    centerLat?: number;
+    centerLng?: number;
+    radiusM?: number;
+    bufferM?: number;
+    color?: string;
+  }) {
+    await this.ensureTables();
+    const fenceType = body.defaultFenceType ?? (body.kind === 'corridor' ? 'corridor' : 'custom');
+    const norm = normalizeGeoJsonForStorage({
+      type: fenceType,
+      geojson: body.geojson,
+      path: body.path,
+      centerLat: body.centerLat,
+      centerLng: body.centerLng,
+      radiusM: body.radiusM,
+      bufferM: body.bufferM ?? 200,
+    });
+    const kind =
+      body.kind ??
+      (fenceType === 'corridor'
+        ? 'corridor'
+        : body.radiusM != null && !body.path
+          ? 'circle'
+          : 'polygon');
+    const rows = await this.dataSource.query(
+      `INSERT INTO "${this.schema()}"."fence_templates"
+        ("name","description","kind","default_fence_type","geojson","buffer_m","radius_m","color")
+       VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8) RETURNING *`,
+      [
+        body.name,
+        body.description ?? null,
+        kind,
+        fenceType,
+        JSON.stringify(norm.geojson),
+        body.bufferM ?? null,
+        body.radiusM ?? null,
+        body.color ?? '#0d9488',
+      ],
+    );
+    return this.mapFenceTemplate(rows[0]);
+  }
+
+  async deleteFenceTemplate(id: string) {
+    await this.ensureTables();
+    await this.dataSource.query(
+      `DELETE FROM "${this.schema()}"."fence_templates" WHERE "id" = $1`,
+      [id],
+    );
+    return { deleted: true };
+  }
+
+  /** Clone a saved template into a live geofence (optionally offset). */
+  async instantiateFenceTemplate(
+    id: string,
+    body: {
+      name: string;
+      type?: string;
+      offsetLat?: number;
+      offsetLng?: number;
+      bufferM?: number;
+      color?: string;
+    },
+  ) {
+    await this.ensureTables();
+    const rows = await this.dataSource.query(
+      `SELECT * FROM "${this.schema()}"."fence_templates" WHERE "id" = $1 LIMIT 1`,
+      [id],
+    );
+    if (!rows[0]) throw new NotFoundException('Template not found');
+    const tpl = rows[0] as Record<string, unknown>;
+    let geojson = tpl.geojson as FenceGeoJson;
+    if (typeof geojson === 'string') {
+      try {
+        geojson = JSON.parse(geojson) as FenceGeoJson;
+      } catch {
+        /* keep */
+      }
+    }
+    const dLat = Number(body.offsetLat ?? 0);
+    const dLng = Number(body.offsetLng ?? 0);
+    if (dLat || dLng) {
+      geojson = shiftGeoJson(geojson, dLat, dLng);
+    }
+    return this.createGeofence({
+      name: body.name,
+      type: body.type ?? String(tpl.default_fence_type ?? 'custom'),
+      geojson,
+      bufferM: body.bufferM ?? (tpl.buffer_m != null ? Number(tpl.buffer_m) : undefined),
+      radiusM: tpl.radius_m != null ? Number(tpl.radius_m) : undefined,
+      color: body.color ?? (tpl.color as string) ?? '#0d9488',
+    });
+  }
+
+  private mapFenceTemplate(r: Record<string, unknown>) {
+    return {
+      id: r.id,
+      name: r.name,
+      description: r.description ?? null,
+      kind: r.kind,
+      defaultFenceType: r.default_fence_type,
+      geojson: r.geojson,
+      bufferM: r.buffer_m != null ? Number(r.buffer_m) : null,
+      radiusM: r.radius_m != null ? Number(r.radius_m) : null,
+      color: r.color,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    };
   }
 
   async exportGeoJson() {

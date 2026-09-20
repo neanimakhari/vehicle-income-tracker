@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 const TOKEN_COOKIE = "system_admin_token";
+const REFRESH_COOKIE = "system_admin_refresh";
 const COOKIE_SECURE = process.env.COOKIE_SECURE === "true";
 
 const cookieBase = {
@@ -11,6 +12,8 @@ const cookieBase = {
   path: "/",
 };
 
+export { TOKEN_COOKIE, REFRESH_COOKIE };
+
 export async function getAuthToken(): Promise<string | null> {
   const cookieStore = await cookies();
   return cookieStore.get(TOKEN_COOKIE)?.value ?? null;
@@ -19,20 +22,39 @@ export async function getAuthToken(): Promise<string | null> {
 const REMEMBER_ME_DAYS = 30;
 const SESSION_COOKIE_DAYS = 1;
 
-export async function setAuthToken(token: string, options?: { rememberMe?: boolean }) {
+export async function getRefreshToken(): Promise<string | null> {
+  const cookieStore = await cookies();
+  return cookieStore.get(REFRESH_COOKIE)?.value ?? null;
+}
+
+export async function setAuthToken(
+  token: string,
+  options?: { rememberMe?: boolean; refreshToken?: string | null },
+) {
   const cookieStore = await cookies();
   const rememberMe = options?.rememberMe === true;
   const maxAge = rememberMe ? REMEMBER_ME_DAYS * 24 * 60 * 60 : SESSION_COOKIE_DAYS * 24 * 60 * 60;
+  const refreshMaxAge = REMEMBER_ME_DAYS * 24 * 60 * 60;
   cookieStore.set(TOKEN_COOKIE, token, {
     ...cookieBase,
     maxAge,
   });
+  if (options?.refreshToken) {
+    cookieStore.set(REFRESH_COOKIE, options.refreshToken, {
+      ...cookieBase,
+      maxAge: refreshMaxAge,
+    });
+  }
 }
 
 export async function clearAuthToken() {
   const cookieStore = await cookies();
   // Match set() attributes so browsers reliably clear the cookie
   cookieStore.set(TOKEN_COOKIE, "", {
+    ...cookieBase,
+    maxAge: 0,
+  });
+  cookieStore.set(REFRESH_COOKIE, "", {
     ...cookieBase,
     maxAge: 0,
   });

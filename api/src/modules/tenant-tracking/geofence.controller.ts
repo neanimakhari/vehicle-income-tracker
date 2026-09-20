@@ -172,6 +172,78 @@ class RouteTemplateDto {
   color?: string;
 }
 
+class FenceTemplateDto {
+  @IsString()
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsIn(['polygon', 'corridor', 'circle'])
+  kind?: string;
+
+  @IsOptional()
+  @IsIn(['rank', 'depot', 'fuel', 'forbidden', 'custom', 'corridor'])
+  defaultFenceType?: string;
+
+  @IsOptional()
+  @IsObject()
+  geojson?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LatLngDto)
+  path?: LatLngDto[];
+
+  @IsOptional()
+  @IsNumber()
+  centerLat?: number;
+
+  @IsOptional()
+  @IsNumber()
+  centerLng?: number;
+
+  @IsOptional()
+  @IsNumber()
+  radiusM?: number;
+
+  @IsOptional()
+  @IsNumber()
+  bufferM?: number;
+
+  @IsOptional()
+  @IsString()
+  color?: string;
+}
+
+class InstantiateTemplateDto {
+  @IsString()
+  name: string;
+
+  @IsOptional()
+  @IsIn(['rank', 'depot', 'fuel', 'forbidden', 'custom', 'corridor'])
+  type?: string;
+
+  @IsOptional()
+  @IsNumber()
+  offsetLat?: number;
+
+  @IsOptional()
+  @IsNumber()
+  offsetLng?: number;
+
+  @IsOptional()
+  @IsNumber()
+  bufferM?: number;
+
+  @IsOptional()
+  @IsString()
+  color?: string;
+}
+
 class AlertRuleDto {
   @IsString()
   name: string;
@@ -315,6 +387,33 @@ export class GeofenceController {
   @Roles('TENANT_ADMIN')
   createRoute(@Body() dto: RouteTemplateDto) {
     return this.geofences.createRouteTemplate(dto);
+  }
+
+  @Get('templates')
+  @Roles('TENANT_ADMIN', 'TENANT_USER')
+  listTemplates() {
+    return this.geofences.listFenceTemplates();
+  }
+
+  @Post('templates')
+  @Roles('TENANT_ADMIN')
+  createTemplate(@Body() dto: FenceTemplateDto) {
+    return this.geofences.createFenceTemplate(dto as never);
+  }
+
+  @Post('templates/:id/instantiate')
+  @Roles('TENANT_ADMIN')
+  instantiateTemplate(
+    @Param('id') id: string,
+    @Body() dto: InstantiateTemplateDto,
+  ) {
+    return this.geofences.instantiateFenceTemplate(id, dto);
+  }
+
+  @Delete('templates/:id')
+  @Roles('TENANT_ADMIN')
+  deleteTemplate(@Param('id') id: string) {
+    return this.geofences.deleteFenceTemplate(id);
   }
 
   @Get('vehicles/:vehicleId')

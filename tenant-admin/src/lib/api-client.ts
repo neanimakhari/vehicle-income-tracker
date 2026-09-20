@@ -34,7 +34,12 @@ export async function fetchJsonClient<T>(
         if (options?.tolerate401) {
           return null;
         }
-        window.location.href = "/login";
+        try {
+          await fetch("/api/logout", { method: "POST", credentials: "include" });
+        } catch {
+          /* ignore */
+        }
+        window.location.assign("/login?error=expired");
         return null;
       }
       return null;

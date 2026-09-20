@@ -24,9 +24,12 @@ export default async function GeofencesPage() {
     );
   }
 
-  const [fences, vehicles] = await Promise.all([
+  const [fences, vehicles, templates] = await Promise.all([
     fetchJson<unknown[]>("/tenant/tracking/geofences", { tolerate401: true }),
     fetchJson<Array<{ id: string; label: string }>>("/tenant/vehicles", {
+      tolerate401: true,
+    }),
+    fetchJson<unknown[]>("/tenant/tracking/geofences/templates", {
       tolerate401: true,
     }),
   ]);
@@ -34,6 +37,7 @@ export default async function GeofencesPage() {
   return (
     <GeofencesClient
       initial={(fences as never) ?? []}
+      initialTemplates={(templates as never) ?? []}
       vehicles={vehicles ?? []}
     />
   );

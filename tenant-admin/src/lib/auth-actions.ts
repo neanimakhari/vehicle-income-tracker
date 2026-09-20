@@ -46,6 +46,7 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
     const body = (await res.json().catch(() => ({}))) as {
       message?: string | string[];
       accessToken?: string;
+      refreshToken?: string;
       user?: { tenantId?: string };
     };
     const apiMessage = Array.isArray(body.message)
@@ -79,7 +80,10 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
     }
 
     try {
-      await setAuthSession(body.accessToken, tenant, { rememberMe });
+      await setAuthSession(body.accessToken, tenant, {
+        rememberMe,
+        refreshToken: body.refreshToken ?? null,
+      });
     } catch (sessionErr) {
       console.error("Login setAuthSession error:", sessionErr);
       return {

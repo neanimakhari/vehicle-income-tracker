@@ -17,13 +17,15 @@ export function middleware(request: NextRequest) {
   // Clearing it here breaks the / ↔ /login redirect loop.
   if (isPublicPath && token && loginError) {
     const res = NextResponse.next();
-    res.cookies.set(TOKEN_COOKIE, "", {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: COOKIE_SECURE,
-      path: "/",
-      maxAge: 0,
-    });
+    for (const name of [TOKEN_COOKIE, "system_admin_refresh"]) {
+      res.cookies.set(name, "", {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: COOKIE_SECURE,
+        path: "/",
+        maxAge: 0,
+      });
+    }
     return res;
   }
 

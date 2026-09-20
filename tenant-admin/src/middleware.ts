@@ -50,6 +50,32 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const parts = pathname.split("/").filter(Boolean);
   const first = parts[0] ?? "";
+  const loginError = request.nextUrl.searchParams.get("error");
+  const COOKIE_SECURE = process.env.COOKIE_SECURE === "true";
+
+  // Clear stale auth cookies when landing on login with an error so the
+  // authenticated layout shell never wraps the login form (logout bug).
+  if (
+    (pathname === "/login" || pathname.endsWith("/login")) &&
+    loginError
+  ) {
+    const res = NextResponse.next();
+    for (const name of [
+      "tenant_admin_token",
+      "tenant_admin_refresh",
+      "tenant_admin_tenant",
+      "tenant_admin_sys_banner",
+    ]) {
+      res.cookies.set(name, "", {
+        httpOnly: name !== "tenant_admin_sys_banner",
+        sameSite: "lax",
+        secure: COOKIE_SECURE,
+        path: "/",
+        maxAge: 0,
+      });
+    }
+    return res;
+  }
 
   // /{slug} or /{slug}/... → rewrite to internal path, remember slug
   if (isTenantSlug(first)) {

@@ -204,6 +204,20 @@ export function pointInFence(
   return false;
 }
 
+/** Close a click-path into a GeoJSON Polygon (ring closed). Requires ≥3 vertices. */
+export function pathToClosedPolygon(path: LatLng[]): GeoJsonPolygon {
+  if (path.length < 3) {
+    throw new Error('Polygon requires at least 3 points');
+  }
+  const ring = path.map((p) => [p.lng, p.lat]);
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  if (first[0] !== last[0] || first[1] !== last[1]) {
+    ring.push([first[0], first[1]]);
+  }
+  return { type: 'Polygon', coordinates: [ring] };
+}
+
 export function normalizeGeoJsonForStorage(input: {
   type: string;
   geojson?: FenceGeoJson | null;
@@ -214,17 +228,30 @@ export function normalizeGeoJsonForStorage(input: {
   path?: LatLng[] | null;
 }): { geojson: GeoJsonPolygon | GeoJsonLineString; centerLat: number | null; centerLng: number | null } {
   if (input.path && input.path.length >= 2) {
-    const line: GeoJsonLineString = {
-      type: 'LineString',
-      coordinates: input.path.map((p) => [p.lng, p.lat]),
-    };
     if (input.type === 'corridor') {
+      const line: GeoJsonLineString = {
+        type: 'LineString',
+        coordinates: input.path.map((p) => [p.lng, p.lat]),
+      };
       return {
         geojson: bufferLineString(line, Number(input.bufferM ?? 200)),
         centerLat: input.path[0].lat,
         centerLng: input.path[0].lng,
       };
     }
+    // Non-corridor click paths with ≥3 points become closed polygons
+    if (input.path.length >= 3) {
+      const poly = pathToClosedPolygon(input.path);
+      return {
+        geojson: poly,
+        centerLat: input.path[0].lat,
+        centerLng: input.path[0].lng,
+      };
+    }
+    const line: GeoJsonLineString = {
+      type: 'LineString',
+      coordinates: input.path.map((p) => [p.lng, p.lat]),
+    };
     return { geojson: line, centerLat: input.path[0].lat, centerLng: input.path[0].lng };
   }
   if (
@@ -269,3 +296,37 @@ export function normalizeGeoJsonForStorage(input: {
   }
   throw new Error('Unsupported geojson');
 }
+
+/** Shift all coordinates in a fence geometry by lat/lng deltas (apply template elsewhere). */
+export function shiftGeoJson(
+  gj: FenceGeoJson,
+  dLat: number,
+  dLng: number,
+): FenceGeoJson {
+  const u = unwrapGeometry(gj);
+  if (u.kind === 'polygon' && u.polygon) {
+    return {
+      type: 'Polygon',
+      coordinates: u.polygon.coordinates.map((ring) =>
+        ring.map(([lng, lat]) => [lng + dLng, lat + dLat]),
+      ),
+    };
+  }
+  if (u.kind === 'line' && u.line) {
+    return {
+      type: 'LineString',
+      coordinates: u.line.coordinates.map(([lng, lat]) => [
+        lng + dLng,
+        lat + dLat,
+      ]),
+    };
+  }
+  if (u.kind === 'point' && u.point) {
+    return {
+      type: 'Point',
+      coordinates: [u.point.lng + dLng, u.point.lat + dLat],
+    };
+  }
+  return gj;
+}
+

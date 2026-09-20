@@ -2,6 +2,8 @@ import {
   bufferLineString,
   circleToPolygon,
   haversineM,
+  normalizeGeoJsonForStorage,
+  pathToClosedPolygon,
   pointInFence,
   pointInRing,
 } from './geofence.geometry';
@@ -60,5 +62,29 @@ describe('geofence.geometry', () => {
     );
     expect(onPath).toBe(true);
     expect(haversineM({ lat: -26.2, lng: 28.06 }, { lat: -26.2, lng: 28.06 })).toBe(0);
+  });
+
+  it('pathToClosedPolygon closes the ring', () => {
+    const poly = pathToClosedPolygon([
+      { lat: -26.2, lng: 28.04 },
+      { lat: -26.2, lng: 28.05 },
+      { lat: -26.21, lng: 28.05 },
+    ]);
+    const ring = poly.coordinates[0];
+    expect(ring.length).toBe(4);
+    expect(ring[0]).toEqual(ring[ring.length - 1]);
+  });
+
+  it('normalize path ≥3 non-corridor becomes polygon', () => {
+    const out = normalizeGeoJsonForStorage({
+      type: 'custom',
+      path: [
+        { lat: -26.2, lng: 28.04 },
+        { lat: -26.2, lng: 28.05 },
+        { lat: -26.21, lng: 28.05 },
+        { lat: -26.21, lng: 28.04 },
+      ],
+    });
+    expect(out.geojson.type).toBe('Polygon');
   });
 });

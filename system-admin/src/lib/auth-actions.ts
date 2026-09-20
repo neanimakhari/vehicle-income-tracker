@@ -51,6 +51,7 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
     const body = (await res.json().catch(() => ({}))) as {
       message?: string | string[];
       accessToken?: string;
+      refreshToken?: string;
     };
     const apiMessage = Array.isArray(body.message)
       ? body.message.join(" ")
@@ -89,7 +90,10 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
     }
 
     try {
-      await setAuthToken(body.accessToken, { rememberMe });
+      await setAuthToken(body.accessToken, {
+        rememberMe,
+        refreshToken: body.refreshToken ?? null,
+      });
     } catch (sessionErr) {
       console.error("Login setAuthToken error:", sessionErr);
       return {
