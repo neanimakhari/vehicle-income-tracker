@@ -92,6 +92,11 @@ Heavy math runs offline via Nest cron; live map / income submit stay insert-only
 
 UI: `/tracking/analytics`, `/tracking/reconciliation`.
 
+### Route playback + gauges
+
+- Live Tracking: **Live | Playback** toggle; day load via `history?from=&to=&limit=2000`; scrubber + playhead; speed-vs-time chart; SVG dials for present values only.
+- Trips page: Day / segment **Replay** deep-links into Playback.
+- History API returns chronological points; recent (no range) still newest-first then reversed.
 ## Geofencing
 
 Modules: `tracking_geofence`, `tracking_alerts` (parent `tracking_live`).

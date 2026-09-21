@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 type VehicleTripRow = {
   vehicleId: string;
@@ -16,11 +16,34 @@ type VehicleTripRow = {
   maxSpeedKph: number | null;
   overspeedEvents: number;
   offlineEvents: number;
+  tripStarts?: string[];
+  tripStops?: string[];
 };
 
 function fmt(n: number | null | undefined, digits = 1, suffix = "") {
   if (n == null || Number.isNaN(n)) return "—";
   return `${n.toFixed(digits)}${suffix}`;
+}
+
+function pairTrips(starts: string[], stops: string[]) {
+  const pairs: Array<{ from: string; to: string; label: string }> = [];
+  const n = Math.max(starts.length, stops.length);
+  for (let i = 0; i < n; i++) {
+    const from = starts[i];
+    const to = stops[i] ?? stops[stops.length - 1];
+    if (!from) continue;
+    const end = to && new Date(to) > new Date(from) ? to : from;
+    const endIso =
+      end === from
+        ? new Date(new Date(from).getTime() + 30 * 60 * 1000).toISOString()
+        : end;
+    pairs.push({
+      from,
+      to: endIso,
+      label: `${new Date(from).toLocaleTimeString()} → ${new Date(endIso).toLocaleTimeString()}`,
+    });
+  }
+  return pairs;
 }
 
 export function TripsReportClient({
@@ -34,6 +57,7 @@ export function TripsReportClient({
   const [rows, setRows] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   async function load(nextDay: string) {
     setBusy(true);
@@ -64,7 +88,7 @@ export function TripsReportClient({
             Trips & parking
           </h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Engine start/stop events plus daily idle (parking) and stop counts.
+            Expand a vehicle to replay engine-start segments on the live map.
           </p>
         </div>
         <input
@@ -95,36 +119,84 @@ export function TripsReportClient({
               <th className="px-3 py-2 font-medium">Max km/h</th>
               <th className="px-3 py-2 font-medium">Overspeed</th>
               <th className="px-3 py-2 font-medium">Offline</th>
+              <th className="px-3 py-2 font-medium">Replay</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-3 py-8 text-center text-zinc-500">
+                <td colSpan={10} className="px-3 py-8 text-center text-zinc-500">
                   No trip/parking data for this day yet.
                 </td>
               </tr>
             ) : (
-              rows.map((r) => (
-                <tr
-                  key={r.vehicleId}
-                  className="border-t border-zinc-100 dark:border-zinc-800"
-                >
-                  <td className="px-3 py-2 font-medium">
-                    {r.vehicleLabel ?? r.vehicleId}
-                  </td>
-                  <td className="px-3 py-2">{r.tripCount}</td>
-                  <td className="px-3 py-2">
-                    {r.engineStarts} / {r.engineStops}
-                  </td>
-                  <td className="px-3 py-2">{fmt(r.parkingHours, 1)}</td>
-                  <td className="px-3 py-2">{fmt(r.movingHours, 1)}</td>
-                  <td className="px-3 py-2">{fmt(r.distanceKm, 1)}</td>
-                  <td className="px-3 py-2">{fmt(r.maxSpeedKph, 0)}</td>
-                  <td className="px-3 py-2">{r.overspeedEvents}</td>
-                  <td className="px-3 py-2">{r.offlineEvents}</td>
-                </tr>
-              ))
+              rows.map((r) => {
+                const pairs = pairTrips(r.tripStarts ?? [], r.tripStops ?? []);
+                const open = expanded === r.vehicleId;
+                return (
+                  <Fragment key={r.vehicleId}>
+                    <tr className="border-t border-zinc-100 dark:border-zinc-800">
+                      <td className="px-3 py-2 font-medium">
+                        {r.vehicleLabel ?? r.vehicleId}
+                      </td>
+                      <td className="px-3 py-2">{r.tripCount}</td>
+                      <td className="px-3 py-2">
+                        {r.engineStarts} / {r.engineStops}
+                      </td>
+                      <td className="px-3 py-2">{fmt(r.parkingHours, 1)}</td>
+                      <td className="px-3 py-2">{fmt(r.movingHours, 1)}</td>
+                      <td className="px-3 py-2">{fmt(r.distanceKm, 1)}</td>
+                      <td className="px-3 py-2">{fmt(r.maxSpeedKph, 0)}</td>
+                      <td className="px-3 py-2">{r.overspeedEvents}</td>
+                      <td className="px-3 py-2">{r.offlineEvents}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap gap-2">
+                          <a
+                            className="font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300"
+                            href={`/tracking?mode=playback&day=${encodeURIComponent(day)}&vehicleId=${encodeURIComponent(r.vehicleId)}`}
+                          >
+                            Day
+                          </a>
+                          {pairs.length ? (
+                            <button
+                              type="button"
+                              className="text-xs text-zinc-500 underline-offset-2 hover:underline"
+                              onClick={() =>
+                                setExpanded(open ? null : r.vehicleId)
+                              }
+                            >
+                              {open ? "Hide segments" : "Segments"}
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                    {open
+                      ? pairs.map((p, i) => (
+                          <tr
+                            key={`${r.vehicleId}-seg-${i}`}
+                            className="border-t border-zinc-50 bg-zinc-50/80 dark:border-zinc-900 dark:bg-zinc-950/40"
+                          >
+                            <td
+                              colSpan={9}
+                              className="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400"
+                            >
+                              Trip {i + 1}: {p.label}
+                            </td>
+                            <td className="px-3 py-2">
+                              <a
+                                className="text-xs font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300"
+                                href={`/tracking?mode=playback&vehicleId=${encodeURIComponent(r.vehicleId)}&from=${encodeURIComponent(p.from)}&to=${encodeURIComponent(p.to)}`}
+                              >
+                                Replay
+                              </a>
+                            </td>
+                          </tr>
+                        ))
+                      : null}
+                  </Fragment>
+                );
+              })
             )}
           </tbody>
         </table>

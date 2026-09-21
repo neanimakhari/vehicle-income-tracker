@@ -204,12 +204,12 @@ export class TenantTrackingService {
       });
     }
     const includeObd = await this.commercial.hasModule(slug, 'tracking_obd');
-    const limit = Math.min(500, Math.max(1, opts.limit ?? 100));
+    const maxLimit = 2000;
+    const limit = Math.min(maxLimit, Math.max(1, opts.limit ?? 100));
+    const ranged = Boolean(opts.from || opts.to);
+
     const rows = await this.pointsRepo().withSchema(async (repo) => {
-      const qb = repo
-        .createQueryBuilder('p')
-        .orderBy('p.recordedAt', 'DESC')
-        .take(limit);
+      const qb = repo.createQueryBuilder('p');
       if (opts.vehicleId) {
         qb.andWhere('p.vehicleId = :vid', { vid: opts.vehicleId });
       }
@@ -219,9 +219,37 @@ export class TenantTrackingService {
       if (opts.to) {
         qb.andWhere('p.recordedAt <= :to', { to: new Date(opts.to) });
       }
+      if (ranged) {
+        qb.orderBy('p.recordedAt', 'ASC').take(limit + 1);
+      } else {
+        // Live/recent: newest first, then reverse for chronological trail
+        qb.orderBy('p.recordedAt', 'DESC').take(limit);
+      }
       return qb.getMany();
     });
-    return rows.map((r) => this.toDto(r, includeObd));
+
+    let ordered = ranged ? rows : [...rows].reverse();
+
+    if (ranged && ordered.length > limit) {
+      const sampled: typeof ordered = [];
+      const n = ordered.length;
+      const step = (n - 1) / (limit - 1);
+      for (let i = 0; i < limit; i++) {
+        const idx = Math.min(n - 1, Math.round(i * step));
+        if (
+          sampled.length === 0 ||
+          sampled[sampled.length - 1] !== ordered[idx]
+        ) {
+          sampled.push(ordered[idx]);
+        }
+      }
+      if (sampled[sampled.length - 1] !== ordered[n - 1]) {
+        sampled.push(ordered[n - 1]);
+      }
+      ordered = sampled;
+    }
+
+    return ordered.map((r) => this.toDto(r, includeObd));
   }
 
   async metricsSummary(opts: {

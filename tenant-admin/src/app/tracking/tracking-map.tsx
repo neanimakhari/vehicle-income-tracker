@@ -54,6 +54,7 @@ type LeafletMarker = {
 type LeafletPolyline = {
   addTo: (m: LeafletMap) => LeafletPolyline;
   setLatLngs: (ll: [number, number][]) => void;
+  setStyle?: (opts: Record<string, unknown>) => void;
 };
 
 declare global {
@@ -119,23 +120,31 @@ function popupHtml(p: MapPoint) {
   </div>`;
 }
 
+/** Trail points must be chronological (oldest → newest). */
 export function TrackingMap({
   points,
   trail,
   selectedVehicleId,
   onSelectVehicle,
+  playheadIndex = null,
+  fitTrail = false,
 }: {
   points: MapPoint[];
   trail: MapPoint[];
   selectedVehicleId?: string | null;
   onSelectVehicle?: (vehicleId: string | null) => void;
+  playheadIndex?: number | null;
+  fitTrail?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const markersRef = useRef<Map<string, LeafletMarker>>(new Map());
   const trailRef = useRef<LeafletPolyline | null>(null);
+  const playedRef = useRef<LeafletPolyline | null>(null);
+  const playheadRef = useRef<LeafletMarker | null>(null);
   const LRef = useRef<LeafletNS | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const lastFitKey = useRef<string>("");
 
   useEffect(() => {
     let cancelled = false;
@@ -163,6 +172,8 @@ export function TrackingMap({
       mapRef.current = null;
       markersRef.current.clear();
       trailRef.current = null;
+      playedRef.current = null;
+      playheadRef.current = null;
       setMapReady(false);
     };
   }, []);
@@ -190,6 +201,12 @@ export function TrackingMap({
       if (!marker) {
         marker = L.marker(latLng, { icon }).addTo(map);
         markersRef.current.set(key, marker);
+        if (onSelectVehicle) {
+          (marker as unknown as { on: (ev: string, fn: () => void) => void }).on?.(
+            "click",
+            () => onSelectVehicle(String(p.vehicleId ?? "")),
+          );
+        }
       } else {
         marker.setLatLng(latLng);
         marker.setIcon?.(icon);
@@ -203,17 +220,23 @@ export function TrackingMap({
       }
     }
 
-    if (trail.length >= 2) {
-      const latlngs = [...trail]
-        .reverse()
-        .map((p) => [Number(p.latitude), Number(p.longitude)] as [number, number]);
+    const latlngs = trail.map(
+      (p) => [Number(p.latitude), Number(p.longitude)] as [number, number],
+    );
+
+    if (latlngs.length >= 2) {
       if (trailRef.current) {
         trailRef.current.setLatLngs(latlngs);
+        trailRef.current.setStyle?.({
+          color: "#94a3b8",
+          weight: 3,
+          opacity: 0.55,
+        });
       } else {
         trailRef.current = L.polyline(latlngs, {
-          color: "#0f766e",
-          weight: 4,
-          opacity: 0.75,
+          color: "#94a3b8",
+          weight: 3,
+          opacity: 0.55,
         }).addTo(map);
       }
     } else if (trailRef.current) {
@@ -221,17 +244,90 @@ export function TrackingMap({
       trailRef.current = null;
     }
 
-    const focus = points.filter((p) =>
-      selectedVehicleId ? String(p.vehicleId) === selectedVehicleId : true,
-    );
-    const boundsPts = focus.length ? focus : points;
-    if (boundsPts.length > 0) {
-      const bounds = L.latLngBounds(
-        boundsPts.map((p) => [Number(p.latitude), Number(p.longitude)] as [number, number]),
-      );
-      map.fitBounds(bounds.pad(0.35));
+    const idx =
+      playheadIndex != null && trail.length
+        ? Math.max(0, Math.min(playheadIndex, trail.length - 1))
+        : null;
+
+    if (idx != null && latlngs.length >= 1) {
+      const played = latlngs.slice(0, idx + 1);
+      if (played.length >= 2) {
+        if (playedRef.current) {
+          playedRef.current.setLatLngs(played);
+        } else {
+          playedRef.current = L.polyline(played, {
+            color: "#0f766e",
+            weight: 4,
+            opacity: 0.9,
+          }).addTo(map);
+        }
+      } else if (playedRef.current) {
+        map.removeLayer(playedRef.current);
+        playedRef.current = null;
+      }
+
+      const ph = trail[idx];
+      const phLl: [number, number] = [
+        Number(ph.latitude),
+        Number(ph.longitude),
+      ];
+      const phIcon = L.divIcon({
+        className: "",
+        html: `<div style="width:16px;height:16px;border-radius:999px;background:#f59e0b;border:2px solid #fff;box-shadow:0 0 0 3px rgba(245,158,11,.35)"></div>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+      });
+      if (!playheadRef.current) {
+        playheadRef.current = L.marker(phLl, { icon: phIcon }).addTo(map);
+      } else {
+        playheadRef.current.setLatLng(phLl);
+        playheadRef.current.setIcon?.(phIcon);
+      }
+      playheadRef.current.bindPopup(popupHtml(ph));
+    } else {
+      if (playedRef.current) {
+        map.removeLayer(playedRef.current);
+        playedRef.current = null;
+      }
+      if (playheadRef.current) {
+        map.removeLayer(playheadRef.current);
+        playheadRef.current = null;
+      }
     }
-  }, [points, trail, mapReady, selectedVehicleId, onSelectVehicle]);
+
+    const fitKey = fitTrail
+      ? `trail:${trail.length}:${trail[0]?.id}:${trail[trail.length - 1]?.id}`
+      : `fleet:${selectedVehicleId ?? "all"}:${points.map((p) => p.id).join(",")}`;
+    if (fitKey !== lastFitKey.current) {
+      lastFitKey.current = fitKey;
+      if (fitTrail && latlngs.length >= 2) {
+        map.fitBounds(L.latLngBounds(latlngs).pad(0.2));
+      } else {
+        const focus = points.filter((p) =>
+          selectedVehicleId ? String(p.vehicleId) === selectedVehicleId : true,
+        );
+        const boundsPts = focus.length ? focus : points;
+        if (boundsPts.length > 0) {
+          map.fitBounds(
+            L.latLngBounds(
+              boundsPts.map(
+                (p) =>
+                  [Number(p.latitude), Number(p.longitude)] as [number, number],
+              ),
+            ).pad(0.35),
+          );
+        }
+      }
+    }
+  }, [
+    points,
+    trail,
+    mapReady,
+    selectedVehicleId,
+    onSelectVehicle,
+    playheadIndex,
+    fitTrail,
+  ]);
 
   return (
     <div

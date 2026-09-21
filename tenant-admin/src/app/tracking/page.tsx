@@ -34,8 +34,24 @@ type DeviceRow = {
   lastSeenAt: string | null;
 };
 
-export default async function TrackingPage() {
+export default async function TrackingPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await requireAuth();
+  const sp = await searchParams;
+  const pick = (k: string) => {
+    const v = sp[k];
+    return Array.isArray(v) ? v[0] : v;
+  };
+  const vehicleId = pick("vehicleId");
+  const from = pick("from");
+  const to = pick("to");
+  const day = pick("day");
+  const modeParam = pick("mode");
+  const initialMode =
+    modeParam === "playback" || from || day ? "playback" : "live";
 
   const policy = await fetchJson<{
     tenantSlug?: string;
@@ -70,6 +86,11 @@ export default async function TrackingPage() {
       entitlements={entitlementsRaw}
       vehicles={vehicles ?? []}
       devices={devices ?? []}
+      initialMode={initialMode}
+      initialDay={day}
+      initialFrom={from}
+      initialTo={to}
+      initialVehicleId={vehicleId}
     />
   );
 }
