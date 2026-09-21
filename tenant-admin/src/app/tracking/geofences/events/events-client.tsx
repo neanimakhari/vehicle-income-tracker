@@ -60,7 +60,7 @@ export function GeofenceEventsClient({ initial }: { initial: Ev[] }) {
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-3 py-8 text-center text-zinc-500">
-                  No events yet — assign fences and move/simulate a vehicle.
+                  No events yet — assign fences and wait for live tracker points.
                 </td>
               </tr>
             ) : (

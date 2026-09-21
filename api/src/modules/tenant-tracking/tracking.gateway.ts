@@ -81,4 +81,8 @@ export class TrackingGateway
       ?.to(`tenant:${tenantSlug}`)
       .emit('tracking:geofence', event);
   }
+
+  emitAlert(tenantSlug: string, event: Record<string, unknown>) {
+    this.server?.to(`tenant:${tenantSlug}`).emit('tracking:alert', event);
+  }
 }

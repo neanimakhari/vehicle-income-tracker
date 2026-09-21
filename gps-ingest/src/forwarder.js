@@ -37,6 +37,17 @@ function createForwarder(opts) {
     const out = { ...point };
     delete out._alarm;
     delete out._altitude;
+    delete out._additionalTags;
+    // Keep Nest ingest fields; drop decoder-only extras not in DTO
+    delete out.gpsSatellites;
+    delete out.beidouSatellites;
+    delete out.glonassSatellites;
+    delete out.intakeAirC;
+    delete out.mafGps;
+    delete out.intakeMapKpa;
+    delete out.throttlePercent;
+    delete out.oilLevelPercent;
+    delete out.dtcHex;
     return out;
   }
 

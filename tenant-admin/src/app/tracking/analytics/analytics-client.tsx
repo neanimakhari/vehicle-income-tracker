@@ -13,10 +13,16 @@ type AnalyticsRow = {
   utilisationHours: number | null;
   avgSpeedMoving: number | null;
   maxSpeedKph: number | null;
+  stopCount?: number;
+  ignitionOnSeconds?: number;
+  avgExternalVoltage?: number | null;
+  minExternalVoltage?: number | null;
+  gpsFixOkPct?: number | null;
   estimatedLitres?: number | null;
   litresPer100km?: number | null;
   kmPerLitre?: number | null;
   overspeedMovingPct: number | null;
+  overspeedSampleCount?: number;
   confidence: string;
   computedAt?: string;
 };
@@ -71,7 +77,7 @@ export function TrackingAnalyticsClient({
       const res = await fetch("/api/proxy/tenant/tracking/analytics/recalculate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ day, includeSimulate: true }),
+        body: JSON.stringify({ day, includeSimulate: false }),
       });
       if (!res.ok) throw new Error(`Recalculate failed (${res.status})`);
       await load(day);
@@ -145,9 +151,13 @@ export function TrackingAnalyticsClient({
             <tr>
               <th className="px-3 py-2 font-medium">Vehicle</th>
               <th className="px-3 py-2 font-medium">Km</th>
+              <th className="px-3 py-2 font-medium">Stops</th>
+              <th className="px-3 py-2 font-medium">Ign. h</th>
               <th className="px-3 py-2 font-medium">Idle %</th>
               <th className="px-3 py-2 font-medium">Util. h</th>
               <th className="px-3 py-2 font-medium">Avg / max</th>
+              <th className="px-3 py-2 font-medium">Avg V</th>
+              <th className="px-3 py-2 font-medium">GPS %</th>
               {includeObd ? (
                 <>
                   <th className="px-3 py-2 font-medium">L</th>
@@ -162,7 +172,7 @@ export function TrackingAnalyticsClient({
             {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={includeObd ? 9 : 7}
+                  colSpan={includeObd ? 13 : 11}
                   className="px-3 py-8 text-center text-zinc-500"
                 >
                   No rollup for this day yet — run Recalculate or wait for the hourly job.
@@ -179,11 +189,19 @@ export function TrackingAnalyticsClient({
                     {fmt(r.distanceKm, 1)}
                     <span className="ml-1 text-xs text-zinc-500">{r.distanceBasis}</span>
                   </td>
+                  <td className="px-3 py-2">{r.stopCount ?? "—"}</td>
+                  <td className="px-3 py-2">
+                    {r.ignitionOnSeconds != null
+                      ? fmt(r.ignitionOnSeconds / 3600, 1)
+                      : "—"}
+                  </td>
                   <td className="px-3 py-2">{fmt(r.idlePct, 0, "%")}</td>
                   <td className="px-3 py-2">{fmt(r.utilisationHours, 2)}</td>
                   <td className="px-3 py-2">
                     {fmt(r.avgSpeedMoving, 0)} / {fmt(r.maxSpeedKph, 0)}
                   </td>
+                  <td className="px-3 py-2">{fmt(r.avgExternalVoltage, 1)}</td>
+                  <td className="px-3 py-2">{fmt(r.gpsFixOkPct, 0, "%")}</td>
                   {includeObd ? (
                     <>
                       <td className="px-3 py-2">{fmt(r.estimatedLitres, 2)}</td>

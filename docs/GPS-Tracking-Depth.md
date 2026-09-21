@@ -29,9 +29,27 @@ Branch: `feature/gps-tracking-postgis-timescale` (merged); geofencing on `featur
 ## Local demo
 
 1. Enable modules for tenant (pro plan includes them after migration).
-2. Open Live Tracking → POPIA → Simulate.
-3. Optional: `cd gps-ingest && GPS_INGEST_SECRET=... node src/server.js` then `IMEI=... npm run simulate`.
+2. Open Live Tracking → POPIA → bind a real IMEI (or set `TRACKING_SIMULATE_ENABLED=true` for lab-only simulate).
+3. Optional: `cd gps-ingest && GPS_INGEST_SECRET=... node src/server.js` then `IMEI=... npm run simulate` (engineering only).
 4. Micodus unit tests: `cd gps-ingest && npm test`.
+
+## Micodus depth (alarms + events)
+
+Migration `1700000000043`:
+
+- Extra point columns: `alarm_flags`, `alarm_ext`, `gsm_signal`, `msg_id`, `can_odometer_km`, `can_speed_kph`
+- `tracking_events` stream (engine start/stop, overspeed, power/low voltage, GPS lost/fix, device alarm bits)
+- Settings: `overspeed_kph` (default 60), `low_voltage_threshold`, `offline_minutes`, `idle_alert_minutes`
+- Live ingest sets `overspeed` from tenant speed limit **and** JT808 alarm bits 1/13
+- Alert rule triggers expanded: `overspeed`, `engine_start`, `engine_stop`, `power_loss`, `low_voltage`, `offline`
+- WS event `tracking:alert`; API `GET /tenant/tracking/events`
+- Simulation is **opt-in** (`TRACKING_SIMULATE_ENABLED=true`); default off in compose
+
+Capability notes:
+
+- GPS + ACC + voltage + odometer work on third-party JT808 today
+- Full CAN (RPM/coolant/fuel rate) fills dynamically when tags `0x81+` appear
+- Capacitive fuel / Micodus cloud-only instrument panels need hardware or vendor path
 
 ## Micodus MV55G onboarding
 

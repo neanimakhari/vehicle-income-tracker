@@ -62,7 +62,7 @@ export function TrackingReconcileClient({
       const res = await fetch("/api/proxy/tenant/tracking/analytics/recalculate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ day, includeSimulate: true }),
+        body: JSON.stringify({ day, includeSimulate: false }),
       });
       if (!res.ok) throw new Error(`Recalculate failed (${res.status})`);
       await load(day);

@@ -21,9 +21,12 @@ export default async function TrackingAlertsPage() {
       </div>
     );
   }
-  const [rules, fires] = await Promise.all([
+  const [rules, fires, events] = await Promise.all([
     fetchJson<unknown[]>("/tenant/tracking/alert-rules", { tolerate401: true }),
     fetchJson<unknown[]>("/tenant/tracking/alert-rules/fires/recent", {
+      tolerate401: true,
+    }),
+    fetchJson<unknown[]>("/tenant/tracking/events?limit=40", {
       tolerate401: true,
     }),
   ]);
@@ -31,6 +34,7 @@ export default async function TrackingAlertsPage() {
     <AlertsClient
       initialRules={(rules as never) ?? []}
       initialFires={(fires as never) ?? []}
+      initialEvents={(events as never) ?? []}
     />
   );
 }

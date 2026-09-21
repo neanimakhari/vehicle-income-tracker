@@ -13,6 +13,12 @@ type Rule = {
 };
 
 const TRIGGERS = [
+  "overspeed",
+  "engine_start",
+  "engine_stop",
+  "power_loss",
+  "low_voltage",
+  "offline",
   "enter_forbidden",
   "off_corridor_minutes",
   "rank_dwell_minutes",
@@ -23,14 +29,17 @@ const TRIGGERS = [
 export function AlertsClient({
   initialRules,
   initialFires,
+  initialEvents = [],
 }: {
   initialRules: Rule[];
   initialFires: Array<Record<string, unknown>>;
+  initialEvents?: Array<Record<string, unknown>>;
 }) {
   const [rules, setRules] = useState(initialRules);
   const [fires, setFires] = useState(initialFires);
-  const [name, setName] = useState("Forbidden enter");
-  const [trigger, setTrigger] = useState(TRIGGERS[0]);
+  const [events, setEvents] = useState(initialEvents);
+  const [name, setName] = useState("Overspeed alert");
+  const [trigger, setTrigger] = useState("overspeed");
   const [threshold, setThreshold] = useState(5);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,11 +74,19 @@ export function AlertsClient({
     if (res.ok) setFires(await res.json());
   }
 
+  async function refreshEvents() {
+    const res = await fetch("/api/proxy/tenant/tracking/events?limit=40");
+    if (res.ok) setEvents(await res.json());
+  }
+
   return (
     <div className="space-y-4">
       <div>
         <p className="text-xs uppercase tracking-wide text-zinc-500">Tracking alerts</p>
-        <h1 className="text-2xl font-semibold">Geofence alert rules</h1>
+        <h1 className="text-2xl font-semibold">Tracking alert rules</h1>
+        <p className="mt-1 text-sm text-zinc-500">
+          Geofence rules plus overspeed, engine, power, and voltage alerts from live tracker data.
+        </p>
       </div>
       {error ? (
         <p className="text-sm text-red-600">{error}</p>
@@ -138,6 +155,30 @@ export function AlertsClient({
           </tbody>
         </table>
       </div>
+
+      <div className="flex items-center justify-between">
+        <h2 className="font-medium">Live tracker events</h2>
+        <button type="button" className="text-sm underline" onClick={refreshEvents}>
+          Refresh
+        </button>
+      </div>
+      <ul className="max-h-64 space-y-2 overflow-auto text-sm">
+        {events.map((e) => (
+          <li
+            key={String(e.id)}
+            className="rounded-md border border-zinc-200 px-3 py-2 dark:border-zinc-800"
+          >
+            <span className="font-mono text-xs text-zinc-500">{String(e.eventType)}</span>{" "}
+            <span className="text-zinc-500">
+              {e.recordedAt ? new Date(String(e.recordedAt)).toLocaleString() : ""}
+            </span>
+            <div>{String(e.message ?? "")}</div>
+          </li>
+        ))}
+        {!events.length ? (
+          <li className="text-zinc-500">No tracker events yet — wait for live ingest.</li>
+        ) : null}
+      </ul>
 
       <div className="flex items-center justify-between">
         <h2 className="font-medium">Recent fires</h2>

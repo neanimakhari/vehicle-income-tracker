@@ -20,6 +20,7 @@ import {
   GeofenceAlertController,
   GeofenceController,
 } from './geofence.controller';
+import { TrackingEventsService } from './tracking-events.service';
 
 @Module({
   imports: [
@@ -49,7 +50,13 @@ import {
     TrackingAnalyticsScheduler,
     GeofenceService,
     GeofenceScheduler,
+    TrackingEventsService,
   ],
-  exports: [TenantTrackingService, TrackingAnalyticsService, GeofenceService],
+  exports: [
+    TenantTrackingService,
+    TrackingAnalyticsService,
+    GeofenceService,
+    TrackingEventsService,
+  ],
 })
 export class TenantTrackingModule {}

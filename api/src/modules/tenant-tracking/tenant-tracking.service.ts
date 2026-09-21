@@ -16,6 +16,7 @@ import { GpsTrackingPoint } from './gps-tracking-point.entity';
 import { TrackerDevice } from './tracker-device.entity';
 import { TrackingGateway } from './tracking.gateway';
 import { GeofenceService } from './geofence.service';
+import { TrackingEventsService } from './tracking-events.service';
 
 export type InsertPointInput = {
   vehicleId?: string | null;
@@ -38,6 +39,12 @@ export type InsertPointInput = {
   coolantC?: number | null;
   engineLoadPercent?: number | null;
   overspeed?: boolean | null;
+  alarmFlags?: number | null;
+  alarmExt?: string | null;
+  gsmSignal?: number | null;
+  msgId?: number | null;
+  canOdometerKm?: number | null;
+  canSpeedKph?: number | null;
   recordedAt?: Date;
   rawPayload?: string | null;
 };
@@ -57,6 +64,7 @@ export class TenantTrackingService {
     private readonly audit: AuditService,
     private readonly gateway: TrackingGateway,
     private readonly geofences: GeofenceService,
+    private readonly trackingEvents: TrackingEventsService,
     @InjectRepository(TrackerDevice)
     private readonly devicesRepo: Repository<TrackerDevice>,
   ) {}
@@ -117,31 +125,36 @@ export class TenantTrackingService {
         pick('backupBatteryLevel', 'backup_battery_level') ?? null,
       overspeed: pick('overspeed', 'overspeed') ?? null,
       recordedAt,
+      gsmSignal: pick('gsmSignal', 'gsm_signal') ?? null,
+      alarmFlags: pick('alarmFlags', 'alarm_flags') ?? null,
     };
-    if (includeObd) {
+    // Voltage is always useful (OBD-rail / battery) even without full OBD module
+    {
       const externalVoltage = pick<number | string>(
         'externalVoltage',
         'external_voltage',
       );
+      const odometerKm = pick<number | string>('odometerKm', 'odometer_km');
+      base.externalVoltage =
+        externalVoltage != null ? Number(externalVoltage) : null;
+      base.odometerKm = odometerKm != null ? Number(odometerKm) : null;
+    }
+    if (includeObd) {
       const engineRpm = pick<number | string>('engineRpm', 'engine_rpm');
       const fuelRateLph = pick<number | string>('fuelRateLph', 'fuel_rate_lph');
       const fuelLevelPercent = pick<number | string>(
         'fuelLevelPercent',
         'fuel_level_percent',
       );
-      const odometerKm = pick<number | string>('odometerKm', 'odometer_km');
       const coolantC = pick<number | string>('coolantC', 'coolant_c');
       const engineLoadPercent = pick<number | string>(
         'engineLoadPercent',
         'engine_load_percent',
       );
-      base.externalVoltage =
-        externalVoltage != null ? Number(externalVoltage) : null;
       base.engineRpm = engineRpm != null ? Number(engineRpm) : null;
       base.fuelRateLph = fuelRateLph != null ? Number(fuelRateLph) : null;
       base.fuelLevelPercent =
         fuelLevelPercent != null ? Number(fuelLevelPercent) : null;
-      base.odometerKm = odometerKm != null ? Number(odometerKm) : null;
       base.coolantC = coolantC != null ? Number(coolantC) : null;
       base.engineLoadPercent =
         engineLoadPercent != null ? Number(engineLoadPercent) : null;
@@ -275,6 +288,16 @@ export class TenantTrackingService {
       );
     }
     const recordedAt = input.recordedAt ?? new Date();
+    const limitKph = await this.trackingEvents.getSpeedLimitKph();
+    const overspeed =
+      input.overspeed === true
+        ? true
+        : this.trackingEvents.computeOverspeed({
+            speedKph: input.speedKph,
+            alarmFlags: input.alarmFlags,
+            limitKph,
+          });
+
     const saved = await this.pointsRepo().withSchema(async (repo) => {
       const point = repo.create({
         vehicleId: input.vehicleId ?? null,
@@ -296,7 +319,14 @@ export class TenantTrackingService {
         odometerKm: input.odometerKm ?? null,
         coolantC: input.coolantC ?? null,
         engineLoadPercent: input.engineLoadPercent ?? null,
-        overspeed: input.overspeed ?? null,
+        overspeed,
+        alarmFlags:
+          input.alarmFlags != null ? String(input.alarmFlags) : null,
+        alarmExt: input.alarmExt ?? null,
+        gsmSignal: input.gsmSignal ?? null,
+        msgId: input.msgId ?? null,
+        canOdometerKm: input.canOdometerKm ?? null,
+        canSpeedKph: input.canSpeedKph ?? null,
         recordedAt,
         rawPayload: input.rawPayload ?? null,
       });
@@ -313,6 +343,31 @@ export class TenantTrackingService {
       );
     } catch {
       /* postgis optional */
+    }
+
+    try {
+      await this.trackingEvents.processPointEdges({
+        vehicleId: saved.vehicleId,
+        deviceId: saved.deviceId,
+        pointId: saved.id,
+        ignitionOn: saved.ignitionOn,
+        overspeed: saved.overspeed === true,
+        externalVoltage:
+          saved.externalVoltage != null
+            ? Number(saved.externalVoltage)
+            : null,
+        gpsFixOk: saved.gpsFixOk,
+        alarmFlags: input.alarmFlags ?? null,
+        alarmExt: input.alarmExt ?? null,
+        latitude: Number(saved.latitude),
+        longitude: Number(saved.longitude),
+        speedKph:
+          saved.speedKph != null ? Number(saved.speedKph) : null,
+        recordedAt: saved.recordedAt,
+        source: saved.source,
+      });
+    } catch {
+      /* events must not break ingest */
     }
 
     const includeObd = await this.commercial.hasModule(slug, 'tracking_obd');

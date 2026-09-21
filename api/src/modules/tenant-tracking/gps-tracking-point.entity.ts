@@ -70,6 +70,24 @@ export class GpsTrackingPoint {
   @Column({ type: 'boolean', nullable: true })
   overspeed: boolean | null;
 
+  @Column({ name: 'alarm_flags', type: 'bigint', nullable: true })
+  alarmFlags: string | null;
+
+  @Column({ name: 'alarm_ext', type: 'varchar', nullable: true })
+  alarmExt: string | null;
+
+  @Column({ name: 'gsm_signal', type: 'smallint', nullable: true })
+  gsmSignal: number | null;
+
+  @Column({ name: 'msg_id', type: 'int', nullable: true })
+  msgId: number | null;
+
+  @Column({ name: 'can_odometer_km', type: 'numeric', nullable: true })
+  canOdometerKm: number | null;
+
+  @Column({ name: 'can_speed_kph', type: 'numeric', nullable: true })
+  canSpeedKph: number | null;
+
   @Column({ name: 'recorded_at', type: 'timestamptz' })
   recordedAt: Date;
 

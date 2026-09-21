@@ -17,7 +17,7 @@ services:
       JWT_REFRESH_SECRET_FILE: /run/secrets/jwt_refresh_secret
       BOOTSTRAP_TOKEN_FILE: /run/secrets/bootstrap_token
       GPS_INGEST_SECRET: ${GPS_INGEST_SECRET:-}
-      TRACKING_SIMULATE_ENABLED: ${TRACKING_SIMULATE_ENABLED:-true}
+      TRACKING_SIMULATE_ENABLED: ${TRACKING_SIMULATE_ENABLED:-false}
     ports:
       - "${API_PORT:-4000}:3000"
     volumes:

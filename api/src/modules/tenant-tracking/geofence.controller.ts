@@ -254,6 +254,12 @@ class AlertRuleDto {
     'off_corridor_minutes',
     'rank_dwell_minutes',
     'enter_rank',
+    'overspeed',
+    'engine_start',
+    'engine_stop',
+    'power_loss',
+    'low_voltage',
+    'offline',
   ])
   trigger: string;
 
@@ -286,6 +292,22 @@ class SettingsDto {
   @IsOptional()
   @IsNumber()
   geofenceHysteresisSamples?: number;
+
+  @IsOptional()
+  @IsNumber()
+  overspeedKph?: number;
+
+  @IsOptional()
+  @IsNumber()
+  lowVoltageThreshold?: number;
+
+  @IsOptional()
+  @IsNumber()
+  offlineMinutes?: number;
+
+  @IsOptional()
+  @IsNumber()
+  idleAlertMinutes?: number;
 }
 
 class RecalcDto {

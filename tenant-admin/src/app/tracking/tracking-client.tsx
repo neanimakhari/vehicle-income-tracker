@@ -166,33 +166,6 @@ export function TrackingClient({
     if (Array.isArray(devs)) setDevices(devs);
   }
 
-  async function runFullSimulate(vehicleId: string) {
-    setBusy(`sim-${vehicleId}`);
-    setMessage(null);
-    setSelectedId(vehicleId);
-    try {
-      const profile = hasObd ? "obd" : "basic";
-      const res = await fetch("/api/proxy/tenant/tracking/simulate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vehicleId, profile, points: 36 }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setMessage(err?.message ?? `Simulate failed (${res.status})`);
-      } else {
-        setMessage(
-          hasObd
-            ? "Full OBD demo trail generated (GPS + RPM, fuel, voltage, coolant, load)."
-            : "GPS demo trail generated.",
-        );
-        await refresh();
-      }
-    } finally {
-      setBusy(null);
-    }
-  }
-
   async function bindDevice() {
     if (!selectedId || !bindImei.trim()) return;
     setBusy("bind");
@@ -369,20 +342,6 @@ export function TrackingClient({
           <button type="button" className="btn btn-secondary" onClick={refresh}>
             Refresh
           </button>
-          {selected && (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={busy?.startsWith("sim")}
-              onClick={() => runFullSimulate(selected.vehicle.id)}
-            >
-              {busy === `sim-${selected.vehicle.id}`
-                ? "Simulating…"
-                : hasObd
-                  ? "Simulate full OBD"
-                  : "Simulate GPS"}
-            </button>
-          )}
         </div>
       </div>
 
@@ -490,18 +449,8 @@ export function TrackingClient({
                 <p className="text-xs text-zinc-500">
                   {selectedPoint
                     ? `${Number(selectedPoint.latitude).toFixed(5)}, ${Number(selectedPoint.longitude).toFixed(5)} · ${ageLabel(selectedPoint.recordedAt)}`
-                    : "No position yet — run a full simulation or wait for ingest."}
+                    : "No position yet — bind an IMEI and wait for tracker ingest."}
                 </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="btn btn-primary text-sm"
-                  disabled={busy?.startsWith("sim")}
-                  onClick={() => runFullSimulate(selected.vehicle.id)}
-                >
-                  {busy === `sim-${selected.vehicle.id}` ? "Running…" : "Simulate everything"}
-                </button>
               </div>
             </div>
 
@@ -547,25 +496,28 @@ export function TrackingClient({
               />
             </div>
 
-            {hasObd ? (
-              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                <TelemetryCell label="Engine RPM" value={fmt(selectedPoint?.engineRpm, 0)} />
-                <TelemetryCell label="Fuel rate" value={fmt(selectedPoint?.fuelRateLph, 1, " L/h")} />
-                <TelemetryCell label="Fuel level" value={fmt(selectedPoint?.fuelLevelPercent, 0, "%")} />
-                <TelemetryCell label="Voltage" value={fmt(selectedPoint?.externalVoltage, 1, " V")} />
-                <TelemetryCell label="Coolant" value={fmt(selectedPoint?.coolantC, 0, "°C")} />
-                <TelemetryCell label="Engine load" value={fmt(selectedPoint?.engineLoadPercent, 0, "%")} />
-                <TelemetryCell
-                  label="Odometer"
-                  value={fmt(selectedPoint?.odometerKm, 1, " km")}
-                />
-              </div>
-            ) : (
-              <p className="mt-3 text-xs text-zinc-500">
-                OBD metrics locked — enable <code className="text-[11px]">tracking_obd</code> for RPM, fuel,
-                voltage, coolant, and load.
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+              <TelemetryCell label="Voltage" value={fmt(selectedPoint?.externalVoltage, 1, " V")} />
+              <TelemetryCell
+                label="Odometer"
+                value={fmt(selectedPoint?.odometerKm, 1, " km")}
+              />
+              {hasObd ? (
+                <>
+                  <TelemetryCell label="Engine RPM" value={fmt(selectedPoint?.engineRpm, 0)} />
+                  <TelemetryCell label="Fuel rate" value={fmt(selectedPoint?.fuelRateLph, 1, " L/h")} />
+                  <TelemetryCell label="Fuel level" value={fmt(selectedPoint?.fuelLevelPercent, 0, "%")} />
+                  <TelemetryCell label="Coolant" value={fmt(selectedPoint?.coolantC, 0, "°C")} />
+                  <TelemetryCell label="Engine load" value={fmt(selectedPoint?.engineLoadPercent, 0, "%")} />
+                </>
+              ) : null}
+            </div>
+            {!hasObd ? (
+              <p className="mt-2 text-xs text-zinc-500">
+                Full OBD (RPM, fuel rate, coolant) needs <code className="text-[11px]">tracking_obd</code> —
+                values appear when the device sends CAN tags.
               </p>
-            )}
+            ) : null}
 
             <div className="mt-4 flex flex-col gap-2 border-t border-zinc-200/70 pt-4 dark:border-zinc-700 sm:flex-row sm:items-end">
               <div className="min-w-0 flex-1">
@@ -655,7 +607,7 @@ export function TrackingClient({
                       colSpan={hasObd ? 6 : 3}
                       className="px-3 py-8 text-center text-zinc-500"
                     >
-                      No trail yet — simulate everything on a vehicle.
+                      No trail yet — bind a tracker IMEI and wait for live points.
                     </td>
                   </tr>
                 )}

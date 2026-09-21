@@ -243,6 +243,12 @@ export class TenantSchemasService {
         "coolant_c" numeric NULL DEFAULT NULL,
         "engine_load_percent" numeric NULL DEFAULT NULL,
         "overspeed" boolean NULL DEFAULT NULL,
+        "alarm_flags" bigint NULL DEFAULT NULL,
+        "alarm_ext" varchar NULL DEFAULT NULL,
+        "gsm_signal" smallint NULL DEFAULT NULL,
+        "msg_id" int NULL DEFAULT NULL,
+        "can_odometer_km" numeric NULL DEFAULT NULL,
+        "can_speed_kph" numeric NULL DEFAULT NULL,
         "recorded_at" timestamptz NOT NULL,
         "raw_payload" text NULL DEFAULT NULL,
         "created_at" timestamptz NOT NULL DEFAULT now()
@@ -353,6 +359,30 @@ export class TenantSchemasService {
         "default_corridor_buffer_m" int NOT NULL DEFAULT 200,
         "geofence_hysteresis_samples" int NOT NULL DEFAULT 2,
         "updated_at" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await this.dataSource.query(`
+      ALTER TABLE "${schemaName}"."tenant_tracking_settings"
+        ADD COLUMN IF NOT EXISTS "overspeed_kph" numeric NOT NULL DEFAULT 60,
+        ADD COLUMN IF NOT EXISTS "low_voltage_threshold" numeric NOT NULL DEFAULT 11.5,
+        ADD COLUMN IF NOT EXISTS "offline_minutes" int NOT NULL DEFAULT 15,
+        ADD COLUMN IF NOT EXISTS "idle_alert_minutes" int NOT NULL DEFAULT 20
+    `);
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS "${schemaName}"."tracking_events" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "vehicle_id" uuid NULL,
+        "device_id" varchar NULL,
+        "point_id" uuid NULL,
+        "event_type" varchar NOT NULL,
+        "severity" varchar NOT NULL DEFAULT 'info',
+        "message" text NULL,
+        "payload" jsonb NOT NULL DEFAULT '{}'::jsonb,
+        "latitude" numeric NULL,
+        "longitude" numeric NULL,
+        "speed_kph" numeric NULL,
+        "recorded_at" timestamptz NOT NULL,
+        "created_at" timestamptz NOT NULL DEFAULT now()
       )
     `);
     await this.dataSource.query(

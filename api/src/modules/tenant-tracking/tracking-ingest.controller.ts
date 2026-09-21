@@ -60,6 +60,11 @@ class IngestPointDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
+  backupBatteryLevel?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
   coolantC?: number;
 
   @IsOptional()
@@ -80,6 +85,39 @@ class IngestPointDto {
   @IsOptional()
   @IsBoolean()
   gpsFixOk?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  overspeed?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  alarmFlags?: number;
+
+  @IsOptional()
+  @IsString()
+  alarmExt?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  gsmSignal?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  msgId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  canOdometerKm?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  canSpeedKph?: number;
 
   @IsOptional()
   @IsString()
@@ -124,10 +162,18 @@ export class TrackingIngestController {
       fuelRateLph: dto.fuelRateLph,
       fuelLevelPercent: dto.fuelLevelPercent,
       externalVoltage: dto.externalVoltage,
+      backupBatteryLevel: dto.backupBatteryLevel,
       coolantC: dto.coolantC,
       odometerKm: dto.odometerKm,
       engineLoadPercent: dto.engineLoadPercent,
       satellites: dto.satellites,
+      overspeed: dto.overspeed,
+      alarmFlags: dto.alarmFlags,
+      alarmExt: dto.alarmExt,
+      gsmSignal: dto.gsmSignal,
+      msgId: dto.msgId,
+      canOdometerKm: dto.canOdometerKm,
+      canSpeedKph: dto.canSpeedKph,
       source: dto.source ?? 'obd',
       rawPayload: dto.rawPayload,
       gpsFixOk: dto.gpsFixOk ?? true,

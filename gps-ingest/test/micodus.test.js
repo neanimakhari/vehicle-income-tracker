@@ -102,6 +102,61 @@ describe("micodus decoder", () => {
     assert.equal(ex.fuelRateLph, 3.1);
   });
 
+  it("decodes live MV55G location hex (voltage + odo + sats)", () => {
+    // Captured 2026-09-21 from terminal 19210227058
+    const hex =
+      "7e02000047019210227058018c00000000001c00070188d21a01aec33a0004001200c62609211752430104000f497c30011331010c3201093301053401058202008a570800000000000000008c040050d2b4a000c27e";
+    const pkt = parsePacket(Buffer.from(hex, "hex"));
+    assert.ok(pkt);
+    assert.equal(pkt.msgId, 0x0200);
+    const d = decodePacket(pkt);
+    assert.equal(d.kind, "location");
+    assert.ok(d.point);
+    assert.equal(d.point.externalVoltage, 13.8);
+    assert.equal(d.point.odometerKm, 100185.2);
+    assert.equal(d.point.satellites, 12);
+    assert.equal(d.point.speedKph, 1.8);
+    assert.equal(d.point.ignitionOn, true);
+    assert.equal(d.point.gpsFixOk, true);
+    assert.equal(d.point.source, "micodus");
+  });
+
+  it("treats 0x0202 as location", () => {
+    const body = Buffer.alloc(28);
+    body.writeUInt32BE(0x03, 4); // ACC + fix
+    body.writeUInt32BE(Math.round(25.7 * 1e6), 8);
+    body.writeUInt32BE(Math.round(28.2 * 1e6), 12);
+    Buffer.from("260921180000", "hex").copy(body, 22);
+    const raw = buildPacket(0x0202, "19210227058", 1, body);
+    const d = decodePacket(parsePacket(raw));
+    assert.equal(d.kind, "location");
+    assert.ok(d.point);
+  });
+
+  it("forwards alarmFlags and alarmExt from live MV55G hex", () => {
+    const hex =
+      "7e02000047019210227058018c00000000001c00070188d21a01aec33a0004001200c62609211752430104000f497c30011331010c3201093301053401058202008a570800000000000000008c040050d2b4a000c27e";
+    const d = decodePacket(parsePacket(Buffer.from(hex, "hex")));
+    assert.equal(d.point.alarmFlags, 0);
+    assert.equal(d.point.alarmExt, "0000000000000000");
+    assert.equal(d.point.gsmSignal, 0x13);
+    assert.equal(d.point.externalVoltage, 13.8);
+    assert.ok(d.point.canOdometerKm != null);
+  });
+
+  it("maps 0x82 voltage and 0x80 as CAN speed not voltage", () => {
+    const buf = Buffer.alloc(8);
+    buf[0] = 0x82;
+    buf[1] = 2;
+    buf.writeUInt16BE(140, 2); // 14.0 V
+    buf[4] = 0x80;
+    buf[5] = 2;
+    buf.writeUInt16BE(55, 6); // 55 km/h CAN
+    const ex = decodeAdditional(buf);
+    assert.equal(ex.externalVoltage, 14);
+    assert.equal(ex.canSpeedKph, 55);
+  });
+
   it("decodePacket heartbeat", () => {
     const raw = buildPacket(0x0002, "123", 9, Buffer.alloc(0));
     const pkt = parsePacket(raw);

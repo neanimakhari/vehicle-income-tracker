@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -31,6 +32,7 @@ import { ModuleEntitlementGuard } from '../commercial/module-entitlement.guard';
 import { RequiresModule } from '../commercial/requires-module.decorator';
 import { TenantTrackingService } from './tenant-tracking.service';
 import { TrackingAnalyticsService } from './tracking-analytics.service';
+import { TrackingEventsService } from './tracking-events.service';
 import {
   johannesburgToday,
 } from './tracking-analytics.formulas';
@@ -89,6 +91,7 @@ export class TenantTrackingController {
   constructor(
     private readonly tracking: TenantTrackingService,
     private readonly trackingAnalytics: TrackingAnalyticsService,
+    private readonly trackingEvents: TrackingEventsService,
   ) {}
 
   @Get('latest')
@@ -99,6 +102,14 @@ export class TenantTrackingController {
       role: req.user?.role ?? null,
     });
     return this.tracking.latest();
+  }
+
+  @Get('events')
+  @Roles('TENANT_ADMIN', 'TENANT_USER')
+  listEvents(@Query('limit') limit?: string) {
+    return this.trackingEvents.listRecent(
+      limit ? Number(limit) : 50,
+    );
   }
 
   @Get('history')
@@ -166,8 +177,12 @@ export class TenantTrackingController {
   @Post('simulate')
   @Roles('TENANT_ADMIN')
   simulate(@Body() dto: SimulateDto) {
-    if (process.env.TRACKING_SIMULATE_ENABLED === 'false') {
-      return { disabled: true };
+    // Opt-in only — production must not expose demo trails.
+    if (process.env.TRACKING_SIMULATE_ENABLED !== 'true') {
+      throw new ForbiddenException({
+        message: 'Tracking simulation is disabled',
+        code: 'TRACKING_SIMULATE_DISABLED',
+      });
     }
     return this.tracking.simulate(dto);
   }

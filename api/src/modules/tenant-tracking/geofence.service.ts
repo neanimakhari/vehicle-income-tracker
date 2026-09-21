@@ -193,6 +193,13 @@ export class GeofenceService {
     await this.dataSource.query(
       `INSERT INTO "${s}"."tenant_tracking_settings" ("id") VALUES (1) ON CONFLICT DO NOTHING`,
     );
+    await this.dataSource.query(`
+      ALTER TABLE "${s}"."tenant_tracking_settings"
+        ADD COLUMN IF NOT EXISTS "overspeed_kph" numeric NOT NULL DEFAULT 60,
+        ADD COLUMN IF NOT EXISTS "low_voltage_threshold" numeric NOT NULL DEFAULT 11.5,
+        ADD COLUMN IF NOT EXISTS "offline_minutes" int NOT NULL DEFAULT 15,
+        ADD COLUMN IF NOT EXISTS "idle_alert_minutes" int NOT NULL DEFAULT 20
+    `);
   }
 
   private invalidateCache() {
@@ -660,6 +667,10 @@ export class GeofenceService {
       geofenceHysteresisSamples: Number(
         r.geofence_hysteresis_samples ?? 2,
       ),
+      overspeedKph: Number(r.overspeed_kph ?? 60),
+      lowVoltageThreshold: Number(r.low_voltage_threshold ?? 11.5),
+      offlineMinutes: Number(r.offline_minutes ?? 15),
+      idleAlertMinutes: Number(r.idle_alert_minutes ?? 20),
     };
   }
 
@@ -668,6 +679,10 @@ export class GeofenceService {
     workWindowEnd?: string;
     defaultCorridorBufferM?: number;
     geofenceHysteresisSamples?: number;
+    overspeedKph?: number;
+    lowVoltageThreshold?: number;
+    offlineMinutes?: number;
+    idleAlertMinutes?: number;
   }) {
     await this.ensureTables();
     await this.dataSource.query(
@@ -676,6 +691,10 @@ export class GeofenceService {
         "work_window_end" = COALESCE($2::time, "work_window_end"),
         "default_corridor_buffer_m" = COALESCE($3, "default_corridor_buffer_m"),
         "geofence_hysteresis_samples" = COALESCE($4, "geofence_hysteresis_samples"),
+        "overspeed_kph" = COALESCE($5, "overspeed_kph"),
+        "low_voltage_threshold" = COALESCE($6, "low_voltage_threshold"),
+        "offline_minutes" = COALESCE($7, "offline_minutes"),
+        "idle_alert_minutes" = COALESCE($8, "idle_alert_minutes"),
         "updated_at" = now()
        WHERE "id" = 1`,
       [
@@ -683,6 +702,10 @@ export class GeofenceService {
         body.workWindowEnd ?? null,
         body.defaultCorridorBufferM ?? null,
         body.geofenceHysteresisSamples ?? null,
+        body.overspeedKph ?? null,
+        body.lowVoltageThreshold ?? null,
+        body.offlineMinutes ?? null,
+        body.idleAlertMinutes ?? null,
       ],
     );
     return this.getSettings();
