@@ -132,6 +132,20 @@ class IngestPointDto {
   rawPayload?: string;
 }
 
+class DeviceSeenDto {
+  @IsString()
+  @IsNotEmpty()
+  imei: string;
+}
+
+function assertIngestSecret(secret: string | undefined) {
+  const expected =
+    process.env.GPS_INGEST_SECRET ?? process.env.TRACKING_INGEST_SECRET;
+  if (!expected || secret !== expected) {
+    throw new UnauthorizedException('Invalid ingest secret');
+  }
+}
+
 /** Internal ingest for gps-ingest sidecar (shared secret). */
 @Controller('internal/tracking')
 @ApiTags('internal-tracking')
@@ -143,11 +157,7 @@ export class TrackingIngestController {
     @Headers('x-ingest-secret') secret: string | undefined,
     @Body() dto: IngestPointDto,
   ) {
-    const expected =
-      process.env.GPS_INGEST_SECRET ?? process.env.TRACKING_INGEST_SECRET;
-    if (!expected || secret !== expected) {
-      throw new UnauthorizedException('Invalid ingest secret');
-    }
+    assertIngestSecret(secret);
     const recordedAt =
       dto.recordedAt != null && dto.recordedAt !== ''
         ? new Date(dto.recordedAt)
@@ -182,5 +192,14 @@ export class TrackingIngestController {
           ? recordedAt
           : undefined,
     });
+  }
+
+  @Post('device-seen')
+  deviceSeen(
+    @Headers('x-ingest-secret') secret: string | undefined,
+    @Body() dto: DeviceSeenDto,
+  ) {
+    assertIngestSecret(secret);
+    return this.tracking.touchDeviceSeen(dto.imei);
   }
 }

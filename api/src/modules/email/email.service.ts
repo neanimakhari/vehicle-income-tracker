@@ -204,6 +204,34 @@ This invite expires in 48 hours. Do not share the link.`;
     return this.send({ to, subject, text, html });
   }
 
+  /** Fleet tracking alert to tenant report recipients. */
+  async sendTrackingAlert(payload: {
+    to: string | string[];
+    tenantSlug: string;
+    trigger: string;
+    message: string;
+  }): Promise<{ sent: boolean }> {
+    const when = new Date().toISOString();
+    const subject = `[VIT ${payload.tenantSlug}] ${payload.trigger}: ${payload.message}`.slice(
+      0,
+      180,
+    );
+    const text = [
+      `Tenant: ${payload.tenantSlug}`,
+      `Trigger: ${payload.trigger}`,
+      `Message: ${payload.message}`,
+      `Time: ${when}`,
+    ].join('\n');
+    const html = `<!DOCTYPE html><html><body style="font-family:sans-serif">
+      <h2>Fleet tracking alert</h2>
+      <p><strong>Tenant:</strong> ${payload.tenantSlug}</p>
+      <p><strong>Trigger:</strong> ${payload.trigger}</p>
+      <p><strong>Message:</strong> ${String(payload.message).replace(/</g, '&lt;')}</p>
+      <p><strong>Time:</strong> ${when}</p>
+    </body></html>`;
+    return this.send({ to: payload.to, subject, text, html });
+  }
+
   /** Send a simple test email (used by POST /email/test). */
   async sendTestEmail(to: string): Promise<{ sent: boolean }> {
     const subject = 'VIT – Email test';

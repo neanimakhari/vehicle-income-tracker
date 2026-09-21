@@ -7,6 +7,13 @@ const {
 } = require("../src/micodus/frame");
 const { decodePacket, decodeLocationBody, decodeAdditional, bcdTimeToIso } = require("../src/micodus/decoder");
 const { buildGeneralAck, buildRegisterAck } = require("../src/micodus/ack");
+const {
+  buildCommand,
+  buildTextMessage,
+  buildSetParams,
+  PRESETS,
+} = require("../src/micodus/downlink");
+const { createSessionRegistry } = require("../src/session-registry");
 const { createForwarder } = require("../src/forwarder");
 
 describe("micodus frame", () => {
@@ -181,6 +188,77 @@ describe("micodus ack", () => {
     const pkt = parsePacket(ack);
     assert.equal(pkt.msgId, 0x8100);
     assert.equal(pkt.body.subarray(3).toString("ascii"), "VIT");
+  });
+});
+
+describe("micodus downlink", () => {
+  it("builds SPEED text 0x8300", () => {
+    const built = buildCommand("19172682984", 7, { type: "speed_alarm", value: 80 });
+    assert.equal(built.kind, "text");
+    assert.equal(built.text, "SPEED,80#");
+    const pkt = parsePacket(built.frame);
+    assert.ok(pkt);
+    assert.equal(pkt.msgId, 0x8300);
+    assert.equal(pkt.body[0], 0x01);
+    assert.equal(pkt.body.subarray(1).toString("utf8"), "SPEED,80#");
+  });
+
+  it("builds set-params 0x8103 for max speed", () => {
+    const built = buildCommand("19172682984", 8, {
+      type: "params",
+      maxSpeedKph: 90,
+      reportIntervalSec: 30,
+    });
+    assert.equal(built.kind, "params");
+    const pkt = parsePacket(built.frame);
+    assert.equal(pkt.msgId, 0x8103);
+    assert.equal(pkt.body[0], 2); // two params
+  });
+
+  it("exposes Micodus SMS presets", () => {
+    assert.equal(PRESETS.vibration(1), "SENALM,1#");
+    assert.equal(PRESETS.status(), "STATUS#");
+  });
+
+  it("round-trips text message frame", () => {
+    const frame = buildTextMessage("1", 1, "TIMER,30#");
+    const pkt = parsePacket(frame);
+    assert.equal(pkt.msgId, 0x8300);
+  });
+
+  it("buildSetParams packs dword values", () => {
+    const { dword } = require("../src/micodus/downlink");
+    const frame = buildSetParams("1", 2, [{ id: 0x0055, value: dword(60) }]);
+    const pkt = parsePacket(frame);
+    assert.equal(pkt.msgId, 0x8103);
+    assert.equal(pkt.body[0], 1);
+  });
+});
+
+describe("session registry", () => {
+  it("queues command when offline and flushes on register", () => {
+    const reg = createSessionRegistry();
+    const writes = [];
+    const result = reg.send("356938035643809", (terminalId, serial) =>
+      buildCommand(terminalId, serial, { type: "status" }),
+    );
+    assert.equal(result.ok, true);
+    assert.equal(result.queued, true);
+    assert.equal(result.online, false);
+
+    const fakeSocket = {
+      destroyed: false,
+      write(buf) {
+        writes.push(buf);
+      },
+    };
+    reg.register(fakeSocket, {
+      imei: "356938035643809",
+      terminalId: "356938035643809",
+    });
+    assert.ok(writes.length >= 1);
+    const pkt = parsePacket(writes[0]);
+    assert.equal(pkt.msgId, 0x8300);
   });
 });
 

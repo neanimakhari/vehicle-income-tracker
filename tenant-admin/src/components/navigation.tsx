@@ -38,6 +38,7 @@ const MODULE_NAV: Record<string, string> = {
   "/tracking/geofences/events": "tracking_geofence",
   "/tracking/geofences/daily": "tracking_geofence",
   "/tracking/alerts": "tracking_alerts",
+  "/tracking/trips": "tracking_live",
   "/notifications": "notifications",
   "/target-calendar": "target_calendar",
 };
@@ -82,6 +83,7 @@ export function Navigation({
       label: "Geofence daily",
     },
     { href: "/tracking/alerts", icon: BellRing, label: "Tracking alerts" },
+    { href: "/tracking/trips", icon: Route, label: "Trips & parking" },
     { href: "/reports", icon: BarChart3, label: "Reports" },
     { href: "/target-calendar", icon: CalendarDays, label: "Target calendar" },
     { href: "/audit", icon: FileText, label: "Audit Trail" },

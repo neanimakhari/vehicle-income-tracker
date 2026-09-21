@@ -105,6 +105,11 @@ export function TrackingClient({
   const [bindImei, setBindImei] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [alertToast, setAlertToast] = useState<{
+    message: string;
+    severity: string;
+  } | null>(null);
+  const [cmdBusy, setCmdBusy] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -142,6 +147,16 @@ export function TrackingClient({
           return [point, ...without];
         });
       });
+      socket.on(
+        "tracking:alert",
+        (ev: { message?: string; eventType?: string; severity?: string }) => {
+          setAlertToast({
+            message: ev.message || ev.eventType || "Tracking alert",
+            severity: ev.severity || "warning",
+          });
+          window.setTimeout(() => setAlertToast(null), 8000);
+        },
+      );
     })();
     return () => {
       cancelled = true;
@@ -196,6 +211,35 @@ export function TrackingClient({
       await refresh();
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function sendCommand(
+    imei: string,
+    body: Record<string, unknown>,
+    label: string,
+  ) {
+    setCmdBusy(label);
+    setMessage(null);
+    try {
+      const res = await fetch(
+        `/api/proxy/tenant/tracking/devices/${encodeURIComponent(imei)}/command`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMessage(data?.message ?? `Command failed (${res.status})`);
+      } else if (data.queued) {
+        setMessage(`${label}: queued until device reconnects`);
+      } else {
+        setMessage(`${label}: sent`);
+      }
+    } finally {
+      setCmdBusy(null);
     }
   }
 
@@ -288,6 +332,19 @@ export function TrackingClient({
 
   return (
     <div className="-mx-1 space-y-4 sm:mx-0">
+      {alertToast ? (
+        <div
+          className={`fixed right-4 top-4 z-50 max-w-sm rounded-lg border px-4 py-3 text-sm shadow-lg ${
+            alertToast.severity === "critical"
+              ? "border-rose-300 bg-rose-50 text-rose-950 dark:border-rose-800 dark:bg-rose-950/90 dark:text-rose-100"
+              : "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950/90 dark:text-amber-100"
+          }`}
+          role="alert"
+        >
+          <p className="font-semibold">Live alert</p>
+          <p className="mt-0.5 opacity-90">{alertToast.message}</p>
+        </div>
+      ) : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700 dark:text-teal-300">
@@ -323,6 +380,12 @@ export function TrackingClient({
               className="font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300"
             >
               Alerts
+            </a>
+            <a
+              href="/tracking/trips"
+              className="font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300"
+            >
+              Trips & parking
             </a>
           </p>
         </div>
@@ -548,6 +611,63 @@ export function TrackingClient({
                 </button>
               )}
             </div>
+
+            {selected.device ? (
+              <div className="mt-4 border-t border-zinc-200/70 pt-4 dark:border-zinc-700">
+                <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  Device commands
+                </p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  JT808 downlink via live TCP session. Queued if the unit is offline.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[
+                    {
+                      label: "Speed 60",
+                      body: { type: "speed_alarm", value: 60 },
+                    },
+                    {
+                      label: "Speed 80",
+                      body: { type: "speed_alarm", value: 80 },
+                    },
+                    {
+                      label: "Interval 30s",
+                      body: { type: "upload_interval", value: 30 },
+                    },
+                    {
+                      label: "Vibration on",
+                      body: { type: "vibration", value: 1 },
+                    },
+                    {
+                      label: "Engine alm on",
+                      body: { type: "engine_alarm", value: 1 },
+                    },
+                    {
+                      label: "Power alm on",
+                      body: { type: "power_alarm", value: 1 },
+                    },
+                    { label: "Status", body: { type: "status" } },
+                    { label: "Mileage", body: { type: "mileage" } },
+                  ].map((c) => (
+                    <button
+                      key={c.label}
+                      type="button"
+                      className="btn btn-secondary text-xs"
+                      disabled={cmdBusy != null}
+                      onClick={() =>
+                        sendCommand(selected.device!.imei, c.body, c.label)
+                      }
+                    >
+                      {cmdBusy === c.label ? "…" : c.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {message ? (
+              <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-300">{message}</p>
+            ) : null}
           </div>
         )}
       </div>

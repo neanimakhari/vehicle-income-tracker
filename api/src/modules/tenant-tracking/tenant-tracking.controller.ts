@@ -21,6 +21,7 @@ import {
   IsUUID,
   Max,
   Min,
+  Allow,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -61,6 +62,56 @@ class BindImeiDto {
 class DeviceActiveDto {
   @IsBoolean()
   isActive: boolean;
+}
+
+class DeviceCommandDto {
+  @IsOptional()
+  @IsString()
+  type?: string;
+
+  @IsOptional()
+  @IsString()
+  command?: string;
+
+  @IsOptional()
+  @IsString()
+  text?: string;
+
+  @IsOptional()
+  @Allow()
+  value?: number | boolean | string;
+
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  maxSpeedKph?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(3600)
+  reportIntervalSec?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(3600)
+  heartbeatIntervalSec?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(600)
+  overspeedDurationSec?: number;
 }
 
 class RecalculateDto {
@@ -110,6 +161,15 @@ export class TenantTrackingController {
     return this.trackingEvents.listRecent(
       limit ? Number(limit) : 50,
     );
+  }
+
+  @Get('trips-report')
+  @Roles('TENANT_ADMIN', 'TENANT_USER')
+  tripsReport(
+    @Query('day') day?: string,
+    @Query('vehicleId') vehicleId?: string,
+  ) {
+    return this.trackingEvents.tripsAndParkingReport({ day, vehicleId });
   }
 
   @Get('history')
@@ -209,5 +269,18 @@ export class TenantTrackingController {
   @Roles('TENANT_ADMIN')
   setActive(@Param('imei') imei: string, @Body() dto: DeviceActiveDto) {
     return this.tracking.setDeviceActive(imei, dto.isActive);
+  }
+
+  @Post('devices/:imei/command')
+  @Roles('TENANT_ADMIN')
+  sendCommand(
+    @Param('imei') imei: string,
+    @Body() dto: DeviceCommandDto,
+    @Req() req: { user?: { sub?: string; role?: string } },
+  ) {
+    return this.tracking.sendDeviceCommand(imei, dto as Record<string, unknown>, {
+      sub: req.user?.sub,
+      role: req.user?.role,
+    });
   }
 }

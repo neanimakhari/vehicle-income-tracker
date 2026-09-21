@@ -537,6 +537,86 @@ export class TenantTrackingService {
     return { imei, isActive };
   }
 
+  /** Heartbeat / register — update lastSeen without inserting a point. */
+  async touchDeviceSeen(imei: string) {
+    const device = await this.devicesRepo.findOne({ where: { imei } });
+    if (!device || !device.isActive) {
+      throw new ForbiddenException({
+        message: 'Unknown or inactive IMEI',
+        code: 'TRACKER_REJECTED',
+      });
+    }
+    device.lastSeenAt = new Date();
+    await this.devicesRepo.save(device);
+    return { imei, lastSeenAt: device.lastSeenAt };
+  }
+
+  /**
+   * Send JT808 / Micodus command via gps-ingest session bridge.
+   */
+  async sendDeviceCommand(
+    imei: string,
+    body: Record<string, unknown>,
+    actor?: { sub?: string; role?: string },
+  ) {
+    const slug = this.slug();
+    const device = await this.devicesRepo.findOne({ where: { imei } });
+    if (!device || device.tenantSlug !== slug) {
+      throw new NotFoundException('Device not found');
+    }
+
+    const base =
+      process.env.GPS_INGEST_COMMAND_URL ??
+      process.env.GPS_INGEST_URL ??
+      'http://gps-ingest:9088';
+    const secret =
+      process.env.GPS_INGEST_SECRET ?? process.env.TRACKING_INGEST_SECRET ?? '';
+    if (!secret) {
+      throw new BadRequestException('GPS_INGEST_SECRET not configured');
+    }
+
+    const url = `${base.replace(/\/$/, '')}/internal/command`;
+    const payload = { ...body, imei };
+    let result: Record<string, unknown>;
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-ingest-secret': secret,
+        },
+        body: JSON.stringify(payload),
+      });
+      result = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!res.ok) {
+        throw new BadRequestException(
+          (result.error as string) ?? `Command failed (${res.status})`,
+        );
+      }
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      throw new BadRequestException(
+        `gps-ingest unreachable: ${String((err as Error).message ?? err)}`,
+      );
+    }
+
+    await this.audit.log({
+      action: 'TRACKING_DEVICE_COMMAND',
+      actorUserId: actor?.sub ?? null,
+      actorRole: actor?.role ?? null,
+      targetType: 'tracker_device',
+      targetId: imei,
+      metadata: {
+        tenant: slug,
+        vehicleId: device.vehicleId,
+        command: body,
+        result,
+      },
+    });
+
+    return { imei, vehicleId: device.vehicleId, ...result };
+  }
+
   async listDevices() {
     return this.devicesRepo.find({
       where: { tenantSlug: this.slug() },

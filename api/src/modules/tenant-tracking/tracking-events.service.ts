@@ -1,9 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { TenantContextService } from '../../tenancy/tenant-context.service';
 import { TenantScopeService } from '../../tenancy/tenant-scope.service';
 import { CommercialService } from '../commercial/commercial.service';
 import { EmailService } from '../email/email.service';
+import { TenantReportRecipientsService } from '../tenants/tenant-report-recipients.service';
 import { TrackingGateway } from './tracking.gateway';
+import { johannesburgToday } from './tracking-analytics.formulas';
 
 export type TrackingEventInput = {
   vehicleId?: string | null;
@@ -39,8 +42,10 @@ export class TrackingEventsService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly tenantScope: TenantScopeService,
+    private readonly tenantContext: TenantContextService,
     private readonly commercial: CommercialService,
     private readonly email: EmailService,
+    private readonly recipients: TenantReportRecipientsService,
     private readonly gateway: TrackingGateway,
   ) {}
 
@@ -49,7 +54,9 @@ export class TrackingEventsService {
   }
 
   private slug() {
-    return this.tenantScope.getTenantSlug();
+    const slug = this.tenantContext.getTenantId();
+    if (!slug) throw new Error('Tenant context missing');
+    return slug;
   }
 
   async ensureTables() {
@@ -352,6 +359,7 @@ export class TrackingEventsService {
       device_alarm_power_off: 'power_loss',
       low_voltage: 'low_voltage',
       device_alarm_undervoltage: 'low_voltage',
+      offline: 'offline',
     };
     const trigger = triggerMap[eventType];
     if (!trigger) return;
@@ -387,17 +395,226 @@ export class TrackingEventsService {
         : [];
       if (channels.includes('email')) {
         try {
-          await this.email.sendOpsAlert({
-            method: 'TRACKING_ALERT',
-            status: 200,
-            path: `/tenant/${slug}/tracking/alerts`,
-            message: String(message),
-          });
+          await this.sendAlertEmail(slug, String(message), trigger);
         } catch (err) {
           this.logger.warn(`Alert email failed: ${String(err)}`);
         }
       }
     }
+  }
+
+  private async sendAlertEmail(slug: string, message: string, trigger: string) {
+    let emails: string[] = [];
+    try {
+      emails = await this.recipients.listActiveEmails(slug);
+    } catch (err) {
+      this.logger.warn(`Recipient lookup failed: ${String(err)}`);
+    }
+    if (emails.length) {
+      await this.email.sendTrackingAlert({
+        to: emails,
+        tenantSlug: slug,
+        trigger,
+        message,
+      });
+      return;
+    }
+    await this.email.sendOpsAlert({
+      method: 'TRACKING_ALERT',
+      status: 200,
+      path: `/tenant/${slug}/tracking/alerts`,
+      message,
+    });
+  }
+
+  /**
+   * Cron: flag devices past offline_minutes since last_seen_at.
+   */
+  async scanOfflineDevices() {
+    await this.ensureTables();
+    const slug = this.slug();
+    const settings = await this.dataSource.query(
+      `SELECT "offline_minutes" FROM "${this.schema()}"."tenant_tracking_settings" WHERE "id" = 1`,
+    );
+    const offlineMinutes = Math.max(
+      5,
+      Number(settings[0]?.offline_minutes ?? 15) || 15,
+    );
+
+    const devices: Array<{
+      imei: string;
+      vehicle_id: string;
+      last_seen_at: Date | string | null;
+    }> = await this.dataSource.query(
+      `SELECT "imei", "vehicle_id", "last_seen_at"
+       FROM "platform"."tracker_devices"
+       WHERE "tenant_slug" = $1 AND "is_active" = true
+         AND "last_seen_at" IS NOT NULL
+         AND "last_seen_at" < now() - ($2::text || ' minutes')::interval`,
+      [slug, String(offlineMinutes)],
+    );
+
+    for (const d of devices) {
+      const recent = await this.dataSource.query(
+        `SELECT 1 FROM "${this.schema()}"."tracking_events"
+         WHERE "event_type" = 'offline'
+           AND "device_id" = $1
+           AND "recorded_at" > now() - ($2::text || ' minutes')::interval
+         LIMIT 1`,
+        [d.imei, String(Math.max(offlineMinutes, 30))],
+      );
+      if (recent.length) continue;
+
+      await this.record({
+        vehicleId: d.vehicle_id,
+        deviceId: d.imei,
+        eventType: 'offline',
+        severity: 'warning',
+        message: `Tracker offline > ${offlineMinutes} min`,
+        payload: {
+          lastSeenAt: d.last_seen_at,
+          offlineMinutes,
+        },
+        recordedAt: new Date(),
+        source: 'scheduler',
+      });
+    }
+  }
+
+  /**
+   * Trip / parking summary for a Johannesburg calendar day from tracking_events + daily rollup.
+   */
+  async tripsAndParkingReport(opts: { day?: string; vehicleId?: string }) {
+    await this.ensureTables();
+    const day = opts.day && /^\d{4}-\d{2}-\d{2}$/.test(opts.day)
+      ? opts.day
+      : johannesburgToday();
+    const from = new Date(`${day}T00:00:00+02:00`);
+    const to = new Date(`${day}T23:59:59.999+02:00`);
+    const s = this.schema();
+    const params: unknown[] = [from, to];
+    let vehicleFilter = '';
+    if (opts.vehicleId) {
+      params.push(opts.vehicleId);
+      vehicleFilter = ` AND "vehicle_id" = $${params.length}`;
+    }
+
+    const events = await this.dataSource.query(
+      `SELECT "id", "vehicle_id", "event_type", "recorded_at", "latitude", "longitude", "speed_kph"
+       FROM "${s}"."tracking_events"
+       WHERE "recorded_at" >= $1 AND "recorded_at" <= $2
+         AND "event_type" IN ('engine_start','engine_stop','overspeed','offline')
+         ${vehicleFilter}
+       ORDER BY "recorded_at" ASC`,
+      params,
+    );
+
+    const rollupParams: unknown[] = [day];
+    let rollupFilter = '';
+    if (opts.vehicleId) {
+      rollupParams.push(opts.vehicleId);
+      rollupFilter = ` AND "vehicle_id" = $${rollupParams.length}`;
+    }
+    let rollups: Array<Record<string, unknown>> = [];
+    try {
+      rollups = await this.dataSource.query(
+        `SELECT "vehicle_id", "vehicle_label", "stop_count", "idle_seconds",
+                "moving_seconds", "ignition_on_seconds", "distance_km", "max_speed_kph"
+         FROM "${s}"."vehicle_tracking_daily"
+         WHERE "day" = $1::date ${rollupFilter}`,
+        rollupParams,
+      );
+    } catch {
+      rollups = [];
+    }
+
+    const byVehicle = new Map<
+      string,
+      {
+        vehicleId: string;
+        starts: string[];
+        stops: string[];
+        overspeeds: number;
+        offline: number;
+      }
+    >();
+
+    for (const e of events) {
+      const vid = String(e.vehicle_id ?? 'unknown');
+      let row = byVehicle.get(vid);
+      if (!row) {
+        row = {
+          vehicleId: vid,
+          starts: [],
+          stops: [],
+          overspeeds: 0,
+          offline: 0,
+        };
+        byVehicle.set(vid, row);
+      }
+      if (e.event_type === 'engine_start') {
+        row.starts.push(String(e.recorded_at));
+      } else if (e.event_type === 'engine_stop') {
+        row.stops.push(String(e.recorded_at));
+      } else if (e.event_type === 'overspeed') {
+        row.overspeeds += 1;
+      } else if (e.event_type === 'offline') {
+        row.offline += 1;
+      }
+    }
+
+    const vehicles = rollups.map((r) => {
+      const vid = String(r.vehicle_id);
+      const ev = byVehicle.get(vid);
+      const idleSec = Number(r.idle_seconds ?? 0);
+      const tripCount = Math.max(
+        ev?.starts.length ?? 0,
+        Number(r.stop_count ?? 0),
+      );
+      return {
+        vehicleId: vid,
+        vehicleLabel: r.vehicle_label ?? null,
+        tripCount,
+        engineStarts: ev?.starts.length ?? 0,
+        engineStops: ev?.stops.length ?? 0,
+        stopCount: Number(r.stop_count ?? 0),
+        parkingHours: idleSec / 3600,
+        movingHours: Number(r.moving_seconds ?? 0) / 3600,
+        ignitionHours: Number(r.ignition_on_seconds ?? 0) / 3600,
+        distanceKm:
+          r.distance_km != null ? Number(r.distance_km) : null,
+        maxSpeedKph:
+          r.max_speed_kph != null ? Number(r.max_speed_kph) : null,
+        overspeedEvents: ev?.overspeeds ?? 0,
+        offlineEvents: ev?.offline ?? 0,
+        tripStarts: ev?.starts ?? [],
+        tripStops: ev?.stops ?? [],
+      };
+    });
+
+    // Include vehicles that only have events (no rollup yet)
+    for (const [vid, ev] of byVehicle) {
+      if (vehicles.some((v) => v.vehicleId === vid)) continue;
+      vehicles.push({
+        vehicleId: vid,
+        vehicleLabel: null,
+        tripCount: ev.starts.length,
+        engineStarts: ev.starts.length,
+        engineStops: ev.stops.length,
+        stopCount: 0,
+        parkingHours: 0,
+        movingHours: 0,
+        ignitionHours: 0,
+        distanceKm: null,
+        maxSpeedKph: null,
+        overspeedEvents: ev.overspeeds,
+        offlineEvents: ev.offline,
+        tripStarts: ev.starts,
+        tripStops: ev.stops,
+      });
+    }
+
+    return { day, vehicles };
   }
 
   async listRecent(limit = 50) {

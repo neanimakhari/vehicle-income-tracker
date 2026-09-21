@@ -38,12 +38,34 @@ Branch: `feature/gps-tracking-postgis-timescale` (merged); geofencing on `featur
 Migration `1700000000043`:
 
 - Extra point columns: `alarm_flags`, `alarm_ext`, `gsm_signal`, `msg_id`, `can_odometer_km`, `can_speed_kph`
-- `tracking_events` stream (engine start/stop, overspeed, power/low voltage, GPS lost/fix, device alarm bits)
+- `tracking_events` stream (engine start/stop, overspeed, power/low voltage, GPS lost/fix, device alarm bits, offline)
 - Settings: `overspeed_kph` (default 60), `low_voltage_threshold`, `offline_minutes`, `idle_alert_minutes`
 - Live ingest sets `overspeed` from tenant speed limit **and** JT808 alarm bits 1/13
 - Alert rule triggers expanded: `overspeed`, `engine_start`, `engine_stop`, `power_loss`, `low_voltage`, `offline`
 - WS event `tracking:alert`; API `GET /tenant/tracking/events`
+- Offline cron every 5 minutes (uses `tracker_devices.last_seen_at`; heartbeats call `POST /v1/internal/tracking/device-seen`)
+- Alert emails go to **tenant report recipients** (ops fallback if none)
+- Trips & parking: `GET /tenant/tracking/trips-report` + UI `/tracking/trips`
 - Simulation is **opt-in** (`TRACKING_SIMULATE_ENABLED=true`); default off in compose
+
+### Device commands (Phase 5 downlink)
+
+- gps-ingest keeps a live Micodus session registry and accepts `POST /internal/command` (shared `GPS_INGEST_SECRET`)
+- Nest: `POST /tenant/tracking/devices/:imei/command` → gps-ingest (`GPS_INGEST_COMMAND_URL`, default `http://gps-ingest:9088`)
+- JT808 `0x8300` text (Micodus SMS-style: `SPEED`, `TIMER`, `SENALM`, `ACCALM`, `PWRALM`, `STATUS`, `MILEAGE`) and `0x8103` params (max speed / intervals)
+- Offline commands are queued briefly and flushed on reconnect; audited as `TRACKING_DEVICE_COMMAND`
+- Tenant-admin Live Tracking shows a Device commands strip when an IMEI is bound
+
+### Enable device-side alarm bits (SMS on unit, one-time)
+
+So JT808 alarm DWORD bits actually fire (not only server overspeed):
+
+```
+SPEED,80#
+ACCALM,1#
+PWRALM,1#
+SENALM,1#
+```
 
 Capability notes:
 
