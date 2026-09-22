@@ -1,5 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { fetchJson } from "../../../lib/api";
+import { GeofenceShell } from "@/components/section-tabs";
 import { GeofencesClient } from "./geofences-client";
 
 export default async function GeofencesPage() {
@@ -10,8 +11,7 @@ export default async function GeofencesPage() {
   }>("/tenant/policy");
   const raw = policy?.entitlements ?? policy?.featureFlags ?? null;
   const entitled = raw == null ? null : new Set(raw);
-  const has =
-    entitled == null || entitled.has("tracking_geofence");
+  const has = entitled == null || entitled.has("tracking_geofence");
 
   if (!has) {
     return (
@@ -35,10 +35,12 @@ export default async function GeofencesPage() {
   ]);
 
   return (
-    <GeofencesClient
-      initial={(fences as never) ?? []}
-      initialTemplates={(templates as never) ?? []}
-      vehicles={vehicles ?? []}
-    />
+    <GeofenceShell>
+      <GeofencesClient
+        initial={(fences as never) ?? []}
+        initialTemplates={(templates as never) ?? []}
+        vehicles={vehicles ?? []}
+      />
+    </GeofenceShell>
   );
 }

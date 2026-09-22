@@ -20,11 +20,7 @@ import {
   GraduationCap,
   MapPinned,
   CalendarDays,
-  Activity,
-  Scale,
   Pentagon,
-  BellRing,
-  ListTree,
 } from "lucide-react";
 
 const MODULE_NAV: Record<string, string> = {
@@ -32,17 +28,25 @@ const MODULE_NAV: Record<string, string> = {
   "/scholar-payments": "scholar_payments",
   "/transport": "scholar_payments",
   "/tracking": "tracking_live",
-  "/tracking/setup": "tracking_live",
-  "/tracking/analytics": "tracking_live",
-  "/tracking/reconciliation": "tracking_live",
   "/tracking/geofences": "tracking_geofence",
-  "/tracking/geofences/events": "tracking_geofence",
-  "/tracking/geofences/daily": "tracking_geofence",
-  "/tracking/alerts": "tracking_alerts",
-  "/tracking/trips": "tracking_live",
   "/notifications": "notifications",
   "/target-calendar": "target_calendar",
 };
+
+function isNavActive(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  if (href === "/tracking") {
+    return (
+      pathname === "/tracking" ||
+      (pathname.startsWith("/tracking/") &&
+        !pathname.startsWith("/tracking/geofences"))
+    );
+  }
+  if (href === "/tracking/geofences") {
+    return pathname.startsWith("/tracking/geofences");
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function Navigation({
   onLinkClick,
@@ -66,26 +70,7 @@ export function Navigation({
     { href: "/trips", icon: Route, label: "Trips" },
     { href: "/transport", icon: GraduationCap, label: "Scholar & staff" },
     { href: "/tracking", icon: MapPinned, label: "Live Tracking" },
-    { href: "/tracking/setup", icon: Smartphone, label: "Set up tracker" },
-    { href: "/tracking/analytics", icon: Activity, label: "Tracker analytics" },
-    {
-      href: "/tracking/reconciliation",
-      icon: Scale,
-      label: "Day reconciliation",
-    },
     { href: "/tracking/geofences", icon: Pentagon, label: "Geofences" },
-    {
-      href: "/tracking/geofences/events",
-      icon: ListTree,
-      label: "Geofence events",
-    },
-    {
-      href: "/tracking/geofences/daily",
-      icon: Activity,
-      label: "Geofence daily",
-    },
-    { href: "/tracking/alerts", icon: BellRing, label: "Tracking alerts" },
-    { href: "/tracking/trips", icon: Route, label: "Trips & parking" },
     { href: "/reports", icon: BarChart3, label: "Reports" },
     { href: "/target-calendar", icon: CalendarDays, label: "Target calendar" },
     { href: "/audit", icon: FileText, label: "Audit Trail" },
@@ -104,11 +89,7 @@ export function Navigation({
     <nav className="mt-6 px-4 space-y-1">
       {navItems.map((item) => {
         const Icon = item.icon;
-        const isActive =
-          pathname === item.href ||
-          (item.href !== "/" &&
-            item.href !== "/tracking" &&
-            pathname.startsWith(`${item.href}/`));
+        const isActive = isNavActive(pathname, item.href);
 
         return (
           <Link

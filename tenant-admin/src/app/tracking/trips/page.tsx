@@ -1,5 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { fetchJson } from "../../../lib/api";
+import { TrackingShell } from "@/components/section-tabs";
 import { TripsReportClient } from "./trips-client";
 
 function todayJhb(): string {
@@ -22,6 +23,7 @@ export default async function TrackingTripsPage() {
   const entitlementsRaw = policy?.entitlements ?? policy?.featureFlags ?? null;
   const entitled = entitlementsRaw == null ? null : new Set(entitlementsRaw);
   const hasLive = entitled == null || entitled.has("tracking_live");
+  const showAlerts = entitled == null || entitled.has("tracking_alerts");
 
   const data = hasLive
     ? await fetchJson<{ vehicles?: Array<Record<string, unknown>> }>(
@@ -42,9 +44,11 @@ export default async function TrackingTripsPage() {
   }
 
   return (
-    <TripsReportClient
-      initialDay={day}
-      initial={(data?.vehicles ?? []) as never}
-    />
+    <TrackingShell showAlerts={showAlerts}>
+      <TripsReportClient
+        initialDay={day}
+        initial={(data?.vehicles ?? []) as never}
+      />
+    </TrackingShell>
   );
 }

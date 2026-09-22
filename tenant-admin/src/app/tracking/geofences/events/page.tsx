@@ -1,5 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { fetchJson } from "../../../../lib/api";
+import { GeofenceShell } from "@/components/section-tabs";
 import { GeofenceEventsClient } from "./events-client";
 
 export default async function GeofenceEventsPage() {
@@ -8,5 +9,9 @@ export default async function GeofenceEventsPage() {
     "/tenant/tracking/geofences/events?limit=100",
     { tolerate401: true },
   );
-  return <GeofenceEventsClient initial={(events as never) ?? []} />;
+  return (
+    <GeofenceShell>
+      <GeofenceEventsClient initial={(events as never) ?? []} />
+    </GeofenceShell>
+  );
 }

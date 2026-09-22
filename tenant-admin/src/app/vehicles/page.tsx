@@ -6,9 +6,15 @@ import { CreateVehicleModal } from "@/components/create-vehicle-modal";
 import { VehiclesTable } from "@/components/vehicles-table";
 
 async function fetchVehicles() {
-  const vehicles = await fetchJson<Array<{ id: string; label: string; registrationNumber: string; isActive: boolean }>>(
-    "/tenant/vehicles",
-  );
+  const vehicles = await fetchJson<
+    Array<{
+      id: string;
+      label: string;
+      registrationNumber: string;
+      isActive: boolean;
+      trackerImei?: string | null;
+    }>
+  >("/tenant/vehicles");
   return vehicles ?? [];
 }
 

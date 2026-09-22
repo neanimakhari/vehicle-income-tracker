@@ -222,7 +222,7 @@ export default async function RootLayout({
                       </div>
                     </Link>
                   </div>
-                  <div className="flex-1 overflow-y-auto">
+                  <div className="sidebar-scroll flex-1 overflow-y-auto">
                     <Navigation entitlements={entitlements} />
                   </div>
                   <div className="shrink-0 p-4 border-t border-zinc-800 space-y-2">

@@ -1,5 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { fetchJson } from "../../../../lib/api";
+import { GeofenceShell } from "@/components/section-tabs";
 import { GeofenceDailyClient } from "./daily-client";
 
 export default async function GeofenceDailyPage() {
@@ -27,5 +28,9 @@ export default async function GeofenceDailyPage() {
     { tolerate401: true },
   );
   const rows = Array.isArray(data) ? data : (data?.vehicles ?? []);
-  return <GeofenceDailyClient initial={(rows as never) ?? []} initialDay={today} />;
+  return (
+    <GeofenceShell>
+      <GeofenceDailyClient initial={(rows as never) ?? []} initialDay={today} />
+    </GeofenceShell>
+  );
 }

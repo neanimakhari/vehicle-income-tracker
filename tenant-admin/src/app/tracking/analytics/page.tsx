@@ -1,5 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { fetchJson } from "../../../lib/api";
+import { TrackingShell } from "@/components/section-tabs";
 import { TrackingAnalyticsClient } from "./analytics-client";
 
 function todayJhb(): string {
@@ -23,6 +24,7 @@ export default async function TrackingAnalyticsPage() {
   const entitled = entitlementsRaw == null ? null : new Set(entitlementsRaw);
   const hasLive = entitled == null || entitled.has("tracking_live");
   const includeObd = entitled == null || entitled.has("tracking_obd");
+  const showAlerts = entitled == null || entitled.has("tracking_alerts");
 
   const data = hasLive
     ? await fetchJson<{
@@ -45,10 +47,12 @@ export default async function TrackingAnalyticsPage() {
   }
 
   return (
-    <TrackingAnalyticsClient
-      initialDay={day}
-      includeObd={includeObd || Boolean(data?.includeObd)}
-      initial={(data?.vehicles ?? []) as never}
-    />
+    <TrackingShell showAlerts={showAlerts}>
+      <TrackingAnalyticsClient
+        initialDay={day}
+        includeObd={includeObd || Boolean(data?.includeObd)}
+        initial={(data?.vehicles ?? []) as never}
+      />
+    </TrackingShell>
   );
 }

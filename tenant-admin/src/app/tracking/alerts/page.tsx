@@ -1,5 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { fetchJson } from "../../../lib/api";
+import { TrackingShell } from "@/components/section-tabs";
 import { AlertsClient } from "./alerts-client";
 
 export default async function TrackingAlertsPage() {
@@ -31,10 +32,12 @@ export default async function TrackingAlertsPage() {
     }),
   ]);
   return (
-    <AlertsClient
-      initialRules={(rules as never) ?? []}
-      initialFires={(fires as never) ?? []}
-      initialEvents={(events as never) ?? []}
-    />
+    <TrackingShell showAlerts>
+      <AlertsClient
+        initialRules={(rules as never) ?? []}
+        initialFires={(fires as never) ?? []}
+        initialEvents={(events as never) ?? []}
+      />
+    </TrackingShell>
   );
 }

@@ -80,6 +80,7 @@ async function fetchVehicle(id: string) {
       permitExpiry: string | null;
       notes: string | null;
       isActive: boolean;
+      trackerImei: string | null;
     }>>("/tenant/vehicles");
     
     if (!vehicles || !Array.isArray(vehicles)) {
@@ -233,12 +234,20 @@ export default async function VehicleDetailPage({
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
             Registration: {vehicle.registrationNumber}
           </p>
-          <p className="mt-2">
+          <p className="mt-2 flex flex-wrap gap-4">
+            {vehicle.trackerImei ? (
+              <Link
+                href={`/tracking?vehicleId=${encodeURIComponent(vehicle.id)}`}
+                className="text-sm font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300"
+              >
+                Track on map
+              </Link>
+            ) : null}
             <Link
               href={`/tracking/setup?vehicleId=${encodeURIComponent(vehicle.id)}`}
               className="text-sm font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300"
             >
-              Set up GPS tracker
+              {vehicle.trackerImei ? "Fix / rebind tracker" : "Set up GPS tracker"}
             </Link>
           </p>
         </div>

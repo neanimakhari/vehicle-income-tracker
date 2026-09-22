@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { requireAuth } from "@/lib/auth";
 import { fetchJson } from "../../../lib/api";
+import { TrackingShell } from "@/components/section-tabs";
 import { TrackerSetupClient } from "./setup-client";
 
 type VehicleRow = { id: string; label: string; trackerImei?: string | null };
@@ -23,6 +24,7 @@ export default async function TrackerSetupPage({
   const entitlementsRaw = policy?.entitlements ?? policy?.featureFlags ?? null;
   const entitled = entitlementsRaw == null ? null : new Set(entitlementsRaw);
   const hasLive = entitled == null || entitled.has("tracking_live");
+  const showAlerts = entitled == null || entitled.has("tracking_alerts");
 
   if (!hasLive) {
     return (
@@ -39,11 +41,13 @@ export default async function TrackerSetupPage({
     (await fetchJson<VehicleRow[]>("/tenant/vehicles")) ?? [];
 
   return (
-    <Suspense fallback={<p className="text-sm text-zinc-500">Loading setup…</p>}>
-      <TrackerSetupClient
-        vehicles={vehicles}
-        initialVehicleId={vehicleId}
-      />
-    </Suspense>
+    <TrackingShell showAlerts={showAlerts}>
+      <Suspense fallback={<p className="text-sm text-zinc-500">Loading setup…</p>}>
+        <TrackerSetupClient
+          vehicles={vehicles}
+          initialVehicleId={vehicleId}
+        />
+      </Suspense>
+    </TrackingShell>
   );
 }

@@ -534,7 +534,7 @@ export function TrackingClient({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700 dark:text-teal-300">
-            Fleet map · v1.2.0
+            Fleet map · v1.2.1
           </p>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
             Live Tracking
@@ -542,26 +542,6 @@ export function TrackingClient({
           <p className="mt-1 max-w-xl text-sm text-zinc-600 dark:text-zinc-300">
             See what the fleet is doing now, then replay a day or trip when you
             need to explain a route.
-          </p>
-          <p className="mt-2 flex flex-wrap gap-3 text-sm">
-            <Link
-              href="/tracking/setup"
-              className="font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300"
-            >
-              Set up tracker
-            </Link>
-            <Link
-              href="/tracking/trips"
-              className="font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300"
-            >
-              Trips & parking
-            </Link>
-            <Link
-              href="/tracking/alerts"
-              className="font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300"
-            >
-              Alerts
-            </Link>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

@@ -10,6 +10,7 @@ type Vehicle = {
   label: string;
   registrationNumber: string;
   isActive: boolean;
+  trackerImei?: string | null;
 };
 
 type SortKey = "label" | "registrationNumber" | "status";
@@ -200,7 +201,22 @@ export function VehiclesTable({ vehicles, missingVehicleIds = [], onToggle, onDe
                         )}
                       </td>
                       <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                        <div className="flex items-center justify-end gap-3">
+                        <div className="flex flex-wrap items-center justify-end gap-3">
+                          {vehicle.trackerImei ? (
+                            <Link
+                              href={`/tracking?vehicleId=${encodeURIComponent(vehicle.id)}`}
+                              className="text-teal-600 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-300"
+                            >
+                              Track
+                            </Link>
+                          ) : (
+                            <Link
+                              href={`/tracking/setup?vehicleId=${encodeURIComponent(vehicle.id)}`}
+                              className="text-teal-600 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-300"
+                            >
+                              Set up tracker
+                            </Link>
+                          )}
                           <Link
                             href={`/vehicles/${vehicle.id}`}
                             className="text-teal-600 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-300"

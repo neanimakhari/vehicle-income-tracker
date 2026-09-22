@@ -1,5 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { fetchJson } from "../../lib/api";
+import { TrackingShell } from "@/components/section-tabs";
 import { TrackingClient } from "./tracking-client";
 
 type TrackingPoint = {
@@ -63,6 +64,7 @@ export default async function TrackingPage({
   const tenantSlug = policy?.tenantSlug ?? "";
   const entitled = entitlementsRaw == null ? null : new Set(entitlementsRaw);
   const hasLive = entitled == null || entitled.has("tracking_live");
+  const showAlerts = entitled == null || entitled.has("tracking_alerts");
 
   const [latest, vehicles, devices] = await Promise.all([
     hasLive
@@ -75,17 +77,19 @@ export default async function TrackingPage({
   ]);
 
   return (
-    <TrackingClient
-      initialLatest={latest ?? []}
-      tenantSlug={tenantSlug}
-      entitlements={entitlementsRaw}
-      vehicles={vehicles ?? []}
-      devices={devices ?? []}
-      initialMode={initialMode}
-      initialDay={day}
-      initialFrom={from}
-      initialTo={to}
-      initialVehicleId={vehicleId}
-    />
+    <TrackingShell showAlerts={showAlerts}>
+      <TrackingClient
+        initialLatest={latest ?? []}
+        tenantSlug={tenantSlug}
+        entitlements={entitlementsRaw}
+        vehicles={vehicles ?? []}
+        devices={devices ?? []}
+        initialMode={initialMode}
+        initialDay={day}
+        initialFrom={from}
+        initialTo={to}
+        initialVehicleId={vehicleId}
+      />
+    </TrackingShell>
   );
 }
