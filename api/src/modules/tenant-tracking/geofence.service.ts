@@ -9,7 +9,6 @@ import { TenantContextService } from '../../tenancy/tenant-context.service';
 import { TenantScopeService } from '../../tenancy/tenant-scope.service';
 import { CommercialService } from '../commercial/commercial.service';
 import { AuditService } from '../audit/audit.service';
-import { EmailService } from '../email/email.service';
 import {
   FenceGeoJson,
   LatLng,
@@ -23,6 +22,7 @@ import {
   johannesburgYesterday,
 } from './tracking-analytics.formulas';
 import { TrackingGateway } from './tracking.gateway';
+import { TrackingEventsService } from './tracking-events.service';
 
 export type GeofenceRow = {
   id: string;
@@ -53,7 +53,7 @@ export class GeofenceService {
     private readonly commercial: CommercialService,
     private readonly audit: AuditService,
     private readonly gateway: TrackingGateway,
-    private readonly email: EmailService,
+    private readonly trackingEvents: TrackingEventsService,
   ) {}
 
   private schema() {
@@ -198,7 +198,9 @@ export class GeofenceService {
         ADD COLUMN IF NOT EXISTS "overspeed_kph" numeric NOT NULL DEFAULT 60,
         ADD COLUMN IF NOT EXISTS "low_voltage_threshold" numeric NOT NULL DEFAULT 11.5,
         ADD COLUMN IF NOT EXISTS "offline_minutes" int NOT NULL DEFAULT 15,
-        ADD COLUMN IF NOT EXISTS "idle_alert_minutes" int NOT NULL DEFAULT 20
+        ADD COLUMN IF NOT EXISTS "idle_alert_minutes" int NOT NULL DEFAULT 20,
+        ADD COLUMN IF NOT EXISTS "quiet_hours_start" time NULL,
+        ADD COLUMN IF NOT EXISTS "quiet_hours_end" time NULL
     `);
   }
 
@@ -660,6 +662,14 @@ export class GeofenceService {
       `SELECT * FROM "${this.schema()}"."tenant_tracking_settings" WHERE "id" = 1`,
     );
     const r = rows[0] ?? {};
+    const quietStart =
+      r.quiet_hours_start != null
+        ? String(r.quiet_hours_start).slice(0, 5)
+        : null;
+    const quietEnd =
+      r.quiet_hours_end != null
+        ? String(r.quiet_hours_end).slice(0, 5)
+        : null;
     return {
       workWindowStart: String(r.work_window_start ?? '04:00').slice(0, 5),
       workWindowEnd: String(r.work_window_end ?? '22:00').slice(0, 5),
@@ -671,6 +681,8 @@ export class GeofenceService {
       lowVoltageThreshold: Number(r.low_voltage_threshold ?? 11.5),
       offlineMinutes: Number(r.offline_minutes ?? 15),
       idleAlertMinutes: Number(r.idle_alert_minutes ?? 20),
+      quietHoursStart: quietStart && quietStart !== 'null' ? quietStart : null,
+      quietHoursEnd: quietEnd && quietEnd !== 'null' ? quietEnd : null,
     };
   }
 
@@ -683,8 +695,36 @@ export class GeofenceService {
     lowVoltageThreshold?: number;
     offlineMinutes?: number;
     idleAlertMinutes?: number;
+    quietHoursStart?: string | null;
+    quietHoursEnd?: string | null;
   }) {
     await this.ensureTables();
+
+    let quietStartParam: string | null = null;
+    let quietEndParam: string | null = null;
+    let touchQuiet = false;
+    if (
+      body.quietHoursStart !== undefined ||
+      body.quietHoursEnd !== undefined
+    ) {
+      touchQuiet = true;
+      const qs =
+        body.quietHoursStart == null || body.quietHoursStart === ''
+          ? null
+          : String(body.quietHoursStart).slice(0, 5);
+      const qe =
+        body.quietHoursEnd == null || body.quietHoursEnd === ''
+          ? null
+          : String(body.quietHoursEnd).slice(0, 5);
+      if (!qs || !qe) {
+        quietStartParam = null;
+        quietEndParam = null;
+      } else {
+        quietStartParam = qs;
+        quietEndParam = qe;
+      }
+    }
+
     await this.dataSource.query(
       `UPDATE "${this.schema()}"."tenant_tracking_settings" SET
         "work_window_start" = COALESCE($1::time, "work_window_start"),
@@ -695,6 +735,8 @@ export class GeofenceService {
         "low_voltage_threshold" = COALESCE($6, "low_voltage_threshold"),
         "offline_minutes" = COALESCE($7, "offline_minutes"),
         "idle_alert_minutes" = COALESCE($8, "idle_alert_minutes"),
+        "quiet_hours_start" = CASE WHEN $11::boolean THEN $9::time ELSE "quiet_hours_start" END,
+        "quiet_hours_end" = CASE WHEN $11::boolean THEN $10::time ELSE "quiet_hours_end" END,
         "updated_at" = now()
        WHERE "id" = 1`,
       [
@@ -706,6 +748,9 @@ export class GeofenceService {
         body.lowVoltageThreshold ?? null,
         body.offlineMinutes ?? null,
         body.idleAlertMinutes ?? null,
+        quietStartParam,
+        quietEndParam,
+        touchQuiet,
       ],
     );
     return this.getSettings();
@@ -1395,9 +1440,36 @@ export class GeofenceService {
         [rule.id, opts.vehicleId, String(cooldown)],
       );
       if (recent.length) continue;
-      const message = `Geofence alert (${rule.name}): ${opts.trigger} on ${opts.fenceName} (${opts.fenceType})${
-        opts.minutes != null ? ` — ${opts.minutes} min` : ''
-      }`;
+      const labelRows = await this.dataSource.query(
+        `SELECT "label" FROM "${this.schema()}"."vehicles" WHERE "id" = $1 LIMIT 1`,
+        [opts.vehicleId],
+      );
+      const label = labelRows[0]?.label
+        ? String(labelRows[0].label)
+        : 'Vehicle';
+      let message: string;
+      switch (opts.trigger) {
+        case 'enter_forbidden':
+          message = `${label} entered forbidden zone (${opts.fenceName})`;
+          break;
+        case 'enter_rank':
+          message = `${label} entered rank (${opts.fenceName})`;
+          break;
+        case 'off_corridor_minutes':
+          message = `${label} off corridor (${opts.fenceName})${
+            opts.minutes != null ? ` — ${opts.minutes} min` : ''
+          }`;
+          break;
+        case 'rank_dwell_minutes':
+          message = `${label} dwelling at rank (${opts.fenceName})${
+            opts.minutes != null ? ` — ${opts.minutes} min` : ''
+          }`;
+          break;
+        default:
+          message = `Geofence alert (${rule.name}): ${opts.trigger} on ${opts.fenceName}${
+            opts.minutes != null ? ` — ${opts.minutes} min` : ''
+          }`;
+      }
       await this.dataSource.query(
         `INSERT INTO "${this.schema()}"."geofence_alert_fires"
           ("rule_id","vehicle_id","geofence_id","message")
@@ -1410,11 +1482,13 @@ export class GeofenceService {
           : rule.channels;
       if (Array.isArray(channels) && channels.includes('email')) {
         try {
-          await this.email.sendOpsAlert({
-            method: 'GEOFENCE',
-            path: `/tenant/${slug}/geofence`,
-            status: 200,
+          await this.trackingEvents.deliverAlertEmail({
             message,
+            trigger: opts.trigger,
+            ruleName: rule.name ?? null,
+            vehicleId: opts.vehicleId,
+            severity: 'warning',
+            recordedAt: new Date(),
           });
         } catch {
           /* ignore email failures */

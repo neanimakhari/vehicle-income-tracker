@@ -5,6 +5,14 @@ import { Car } from "lucide-react";
 import { CreateVehicleModal } from "@/components/create-vehicle-modal";
 import { VehiclesTable } from "@/components/vehicles-table";
 
+type DeviceRow = {
+  id: string;
+  imei: string;
+  vehicleId: string;
+  isActive: boolean;
+  lastSeenAt: string | null;
+};
+
 async function fetchVehicles() {
   const vehicles = await fetchJson<
     Array<{
@@ -26,9 +34,30 @@ async function fetchMissingVehicles() {
   return new Set(vehicles.map((v) => v.id));
 }
 
+async function fetchGpsContext() {
+  const [devices, settings] = await Promise.all([
+    fetchJson<DeviceRow[]>("/tenant/tracking/devices", { tolerate401: true }),
+    fetchJson<{ offlineMinutes?: number }>(
+      "/tenant/tracking/geofences/settings",
+      { tolerate401: true },
+    ),
+  ]);
+  return {
+    devices: Array.isArray(devices) ? devices : [],
+    offlineMinutes:
+      settings?.offlineMinutes != null && Number.isFinite(Number(settings.offlineMinutes))
+        ? Number(settings.offlineMinutes)
+        : 15,
+  };
+}
+
 export default async function VehiclesPage() {
   await requireAuth();
-  const [vehicles, missingVehicleIds] = await Promise.all([fetchVehicles(), fetchMissingVehicles()]);
+  const [vehicles, missingVehicleIds, gps] = await Promise.all([
+    fetchVehicles(),
+    fetchMissingVehicles(),
+    fetchGpsContext(),
+  ]);
 
   async function createVehicle(formData: FormData): Promise<{ success?: boolean; error?: string }> {
     "use server";
@@ -103,7 +132,7 @@ export default async function VehiclesPage() {
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-teal-600 to-teal-700 bg-clip-text text-transparent">Vehicles</h1>
               <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                Manage tenant vehicles and registration details
+                Manage tenant vehicles, registration, and GPS health
               </p>
             </div>
           </div>
@@ -123,10 +152,11 @@ export default async function VehiclesPage() {
       <VehiclesTable
         vehicles={vehicles}
         missingVehicleIds={Array.from(missingVehicleIds)}
+        devices={gps.devices}
+        offlineMinutes={gps.offlineMinutes}
         onToggle={toggleVehicle}
         onDelete={deleteVehicle}
       />
     </div>
   );
 }
-

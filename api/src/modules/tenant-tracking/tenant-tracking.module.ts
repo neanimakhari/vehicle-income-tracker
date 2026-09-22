@@ -20,6 +20,7 @@ import { GeofenceScheduler } from './geofence.scheduler';
 import {
   GeofenceAlertController,
   GeofenceController,
+  AlertRecipientsController,
 } from './geofence.controller';
 import { TrackingEventsService } from './tracking-events.service';
 import { TrackingOfflineScheduler } from './tracking-offline.scheduler';
@@ -45,6 +46,7 @@ import { TrackingOfflineScheduler } from './tracking-offline.scheduler';
     TrackingIngestController,
     GeofenceController,
     GeofenceAlertController,
+    AlertRecipientsController,
   ],
   providers: [
     TenantTrackingService,

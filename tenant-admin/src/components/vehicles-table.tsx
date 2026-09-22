@@ -13,12 +13,24 @@ type Vehicle = {
   trackerImei?: string | null;
 };
 
-type SortKey = "label" | "registrationNumber" | "status";
+type Device = {
+  id: string;
+  imei: string;
+  vehicleId: string;
+  isActive: boolean;
+  lastSeenAt: string | null;
+};
+
+type SortKey = "label" | "registrationNumber" | "status" | "gps";
 type SortDir = "asc" | "desc";
+
+type GpsStatus = "no_tracker" | "online" | "offline" | "never_seen";
 
 type Props = {
   vehicles: Vehicle[];
   missingVehicleIds?: string[];
+  devices?: Device[];
+  offlineMinutes?: number;
   onToggle: (formData: FormData) => Promise<void>;
   onDelete: (formData: FormData) => Promise<void>;
 };
@@ -28,7 +40,44 @@ function SortIcon({ current, dir }: { current: boolean; dir: SortDir | null }) {
   return dir === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
 }
 
-export function VehiclesTable({ vehicles, missingVehicleIds = [], onToggle, onDelete }: Props) {
+function gpsStatusFor(
+  vehicle: Vehicle,
+  byVehicle: Map<string, Device>,
+  offlineMs: number,
+): GpsStatus {
+  const imei = vehicle.trackerImei?.trim();
+  if (!imei) return "no_tracker";
+  const device =
+    byVehicle.get(vehicle.id) ??
+    [...byVehicle.values()].find((d) => d.imei === imei);
+  if (!device?.lastSeenAt) return "never_seen";
+  const age = Date.now() - new Date(device.lastSeenAt).getTime();
+  if (Number.isNaN(age) || age > offlineMs) return "offline";
+  return "online";
+}
+
+const GPS_LABEL: Record<GpsStatus, string> = {
+  no_tracker: "No tracker",
+  online: "Online",
+  offline: "Offline",
+  never_seen: "Never seen",
+};
+
+const GPS_CLASS: Record<GpsStatus, string> = {
+  no_tracker: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300",
+  online: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  offline: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+  never_seen: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
+};
+
+export function VehiclesTable({
+  vehicles,
+  missingVehicleIds = [],
+  devices = [],
+  offlineMinutes = 15,
+  onToggle,
+  onDelete,
+}: Props) {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("label");
@@ -36,6 +85,14 @@ export function VehiclesTable({ vehicles, missingVehicleIds = [], onToggle, onDe
   const [pageSize, setPageSize] = useState(10);
   const [pageIndex, setPageIndex] = useState(0);
   const missingSet = useMemo(() => new Set(missingVehicleIds), [missingVehicleIds]);
+  const deviceByVehicle = useMemo(() => {
+    const map = new Map<string, Device>();
+    for (const d of devices) {
+      if (d.vehicleId) map.set(d.vehicleId, d);
+    }
+    return map;
+  }, [devices]);
+  const offlineMs = Math.max(1, offlineMinutes) * 60_000;
 
   const filtered = useMemo(() => {
     let list = vehicles.filter((v) => {
@@ -68,17 +125,22 @@ export function VehiclesTable({ vehicles, missingVehicleIds = [], onToggle, onDe
         case "status":
           cmp = (a.isActive ? 1 : 0) - (b.isActive ? 1 : 0);
           break;
+        case "gps":
+          cmp = gpsStatusFor(a, deviceByVehicle, offlineMs).localeCompare(
+            gpsStatusFor(b, deviceByVehicle, offlineMs),
+          );
+          break;
         default:
           break;
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
     return list;
-  }, [filtered, sortKey, sortDir]);
+  }, [filtered, sortKey, sortDir, deviceByVehicle, offlineMs]);
 
   const paginated = useMemo(() => {
     const start = pageIndex * pageSize;
-    return sorted.slice(start, start + pageSize);
+    return sorted.slice(start, pageIndex * pageSize + pageSize);
   }, [sorted, pageIndex, pageSize]);
 
   const toggleSort = (key: SortKey) => {
@@ -161,6 +223,7 @@ export function VehiclesTable({ vehicles, missingVehicleIds = [], onToggle, onDe
                     {th("label", "Vehicle")}
                     {th("registrationNumber", "Registration")}
                     {th("status", "Status")}
+                    {th("gps", "GPS")}
                     <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-50">
                       Income today
                     </th>
@@ -170,7 +233,9 @@ export function VehiclesTable({ vehicles, missingVehicleIds = [], onToggle, onDe
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200 bg-white dark:divide-zinc-800 dark:bg-zinc-950">
-                  {paginated.map((vehicle) => (
+                  {paginated.map((vehicle) => {
+                    const gps = gpsStatusFor(vehicle, deviceByVehicle, offlineMs);
+                    return (
                     <tr key={vehicle.id}>
                       <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-zinc-900 dark:text-zinc-50">
                         {vehicle.label}
@@ -187,6 +252,13 @@ export function VehiclesTable({ vehicles, missingVehicleIds = [], onToggle, onDe
                           }`}
                         >
                           {vehicle.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm">
+                        <span
+                          className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${GPS_CLASS[gps]}`}
+                        >
+                          {GPS_LABEL[gps]}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-3 py-4 text-sm">
@@ -239,7 +311,8 @@ export function VehiclesTable({ vehicles, missingVehicleIds = [], onToggle, onDe
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
               {sorted.length > 0 && (

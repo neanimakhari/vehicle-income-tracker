@@ -31,6 +31,8 @@ type VehicleEdgeState = {
   overspeed: boolean;
   lowVoltage: boolean;
   gpsFixOk: boolean | null;
+  alarmFlags: number;
+  lastEngineEdgeAt: number | null;
 };
 
 /**
@@ -88,7 +90,9 @@ export class TrackingEventsService {
         ADD COLUMN IF NOT EXISTS "overspeed_kph" numeric NOT NULL DEFAULT 60,
         ADD COLUMN IF NOT EXISTS "low_voltage_threshold" numeric NOT NULL DEFAULT 11.5,
         ADD COLUMN IF NOT EXISTS "offline_minutes" int NOT NULL DEFAULT 15,
-        ADD COLUMN IF NOT EXISTS "idle_alert_minutes" int NOT NULL DEFAULT 20
+        ADD COLUMN IF NOT EXISTS "idle_alert_minutes" int NOT NULL DEFAULT 20,
+        ADD COLUMN IF NOT EXISTS "quiet_hours_start" time NULL,
+        ADD COLUMN IF NOT EXISTS "quiet_hours_end" time NULL
     `);
     await this.dataSource.query(`
       ALTER TABLE "${s}"."gps_tracking_points"
@@ -138,7 +142,9 @@ export class TrackingEventsService {
     return false;
   }
 
-  async record(input: TrackingEventInput) {
+  async record(
+    input: TrackingEventInput & { skipLiveToast?: boolean },
+  ) {
     if (input.source === 'simulate') return null;
     await this.ensureTables();
     const rows = await this.dataSource.query(
@@ -176,7 +182,9 @@ export class TrackingEventsService {
       speedKph: row.speed_kph != null ? Number(row.speed_kph) : null,
       recordedAt: row.recorded_at,
     };
-    this.gateway.emitAlert(this.slug(), dto);
+    if (!input.skipLiveToast) {
+      this.gateway.emitAlert(this.slug(), dto);
+    }
     await this.maybeFireRule(input.eventType, dto);
     return dto;
   }
@@ -207,6 +215,8 @@ export class TrackingEventsService {
       overspeed: false,
       lowVoltage: false,
       gpsFixOk: null,
+      alarmFlags: 0,
+      lastEngineEdgeAt: null,
     };
 
     const lowThreshold = await this.getLowVoltageThreshold();
@@ -228,16 +238,24 @@ export class TrackingEventsService {
       source: opts.source,
     };
 
-    if (
-      prev.ignitionOn === false &&
-      opts.ignitionOn === true
-    ) {
-      await this.record({
-        ...base,
-        eventType: 'engine_start',
-        severity: 'info',
-        message: 'Engine / ACC on',
-      });
+    const nowMs = opts.recordedAt.getTime();
+    let lastEngineEdgeAt = prev.lastEngineEdgeAt;
+    const ENGINE_DEBOUNCE_MS = 60_000;
+    const GPS_SUPPRESS_MS = 30_000;
+
+    if (prev.ignitionOn === false && opts.ignitionOn === true) {
+      const recent =
+        lastEngineEdgeAt != null &&
+        nowMs - lastEngineEdgeAt < ENGINE_DEBOUNCE_MS;
+      if (!recent) {
+        await this.record({
+          ...base,
+          eventType: 'engine_start',
+          severity: 'info',
+          message: 'Engine / ACC on',
+        });
+        lastEngineEdgeAt = nowMs;
+      }
     }
     if (prev.ignitionOn === true && opts.ignitionOn === false) {
       await this.record({
@@ -246,6 +264,7 @@ export class TrackingEventsService {
         severity: 'info',
         message: 'Engine / ACC off',
       });
+      lastEngineEdgeAt = nowMs;
     }
 
     if (!prev.overspeed && opts.overspeed) {
@@ -268,7 +287,6 @@ export class TrackingEventsService {
       });
     }
 
-    // Power loss: steep drop (was charging/healthy → near zero)
     if (
       voltage != null &&
       voltage < 4 &&
@@ -284,12 +302,16 @@ export class TrackingEventsService {
       });
     }
 
+    const nearEngine =
+      lastEngineEdgeAt != null && nowMs - lastEngineEdgeAt < GPS_SUPPRESS_MS;
+
     if (prev.gpsFixOk === true && opts.gpsFixOk === false) {
       await this.record({
         ...base,
         eventType: 'gps_lost',
         severity: 'warning',
         message: 'GPS fix lost',
+        skipLiveToast: nearEngine,
       });
     }
     if (prev.gpsFixOk === false && opts.gpsFixOk === true) {
@@ -298,13 +320,17 @@ export class TrackingEventsService {
         eventType: 'gps_fix',
         severity: 'info',
         message: 'GPS fix acquired',
+        skipLiveToast: nearEngine,
       });
     }
 
     const flags = Number(opts.alarmFlags ?? 0);
+    const prevFlags = Number(prev.alarmFlags ?? 0);
     if (flags !== 0) {
       const bits = this.decodeAlarmBits(flags);
       for (const bit of bits) {
+        const mask = 1 << bit.bit;
+        if ((prevFlags & mask) !== 0) continue; // rising edge only
         await this.record({
           ...base,
           eventType: `device_alarm_${bit.key}`,
@@ -320,6 +346,8 @@ export class TrackingEventsService {
       overspeed: opts.overspeed,
       lowVoltage,
       gpsFixOk: opts.gpsFixOk ?? null,
+      alarmFlags: flags,
+      lastEngineEdgeAt,
     });
   }
 
@@ -344,6 +372,117 @@ export class TrackingEventsService {
       { bit: 29, key: 'collision', label: 'Collision', severity: 'critical' },
     ];
     return map.filter((m) => (flags & (1 << m.bit)) !== 0);
+  }
+
+  /** Public entry for geofence (and other) alert emails — includes quiet-hours gate. */
+  async deliverAlertEmail(detail: {
+    message: string;
+    trigger: string;
+    ruleName?: string | null;
+    vehicleId?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    speedKph?: number | null;
+    severity?: string | null;
+    recordedAt?: Date | string | null;
+  }) {
+    await this.sendAlertEmail(this.slug(), detail);
+  }
+
+  private timeToHm(value: unknown): string | null {
+    if (value == null) return null;
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      const h = String(value.getUTCHours()).padStart(2, '0');
+      const m = String(value.getUTCMinutes()).padStart(2, '0');
+      return `${h}:${m}`;
+    }
+    const s = String(value).trim();
+    if (!s) return null;
+    const m = s.match(/^(\d{1,2}):(\d{2})/);
+    if (!m) return null;
+    return `${m[1].padStart(2, '0')}:${m[2]}`;
+  }
+
+  private johannesburgHm(): string {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Africa/Johannesburg',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(new Date());
+  }
+
+  private async isQuietHoursNow(): Promise<boolean> {
+    await this.ensureTables();
+    const rows = await this.dataSource.query(
+      `SELECT "quiet_hours_start", "quiet_hours_end"
+       FROM "${this.schema()}"."tenant_tracking_settings" WHERE "id" = 1`,
+    );
+    const start = this.timeToHm(rows[0]?.quiet_hours_start);
+    const end = this.timeToHm(rows[0]?.quiet_hours_end);
+    if (!start || !end || start === end) return false;
+    const now = this.johannesburgHm();
+    if (start < end) return now >= start && now < end;
+    return now >= start || now < end;
+  }
+
+  private async vehicleLabel(vehicleId?: string | null): Promise<string | null> {
+    if (!vehicleId) return null;
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT "label" FROM "${this.schema()}"."vehicles" WHERE "id" = $1 LIMIT 1`,
+        [vehicleId],
+      );
+      return rows[0]?.label ? String(rows[0].label) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private humanizeAlertMessage(
+    trigger: string,
+    opts: {
+      vehicleLabel?: string | null;
+      message?: string | null;
+      speedKph?: number | null;
+      fenceName?: string | null;
+      minutes?: number | null;
+    },
+  ): string {
+    const label = opts.vehicleLabel?.trim() || 'Vehicle';
+    switch (trigger) {
+      case 'engine_start':
+        return `${label} started (ACC on)`;
+      case 'engine_stop':
+        return `${label} stopped (ACC off)`;
+      case 'overspeed': {
+        const sp =
+          opts.speedKph != null && Number.isFinite(Number(opts.speedKph))
+            ? ` ${Number(opts.speedKph).toFixed(0)} km/h`
+            : '';
+        return `${label} overspeed${sp}`;
+      }
+      case 'power_loss':
+        return `${label}: tracker power loss`;
+      case 'low_voltage':
+        return `${label}: low voltage`;
+      case 'offline':
+        return `${label} tracker offline`;
+      case 'enter_forbidden':
+        return `${label} entered forbidden zone${opts.fenceName ? ` (${opts.fenceName})` : ''}`;
+      case 'enter_rank':
+        return `${label} entered rank${opts.fenceName ? ` (${opts.fenceName})` : ''}`;
+      case 'off_corridor_minutes':
+        return `${label} off corridor${opts.fenceName ? ` (${opts.fenceName})` : ''}${
+          opts.minutes != null ? ` — ${opts.minutes} min` : ''
+        }`;
+      case 'rank_dwell_minutes':
+        return `${label} dwelling at rank${opts.fenceName ? ` (${opts.fenceName})` : ''}${
+          opts.minutes != null ? ` — ${opts.minutes} min` : ''
+        }`;
+      default:
+        return opts.message?.trim() || `${label}: ${trigger.replace(/_/g, ' ')}`;
+    }
   }
 
   private async maybeFireRule(
@@ -383,6 +522,7 @@ export class TrackingEventsService {
        WHERE "is_active" = true AND "trigger" = $1`,
       [trigger],
     );
+    const label = await this.vehicleLabel(dto.vehicleId);
     for (const rule of rules) {
       const cooldown = Number(rule.cooldown_minutes ?? 15);
       if (dto.vehicleId) {
@@ -395,8 +535,11 @@ export class TrackingEventsService {
         );
         if (recent.length) continue;
       }
-      const message =
-        dto.message ?? rule.name ?? trigger;
+      const message = this.humanizeAlertMessage(trigger, {
+        vehicleLabel: label,
+        message: dto.message,
+        speedKph: dto.speedKph,
+      });
       await this.dataSource.query(
         `INSERT INTO "${s}"."geofence_alert_fires"
           ("rule_id","vehicle_id","geofence_id","message")
@@ -440,6 +583,13 @@ export class TrackingEventsService {
       recordedAt?: Date | string | null;
     },
   ) {
+    if (await this.isQuietHoursNow()) {
+      this.logger.debug(
+        `Quiet hours — skip alert email (${detail.trigger}) for ${slug}`,
+      );
+      return;
+    }
+
     let emails: string[] = [];
     try {
       emails = await this.recipients.listActiveEmails(slug);

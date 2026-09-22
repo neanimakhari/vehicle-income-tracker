@@ -188,6 +188,13 @@ export function TrackingClient({
   } | null>(null);
   const [cmdBusy, setCmdBusy] = useState<string | null>(null);
   const [alertedIds, setAlertedIds] = useState<Set<string>>(new Set());
+  const [dayStory, setDayStory] = useState<{
+    vehicles: number;
+    distanceKm: number;
+    starts: number;
+    trips: number;
+    offline: number;
+  } | null>(null);
 
   useEffect(() => {
     try {
@@ -196,6 +203,46 @@ export function TrackingClient({
       /* ignore */
     }
   }, []);
+
+  useEffect(() => {
+    if (!hasLive) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const day = todayJhb();
+        const res = await fetch(
+          `/api/proxy/tenant/tracking/trips-report?day=${encodeURIComponent(day)}`,
+        );
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        const rows = Array.isArray(data?.vehicles) ? data.vehicles : [];
+        let distanceKm = 0;
+        let starts = 0;
+        let trips = 0;
+        let offline = 0;
+        for (const r of rows) {
+          distanceKm += Number(r.distanceKm ?? 0) || 0;
+          starts += Number(r.engineStarts ?? 0) || 0;
+          trips += Number(r.tripCount ?? 0) || 0;
+          offline += Number(r.offlineEvents ?? 0) || 0;
+        }
+        if (!cancelled) {
+          setDayStory({
+            vehicles: rows.length,
+            distanceKm,
+            starts,
+            trips,
+            offline,
+          });
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hasLive]);
 
   useEffect(() => {
     if (!tenantSlug || !hasLive || !popiaAck) return;
@@ -534,7 +581,7 @@ export function TrackingClient({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700 dark:text-teal-300">
-            Fleet map · v1.2.1
+            Fleet map · v1.2.3
           </p>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
             Live Tracking
@@ -562,6 +609,22 @@ export function TrackingClient({
           </button>
         </div>
       </div>
+
+      {dayStory ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-teal-200/70 bg-teal-50/70 px-3 py-2 text-sm text-teal-950 dark:border-teal-900 dark:bg-teal-950/30 dark:text-teal-100">
+          <p>
+            Today · {dayStory.vehicles} vehicles · {fmt(dayStory.distanceKm, 1)} km ·{" "}
+            {dayStory.starts} starts · {dayStory.trips} trip segments
+            {dayStory.offline > 0 ? ` · ${dayStory.offline} offline` : ""}
+          </p>
+          <Link
+            href="/tracking/trips"
+            className="shrink-0 text-xs font-semibold text-teal-800 underline-offset-2 hover:underline dark:text-teal-200"
+          >
+            Full day → Trips & parking
+          </Link>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         {(
