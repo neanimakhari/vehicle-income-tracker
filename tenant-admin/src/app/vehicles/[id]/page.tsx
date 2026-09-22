@@ -233,6 +233,14 @@ export default async function VehicleDetailPage({
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
             Registration: {vehicle.registrationNumber}
           </p>
+          <p className="mt-2">
+            <Link
+              href={`/tracking/setup?vehicleId=${encodeURIComponent(vehicle.id)}`}
+              className="text-sm font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300"
+            >
+              Set up GPS tracker
+            </Link>
+          </p>
         </div>
       </div>
 

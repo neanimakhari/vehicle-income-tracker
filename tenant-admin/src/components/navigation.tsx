@@ -32,6 +32,7 @@ const MODULE_NAV: Record<string, string> = {
   "/scholar-payments": "scholar_payments",
   "/transport": "scholar_payments",
   "/tracking": "tracking_live",
+  "/tracking/setup": "tracking_live",
   "/tracking/analytics": "tracking_live",
   "/tracking/reconciliation": "tracking_live",
   "/tracking/geofences": "tracking_geofence",
@@ -65,6 +66,7 @@ export function Navigation({
     { href: "/trips", icon: Route, label: "Trips" },
     { href: "/transport", icon: GraduationCap, label: "Scholar & staff" },
     { href: "/tracking", icon: MapPinned, label: "Live Tracking" },
+    { href: "/tracking/setup", icon: Smartphone, label: "Set up tracker" },
     { href: "/tracking/analytics", icon: Activity, label: "Tracker analytics" },
     {
       href: "/tracking/reconciliation",

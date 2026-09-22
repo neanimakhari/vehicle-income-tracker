@@ -63,14 +63,10 @@ export default async function TrackingPage({
   const tenantSlug = policy?.tenantSlug ?? "";
   const entitled = entitlementsRaw == null ? null : new Set(entitlementsRaw);
   const hasLive = entitled == null || entitled.has("tracking_live");
-  const hasHistory = entitled == null || entitled.has("tracking_history");
 
-  const [latest, history, vehicles, devices] = await Promise.all([
+  const [latest, vehicles, devices] = await Promise.all([
     hasLive
       ? fetchJson<TrackingPoint[]>("/tenant/tracking/latest")
-      : Promise.resolve([] as TrackingPoint[]),
-    hasLive && hasHistory
-      ? fetchJson<TrackingPoint[]>("/tenant/tracking/history?limit=100")
       : Promise.resolve([] as TrackingPoint[]),
     fetchJson<VehicleRow[]>("/tenant/vehicles"),
     hasLive
@@ -80,7 +76,6 @@ export default async function TrackingPage({
 
   return (
     <TrackingClient
-      initialHistory={history ?? []}
       initialLatest={latest ?? []}
       tenantSlug={tenantSlug}
       entitlements={entitlementsRaw}

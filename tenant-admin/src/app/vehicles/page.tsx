@@ -106,6 +106,12 @@ export default async function VehiclesPage() {
 
       <div className="mt-6 flex flex-wrap items-center gap-4">
         <CreateVehicleModal createVehicle={createVehicle} />
+        <a
+          href="/tracking/setup"
+          className="text-sm font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300"
+        >
+          Set up GPS tracker
+        </a>
       </div>
 
       <VehiclesTable

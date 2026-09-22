@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { fetchJsonClient } from "../../lib/api-client";
@@ -31,19 +32,30 @@ type DeviceRow = {
   lastSeenAt: string | null;
 };
 
+type TrackingEvent = {
+  id: string;
+  vehicleId?: string | null;
+  eventType: string;
+  message?: string | null;
+  severity?: string;
+  recordedAt: string;
+};
+
 type MetricsVehicle = {
   vehicleId: string;
   pointCount?: number;
   maxSpeedKph?: number;
-  avgSpeedKph?: number;
   movingSamples?: number;
   idleSamples?: number;
 };
+
+type FleetFilter = "all" | "moving" | "idle" | "offline" | "alert";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000").replace(
   /\/$/,
   "",
 );
+const OFFLINE_MS = 15 * 60 * 1000;
 
 function todayJhb(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -76,6 +88,18 @@ function ageLabel(iso: string | null | undefined) {
   return new Date(iso).toLocaleString();
 }
 
+function isOffline(point: TrackingPoint | null | undefined) {
+  if (!point?.recordedAt) return true;
+  return Date.now() - new Date(point.recordedAt).getTime() > OFFLINE_MS;
+}
+
+function statusKind(point: TrackingPoint | null | undefined): FleetFilter | "ok" {
+  if (isOffline(point)) return "offline";
+  if (point?.overspeed) return "alert";
+  if ((point?.speedKph ?? 0) > 3) return "moving";
+  return "idle";
+}
+
 function TelemetryCell({
   label,
   value,
@@ -87,7 +111,7 @@ function TelemetryCell({
 }) {
   return (
     <div className="rounded-md bg-zinc-50 px-2.5 py-2 dark:bg-zinc-950/60">
-      <div className="text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+      <div className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
         {label}
       </div>
       <div
@@ -102,7 +126,6 @@ function TelemetryCell({
 }
 
 export function TrackingClient({
-  initialHistory,
   initialLatest,
   tenantSlug,
   entitlements,
@@ -114,7 +137,6 @@ export function TrackingClient({
   initialTo,
   initialVehicleId,
 }: {
-  initialHistory: TrackingPoint[];
   initialLatest: TrackingPoint[];
   tenantSlug: string;
   entitlements: string[] | null;
@@ -134,8 +156,8 @@ export function TrackingClient({
   const hasHistory = entitled == null || entitled.has("tracking_history");
   const hasObd = entitled == null || entitled.has("tracking_obd");
 
-  const [mode, setMode] = useState<"live" | "playback">(
-    hasHistory ? initialMode : "live",
+  const [replayOpen, setReplayOpen] = useState(
+    hasHistory && initialMode === "playback",
   );
   const [playbackDay, setPlaybackDay] = useState(initialDay ?? todayJhb());
   const [playbackTrail, setPlaybackTrail] = useState<TrackingPoint[]>([]);
@@ -144,18 +166,20 @@ export function TrackingClient({
   const [metrics, setMetrics] = useState<MetricsVehicle | null>(null);
   const playTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const [history, setHistory] = useState<TrackingPoint[]>(initialHistory);
   const [latest, setLatest] = useState<TrackingPoint[]>(initialLatest);
   const [devices, setDevices] = useState<DeviceRow[]>(initialDevices);
+  const [events, setEvents] = useState<TrackingEvent[]>([]);
   const [connected, setConnected] = useState(false);
   const [popiaAck, setPopiaAck] = useState(false);
+  const [fleetFilter, setFleetFilter] = useState<FleetFilter>("all");
+  const [showMore, setShowMore] = useState(false);
+  const [showCommands, setShowCommands] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(
     initialVehicleId ??
       initialLatest[0]?.vehicleId ??
       vehicles[0]?.id ??
       null,
   );
-  const [bindImei, setBindImei] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [alertToast, setAlertToast] = useState<{
@@ -163,8 +187,7 @@ export function TrackingClient({
     severity: string;
   } | null>(null);
   const [cmdBusy, setCmdBusy] = useState<string | null>(null);
-  const modeRef = useRef(mode);
-  modeRef.current = mode;
+  const [alertedIds, setAlertedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     try {
@@ -202,17 +225,22 @@ export function TrackingClient({
           );
           return [point, ...without];
         });
-        if (modeRef.current === "live") {
-          setHistory((prev) => [...prev, point].slice(-200));
-        }
       });
       socket.on(
         "tracking:alert",
-        (ev: { message?: string; eventType?: string; severity?: string }) => {
+        (ev: {
+          message?: string;
+          eventType?: string;
+          severity?: string;
+          vehicleId?: string;
+        }) => {
           setAlertToast({
             message: ev.message || ev.eventType || "Tracking alert",
             severity: ev.severity || "warning",
           });
+          if (ev.vehicleId) {
+            setAlertedIds((prev) => new Set(prev).add(String(ev.vehicleId)));
+          }
           window.setTimeout(() => setAlertToast(null), 8000);
         },
       );
@@ -223,6 +251,15 @@ export function TrackingClient({
     };
   }, [tenantSlug, hasLive, popiaAck]);
 
+  useEffect(() => {
+    if (!popiaAck || !hasLive) return;
+    void fetchJsonClient<TrackingEvent[]>(
+      "/api/proxy/tenant/tracking/events?limit=40",
+    ).then((rows) => {
+      if (Array.isArray(rows)) setEvents(rows);
+    });
+  }, [popiaAck, hasLive, selectedId]);
+
   async function loadPlayback(opts?: {
     day?: string;
     from?: string;
@@ -232,7 +269,7 @@ export function TrackingClient({
     if (!hasHistory) return;
     const vid = opts?.vehicleId ?? selectedId;
     if (!vid) {
-      setMessage("Select a vehicle for playback.");
+      setMessage("Select a vehicle to replay.");
       return;
     }
     setBusy("playback");
@@ -264,14 +301,15 @@ export function TrackingClient({
       const trail = Array.isArray(pts) ? pts : [];
       setPlaybackTrail(trail);
       setScrubIndex(trail.length ? trail.length - 1 : 0);
-      setMode("playback");
+      setReplayOpen(true);
       setSelectedId(vid);
       if (opts?.day) setPlaybackDay(opts.day);
-      const m = metricsRes?.vehicles?.find((v) => v.vehicleId === vid) ?? null;
-      setMetrics(m);
+      setMetrics(
+        metricsRes?.vehicles?.find((v) => v.vehicleId === vid) ?? null,
+      );
       setMessage(
         trail.length
-          ? `Loaded ${trail.length} points for playback`
+          ? `Replay: ${trail.length} points`
           : "No points in this window",
       );
     } finally {
@@ -289,11 +327,11 @@ export function TrackingClient({
         vehicleId: initialVehicleId ?? selectedId ?? undefined,
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- deep-link once on ack
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [popiaAck]);
 
   useEffect(() => {
-    if (!playing || mode !== "playback" || playbackTrail.length < 2) {
+    if (!playing || !replayOpen || playbackTrail.length < 2) {
       if (playTimer.current) {
         clearInterval(playTimer.current);
         playTimer.current = null;
@@ -312,61 +350,19 @@ export function TrackingClient({
     return () => {
       if (playTimer.current) clearInterval(playTimer.current);
     };
-  }, [playing, mode, playbackTrail.length]);
+  }, [playing, replayOpen, playbackTrail.length]);
 
   async function refresh() {
-    const [lat, hist, devs] = await Promise.all([
+    const [lat, devs, evs] = await Promise.all([
       fetchJsonClient<TrackingPoint[]>("/api/proxy/tenant/tracking/latest"),
-      hasHistory && mode === "live"
-        ? fetchJsonClient<TrackingPoint[]>(
-            `/api/proxy/tenant/tracking/history?limit=100${
-              selectedId ? `&vehicleId=${encodeURIComponent(selectedId)}` : ""
-            }`,
-          )
-        : Promise.resolve(null),
       fetchJsonClient<DeviceRow[]>("/api/proxy/tenant/tracking/devices"),
+      fetchJsonClient<TrackingEvent[]>(
+        "/api/proxy/tenant/tracking/events?limit=40",
+      ).catch(() => null),
     ]);
     if (Array.isArray(lat)) setLatest(lat);
-    if (Array.isArray(hist)) setHistory(hist);
     if (Array.isArray(devs)) setDevices(devs);
-  }
-
-  async function bindDevice() {
-    if (!selectedId || !bindImei.trim()) return;
-    setBusy("bind");
-    setMessage(null);
-    try {
-      const res = await fetch(
-        `/api/proxy/tenant/tracking/devices/${selectedId}/bind`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imei: bindImei.trim() }),
-        },
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setMessage(err?.message ?? `Bind failed (${res.status})`);
-      } else {
-        setMessage("IMEI bound to selected vehicle.");
-        setBindImei("");
-        await refresh();
-      }
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function unbindDevice(vehicleId: string) {
-    setBusy(`unbind-${vehicleId}`);
-    try {
-      await fetch(`/api/proxy/tenant/tracking/devices/${vehicleId}/unbind`, {
-        method: "POST",
-      });
-      await refresh();
-    } finally {
-      setBusy(null);
-    }
+    if (Array.isArray(evs)) setEvents(evs);
   }
 
   async function sendCommand(
@@ -420,31 +416,47 @@ export function TrackingClient({
     return vehicles.map((v) => {
       const point = latestByVehicle.get(v.id);
       const device = devices.find((d) => d.vehicleId === v.id);
-      return { vehicle: v, point, device };
+      const kind = statusKind(point);
+      const alert =
+        kind === "alert" || alertedIds.has(v.id) || Boolean(point?.overspeed);
+      return {
+        vehicle: v,
+        point,
+        device,
+        kind: alert && kind !== "offline" ? ("alert" as const) : kind,
+      };
     });
-  }, [vehicles, latestByVehicle, devices]);
+  }, [vehicles, latestByVehicle, devices, alertedIds]);
+
+  const counts = useMemo(() => {
+    const c = { moving: 0, idle: 0, offline: 0, alert: 0 };
+    for (const r of fleetRows) {
+      if (r.kind === "moving") c.moving += 1;
+      else if (r.kind === "idle") c.idle += 1;
+      else if (r.kind === "offline") c.offline += 1;
+      if (r.kind === "alert") c.alert += 1;
+    }
+    return c;
+  }, [fleetRows]);
+
+  const filteredFleet = useMemo(() => {
+    if (fleetFilter === "all") return fleetRows;
+    return fleetRows.filter((r) => r.kind === fleetFilter);
+  }, [fleetRows, fleetFilter]);
 
   const selected =
     fleetRows.find((r) => r.vehicle.id === selectedId) ?? fleetRows[0];
-
-  const liveTrail = useMemo(() => {
-    if (!hasHistory || mode !== "live") return [] as TrackingPoint[];
+  const selectedPoint = selected?.point ?? null;
+  const vehicleEvents = useMemo(() => {
     const vid = selected?.vehicle.id;
-    const chron = [...history].sort(
-      (a, b) =>
-        new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime(),
-    );
-    if (!vid) return chron.slice(-80);
-    return chron.filter((p) => p.vehicleId === vid).slice(-80);
-  }, [history, hasHistory, selected?.vehicle.id, mode]);
+    if (!vid) return [];
+    return events.filter((e) => e.vehicleId === vid).slice(0, 3);
+  }, [events, selected?.vehicle.id]);
 
-  const trail = mode === "playback" ? playbackTrail : liveTrail;
   const playheadPoint =
-    mode === "playback" && trail.length
-      ? trail[Math.max(0, Math.min(scrubIndex, trail.length - 1))]
+    replayOpen && playbackTrail.length
+      ? playbackTrail[Math.max(0, Math.min(scrubIndex, playbackTrail.length - 1))]
       : null;
-  const selectedPoint =
-    mode === "playback" ? playheadPoint : (selected?.point ?? null);
 
   const latestSorted = useMemo(
     () =>
@@ -455,19 +467,30 @@ export function TrackingClient({
     [latest],
   );
 
+  const statusLine = (() => {
+    if (!selected) return "Select a vehicle";
+    if (!selected.device) {
+      return "No tracker bound — set up a GPS unit to see live position.";
+    }
+    if (isOffline(selectedPoint)) {
+      return `Offline · last seen ${ageLabel(selectedPoint?.recordedAt ?? selected.device.lastSeenAt)}`;
+    }
+    if (selectedPoint?.overspeed) {
+      return `Overspeed ${fmt(selectedPoint.speedKph, 0, " km/h")} · ${ageLabel(selectedPoint.recordedAt)}`;
+    }
+    if ((selectedPoint?.speedKph ?? 0) > 3) {
+      return `Moving ${fmt(selectedPoint?.speedKph, 0, " km/h")} · signal ${ageLabel(selectedPoint?.recordedAt)}`;
+    }
+    return `Idle · signal ${ageLabel(selectedPoint?.recordedAt)}`;
+  })();
+
   if (!hasLive) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-          Live Tracking
-        </h1>
-        <div className="rounded-xl border border-amber-200/80 bg-amber-50 p-5 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-          <p className="font-medium">Live tracking is not on your plan.</p>
-          <p className="mt-1 opacity-90">
-            Enable <code className="text-xs">tracking_live</code> (and optional
-            history / OBD) to use the fleet map.
-          </p>
-        </div>
+        <h1 className="text-2xl font-semibold">Live Tracking</h1>
+        <p className="text-sm text-zinc-600">
+          Enable <code>tracking_live</code> on your plan.
+        </p>
       </div>
     );
   }
@@ -475,29 +498,14 @@ export function TrackingClient({
   if (!popiaAck) {
     return (
       <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center gap-5 px-2">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700 dark:text-teal-300">
-            Fleet map
-          </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Live Tracking
-          </h1>
-        </div>
-        <div className="rounded-2xl border border-zinc-200/80 bg-white/90 p-6 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/90">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            Location data notice (POPIA)
-          </h2>
+        <h1 className="text-3xl font-semibold tracking-tight">Live Tracking</h1>
+        <div className="rounded-2xl border border-zinc-200/80 bg-white/90 p-6 dark:border-zinc-700 dark:bg-zinc-900/90">
+          <h2 className="text-lg font-semibold">Location data notice (POPIA)</h2>
           <p className="mt-3 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
-            Live tracking processes personal information (vehicle location and
-            related telemetry). Use it only for legitimate fleet operations,
-            inform drivers where required, and keep access limited to authorised
-            staff. Map views are audited.
+            Live tracking processes vehicle location and related telemetry. Use
+            it only for legitimate fleet operations.
           </p>
-          <button
-            type="button"
-            className="btn btn-primary mt-5 w-full sm:w-auto"
-            onClick={ackPopia}
-          >
+          <button type="button" className="btn btn-primary mt-5" onClick={ackPopia}>
             I understand — open fleet map
           </button>
         </div>
@@ -505,14 +513,16 @@ export function TrackingClient({
     );
   }
 
+  const unboundCount = fleetRows.filter((r) => !r.device).length;
+
   return (
     <div className="-mx-1 space-y-4 sm:mx-0">
       {alertToast ? (
         <div
           className={`fixed right-4 top-4 z-50 max-w-sm rounded-lg border px-4 py-3 text-sm shadow-lg ${
             alertToast.severity === "critical"
-              ? "border-rose-300 bg-rose-50 text-rose-950 dark:border-rose-800 dark:bg-rose-950/90 dark:text-rose-100"
-              : "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950/90 dark:text-amber-100"
+              ? "border-rose-300 bg-rose-50 text-rose-950"
+              : "border-amber-300 bg-amber-50 text-amber-950"
           }`}
           role="alert"
         >
@@ -524,73 +534,48 @@ export function TrackingClient({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700 dark:text-teal-300">
-            Fleet map
+            Fleet map · v1.2.0
           </p>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
             Live Tracking
           </h1>
+          <p className="mt-1 max-w-xl text-sm text-zinc-600 dark:text-zinc-300">
+            See what the fleet is doing now, then replay a day or trip when you
+            need to explain a route.
+          </p>
           <p className="mt-2 flex flex-wrap gap-3 text-sm">
-            <a
-              href="/tracking/analytics"
+            <Link
+              href="/tracking/setup"
               className="font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300"
             >
-              Tracker analytics
-            </a>
-            <a
+              Set up tracker
+            </Link>
+            <Link
               href="/tracking/trips"
               className="font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300"
             >
               Trips & parking
-            </a>
-            <a
+            </Link>
+            <Link
               href="/tracking/alerts"
               className="font-medium text-teal-700 underline-offset-2 hover:underline dark:text-teal-300"
             >
               Alerts
-            </a>
+            </Link>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {hasHistory ? (
-            <div className="inline-flex rounded-lg border border-zinc-200 p-0.5 dark:border-zinc-700">
-              <button
-                type="button"
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                  mode === "live"
-                    ? "bg-teal-600 text-white"
-                    : "text-zinc-600 dark:text-zinc-300"
-                }`}
-                onClick={() => {
-                  setMode("live");
-                  setPlaying(false);
-                }}
-              >
-                Live
-              </button>
-              <button
-                type="button"
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                  mode === "playback"
-                    ? "bg-teal-600 text-white"
-                    : "text-zinc-600 dark:text-zinc-300"
-                }`}
-                onClick={() => setMode("playback")}
-              >
-                Playback
-              </button>
-            </div>
-          ) : null}
           <span
             className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
               connected
-                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
-                : "bg-zinc-200/80 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                ? "bg-emerald-100 text-emerald-800"
+                : "bg-zinc-200/80 text-zinc-700"
             }`}
           >
             <span
               className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-emerald-500" : "bg-zinc-400"}`}
             />
-            {connected ? "WS" : "Offline"}
+            {connected ? "Live feed" : "Reconnecting"}
           </span>
           <button type="button" className="btn btn-secondary" onClick={refresh}>
             Refresh
@@ -598,365 +583,357 @@ export function TrackingClient({
         </div>
       </div>
 
-      {hasHistory && mode === "playback" ? (
-        <div className="flex flex-col gap-3 rounded-xl border border-zinc-200/80 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900 sm:flex-row sm:items-end">
-          <div>
-            <label className="text-xs font-medium text-zinc-500">Day (JHB)</label>
-            <input
-              type="date"
-              className="input mt-1"
-              value={playbackDay}
-              onChange={(e) => setPlaybackDay(e.target.value)}
-            />
-          </div>
+      <div className="flex flex-wrap gap-2">
+        {(
+          [
+            ["all", `All ${fleetRows.length}`],
+            ["moving", `Moving ${counts.moving}`],
+            ["idle", `Idle ${counts.idle}`],
+            ["offline", `Offline ${counts.offline}`],
+            ["alert", `Alerts ${counts.alert}`],
+          ] as Array<[FleetFilter, string]>
+        ).map(([key, label]) => (
           <button
+            key={key}
             type="button"
-            className="btn btn-primary"
-            disabled={busy === "playback" || !selectedId}
-            onClick={() => loadPlayback({ day: playbackDay })}
+            onClick={() => setFleetFilter(key)}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+              fleetFilter === key
+                ? "bg-teal-600 text-white"
+                : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+            }`}
           >
-            {busy === "playback" ? "Loading…" : "Load route"}
+            {label}
           </button>
-          {playbackTrail.length > 1 ? (
-            <>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setPlaying((p) => !p)}
-              >
-                {playing ? "Pause" : "Play"}
-              </button>
-              <div className="min-w-0 flex-1">
-                <label className="text-xs font-medium text-zinc-500">
-                  Scrub ·{" "}
-                  {playheadPoint
-                    ? new Date(playheadPoint.recordedAt).toLocaleTimeString()
-                    : "—"}{" "}
-                  · {fmt(playheadPoint?.speedKph, 0, " km/h")}
-                </label>
-                <input
-                  type="range"
-                  className="mt-1 w-full"
-                  min={0}
-                  max={Math.max(0, playbackTrail.length - 1)}
-                  value={scrubIndex}
-                  onChange={(e) => {
-                    setPlaying(false);
-                    setScrubIndex(Number(e.target.value));
-                  }}
-                />
-              </div>
-            </>
-          ) : null}
-        </div>
+        ))}
+      </div>
+
+      {unboundCount > 0 ? (
+        <p className="rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          {unboundCount} vehicle{unboundCount === 1 ? "" : "s"} without a
+          tracker.{" "}
+          <Link href="/tracking/setup" className="font-semibold underline">
+            Set up a tracker
+          </Link>
+        </p>
       ) : null}
 
-      {mode === "playback" && metrics ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <TelemetryCell label="Points" value={String(metrics.pointCount ?? 0)} />
-          <TelemetryCell
-            label="Max speed"
-            value={fmt(metrics.maxSpeedKph != null ? Number(metrics.maxSpeedKph) : null, 0, " km/h")}
-          />
-          <TelemetryCell
-            label="Moving samples"
-            value={String(metrics.movingSamples ?? 0)}
-          />
-          <TelemetryCell
-            label="Idle samples"
-            value={String(metrics.idleSamples ?? 0)}
-          />
-        </div>
-      ) : null}
-
-      {message && (
+      {message ? (
         <p
           className="rounded-lg border border-teal-200/70 bg-teal-50 px-3 py-2 text-sm text-teal-950 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-100"
           role="status"
         >
           {message}
         </p>
-      )}
+      ) : null}
 
       <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
-        <div className="grid lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="relative min-h-[420px] border-b border-zinc-200/80 lg:border-b-0 lg:border-r dark:border-zinc-700">
             <TrackingMap
               points={latestSorted}
-              trail={trail}
+              trail={[]}
               selectedVehicleId={selected?.vehicle.id}
               onSelectVehicle={setSelectedId}
-              playheadIndex={mode === "playback" ? scrubIndex : null}
-              fitTrail={mode === "playback" && playbackTrail.length >= 2}
             />
           </div>
 
-          <div className="flex max-h-[560px] flex-col">
+          <div className="flex max-h-[640px] flex-col">
             <div className="border-b border-zinc-200/80 px-4 py-3 dark:border-zinc-700">
               <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                Fleet · {fleetRows.length}
+                Fleet · {filteredFleet.length}
               </div>
             </div>
-            <div className="flex-1 space-y-2 overflow-y-auto p-3">
-              {fleetRows.map(({ vehicle, point, device }) => {
+            <div className="max-h-48 space-y-1 overflow-y-auto border-b border-zinc-200/80 p-2 dark:border-zinc-700">
+              {filteredFleet.map(({ vehicle, point, device, kind }) => {
                 const active = selected?.vehicle.id === vehicle.id;
-                const moving = (point?.speedKph ?? 0) > 3;
                 return (
                   <button
                     key={vehicle.id}
                     type="button"
                     onClick={() => setSelectedId(vehicle.id)}
-                    className={`w-full rounded-xl border px-3 py-3 text-left transition ${
+                    className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
                       active
-                        ? "border-teal-500/70 bg-teal-50/80 ring-1 ring-teal-500/30 dark:border-teal-500/50 dark:bg-teal-950/30"
-                        : "border-zinc-200/80 bg-zinc-50/50 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-950/40"
+                        ? "bg-teal-50 ring-1 ring-teal-500/40 dark:bg-teal-950/40"
+                        : "hover:bg-zinc-50 dark:hover:bg-zinc-950/50"
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="truncate font-semibold text-zinc-900 dark:text-zinc-50">
-                          {vehicle.label}
-                        </div>
-                        <div className="mt-0.5 text-xs text-zinc-500">
-                          {device ? (
-                            <span className="font-mono">{device.imei}</span>
-                          ) : (
-                            "No IMEI bound"
-                          )}
-                        </div>
-                      </div>
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                          !point
-                            ? "bg-zinc-200 text-zinc-600"
-                            : point.overspeed
-                              ? "bg-rose-100 text-rose-700"
-                              : moving
-                                ? "bg-teal-100 text-teal-800"
-                                : "bg-zinc-200 text-zinc-600"
-                        }`}
-                      >
-                        {!point
-                          ? "Offline"
-                          : point.overspeed
-                            ? "Alert"
-                            : moving
-                              ? "Moving"
-                              : "Idle"}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-medium">{vehicle.label}</span>
+                      <span className="text-[10px] font-semibold uppercase text-zinc-500">
+                        {kind}
                       </span>
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-600 dark:text-zinc-300">
-                      <span>{fmt(point?.speedKph, 0, " km/h")}</span>
-                      <span className="text-zinc-400">
-                        {ageLabel(point?.recordedAt)}
-                      </span>
+                    <div className="mt-0.5 text-xs text-zinc-500">
+                      {device ? (
+                        <span className="font-mono">{device.imei}</span>
+                      ) : (
+                        "No IMEI"
+                      )}{" "}
+                      · {fmt(point?.speedKph, 0, " km/h")}
                     </div>
                   </button>
                 );
               })}
             </div>
+
+            {selected ? (
+              <div className="flex-1 space-y-3 overflow-y-auto p-4">
+                <div>
+                  <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
+                    {selected.vehicle.label}
+                  </h2>
+                  <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-200">
+                    {statusLine}
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Overspeed uses your fleet speed limit in Tracking settings
+                    (alerts). Offline means no GPS for about 15+ minutes.
+                  </p>
+                </div>
+
+                <TelemetryGauges point={selectedPoint} hasObd={hasObd} />
+
+                {vehicleEvents.length > 0 ? (
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                      Recent events
+                    </p>
+                    <ul className="mt-1 space-y-1">
+                      {vehicleEvents.map((e) => (
+                        <li
+                          key={e.id}
+                          className="text-xs text-zinc-600 dark:text-zinc-300"
+                        >
+                          <span className="font-medium">{e.message ?? e.eventType}</span>
+                          <span className="text-zinc-400">
+                            {" "}
+                            · {ageLabel(e.recordedAt)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                <div className="flex flex-wrap gap-2">
+                  {hasHistory ? (
+                    <button
+                      type="button"
+                      className="btn btn-primary text-xs"
+                      disabled={busy === "playback"}
+                      onClick={() =>
+                        loadPlayback({
+                          day: todayJhb(),
+                          vehicleId: selected.vehicle.id,
+                        })
+                      }
+                    >
+                      {busy === "playback" ? "Loading…" : "Replay today"}
+                    </button>
+                  ) : null}
+                  <Link
+                    href={`/tracking/setup?vehicleId=${encodeURIComponent(selected.vehicle.id)}`}
+                    className="btn btn-secondary text-xs"
+                  >
+                    {selected.device ? "Fix tracker" : "Add tracker"}
+                  </Link>
+                  <Link href="/tracking/alerts" className="btn btn-secondary text-xs">
+                    Alerts
+                  </Link>
+                  {selected.device ? (
+                    <button
+                      type="button"
+                      className="btn btn-secondary text-xs"
+                      onClick={() => setShowCommands((v) => !v)}
+                    >
+                      Commands
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="btn btn-secondary text-xs"
+                    onClick={() => setShowMore((v) => !v)}
+                  >
+                    {showMore ? "Less" : "More"}
+                  </button>
+                </div>
+
+                {showCommands && selected.device ? (
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { label: "Speed 80", body: { type: "speed_alarm", value: 80 } },
+                      {
+                        label: "Interval 30s",
+                        body: { type: "upload_interval", value: 30 },
+                      },
+                      { label: "Status", body: { type: "status" } },
+                    ].map((c) => (
+                      <button
+                        key={c.label}
+                        type="button"
+                        className="btn btn-secondary text-xs"
+                        disabled={cmdBusy != null}
+                        onClick={() =>
+                          sendCommand(selected.device!.imei, c.body, c.label)
+                        }
+                      >
+                        {cmdBusy === c.label ? "…" : c.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
+                {showMore ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <TelemetryCell
+                      label="Heading"
+                      value={fmt(selectedPoint?.heading, 0, "°")}
+                    />
+                    <TelemetryCell
+                      label="Ignition"
+                      value={
+                        selectedPoint?.ignitionOn == null
+                          ? "—"
+                          : selectedPoint.ignitionOn
+                            ? "On"
+                            : "Off"
+                      }
+                    />
+                    <TelemetryCell
+                      label="GPS"
+                      value={
+                        selectedPoint?.gpsFixOk == null
+                          ? "—"
+                          : selectedPoint.gpsFixOk
+                            ? `OK · ${fmt(selectedPoint.satellites, 0)} sats`
+                            : "No fix"
+                      }
+                    />
+                    <TelemetryCell
+                      label="Odometer"
+                      value={fmt(selectedPoint?.odometerKm, 1, " km")}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div>
+      </div>
 
-        {selected && (
-          <div className="border-t border-zinc-200/80 bg-zinc-50/60 px-4 py-4 dark:border-zinc-700 dark:bg-zinc-950/40">
-            <div className="mb-3">
-              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
-                {selected.vehicle.label}
-                {mode === "playback" ? (
-                  <span className="ml-2 text-xs font-normal text-zinc-500">
-                    playback
-                  </span>
-                ) : null}
-              </h2>
-              <p className="text-xs text-zinc-500">
-                {selectedPoint
-                  ? `${Number(selectedPoint.latitude).toFixed(5)}, ${Number(selectedPoint.longitude).toFixed(5)} · ${ageLabel(selectedPoint.recordedAt)}`
-                  : "No position yet."}
-              </p>
+      {replayOpen ? (
+        <div className="fixed inset-0 z-50 flex flex-col bg-zinc-950/50 backdrop-blur-sm">
+          <div className="m-2 flex max-h-[calc(100vh-1rem)] flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-900 sm:m-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  Replay
+                </p>
+                <h2 className="text-lg font-semibold">
+                  {selected?.vehicle.label ?? "Vehicle"}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setReplayOpen(false);
+                  setPlaying(false);
+                }}
+              >
+                Close
+              </button>
             </div>
-
-            <TelemetryGauges point={selectedPoint} hasObd={hasObd} />
-
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-              <TelemetryCell
-                label="Heading"
-                value={fmt(selectedPoint?.heading, 0, "°")}
-              />
-              <TelemetryCell
-                label="Ignition"
-                value={
-                  selectedPoint?.ignitionOn == null
-                    ? "—"
-                    : selectedPoint.ignitionOn
-                      ? "On"
-                      : "Off"
+            <div className="flex flex-wrap items-end gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
+              <div>
+                <label className="text-xs text-zinc-500">Day (JHB)</label>
+                <input
+                  type="date"
+                  className="input mt-1"
+                  value={playbackDay}
+                  onChange={(e) => setPlaybackDay(e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={busy === "playback"}
+                onClick={() =>
+                  loadPlayback({
+                    day: playbackDay,
+                    vehicleId: selected?.vehicle.id,
+                  })
                 }
-              />
-              <TelemetryCell
-                label="GPS"
-                value={
-                  selectedPoint?.gpsFixOk == null
-                    ? "—"
-                    : selectedPoint.gpsFixOk
-                      ? `OK · ${fmt(selectedPoint.satellites, 0)} sats`
-                      : "No fix"
-                }
-              />
-              <TelemetryCell
-                label="Odometer"
-                value={fmt(selectedPoint?.odometerKm, 1, " km")}
-              />
-              <TelemetryCell
-                label="Backup batt."
-                value={fmt(selectedPoint?.backupBatteryLevel, 0, "%")}
-              />
-              <TelemetryCell
-                label="Status"
-                value={
-                  selectedPoint?.overspeed
-                    ? "Overspeed"
-                    : (selectedPoint?.speedKph ?? 0) > 3
-                      ? "Moving"
-                      : selectedPoint
-                        ? "Idle"
-                        : "Offline"
-                }
-                warn={Boolean(selectedPoint?.overspeed)}
-              />
-            </div>
-
-            {mode === "live" ? (
-              <div className="mt-4 flex flex-col gap-2 border-t border-zinc-200/70 pt-4 dark:border-zinc-700 sm:flex-row sm:items-end">
-                <div className="min-w-0 flex-1">
-                  <label className="text-xs font-medium text-zinc-500">
-                    Bind IMEI
-                  </label>
-                  <input
-                    className="input mt-1 w-full"
-                    placeholder="e.g. 356938035643809"
-                    value={bindImei}
-                    onChange={(e) => setBindImei(e.target.value)}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  disabled={busy === "bind"}
-                  onClick={bindDevice}
-                >
-                  Bind
-                </button>
-                {selected.device && (
+              >
+                Load route
+              </button>
+              {playbackTrail.length > 1 ? (
+                <>
                   <button
                     type="button"
                     className="btn btn-secondary"
-                    disabled={busy === `unbind-${selected.vehicle.id}`}
-                    onClick={() => unbindDevice(selected.vehicle.id)}
+                    onClick={() => setPlaying((p) => !p)}
                   >
-                    Unbind
+                    {playing ? "Pause" : "Play"}
                   </button>
-                )}
-              </div>
-            ) : null}
-
-            {mode === "live" && selected.device ? (
-              <div className="mt-4 border-t border-zinc-200/70 pt-4 dark:border-zinc-700">
-                <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                  Device commands
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {[
-                    { label: "Speed 80", body: { type: "speed_alarm", value: 80 } },
-                    {
-                      label: "Interval 30s",
-                      body: { type: "upload_interval", value: 30 },
-                    },
-                    { label: "Status", body: { type: "status" } },
-                    { label: "Mileage", body: { type: "mileage" } },
-                  ].map((c) => (
-                    <button
-                      key={c.label}
-                      type="button"
-                      className="btn btn-secondary text-xs"
-                      disabled={cmdBusy != null}
-                      onClick={() =>
-                        sendCommand(selected.device!.imei, c.body, c.label)
-                      }
-                    >
-                      {cmdBusy === c.label ? "…" : c.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        )}
-      </div>
-
-      {mode === "playback" && playbackTrail.length >= 2 ? (
-        <TrackingSpeedChart
-          points={playbackTrail}
-          scrubIndex={scrubIndex}
-          onScrub={(i) => {
-            setPlaying(false);
-            setScrubIndex(i);
-          }}
-        />
-      ) : null}
-
-      {hasHistory && trail.length > 0 && (
-        <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
-          <div className="flex items-center justify-between border-b border-zinc-200/80 px-4 py-3 dark:border-zinc-700">
-            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-              Trail · {selected?.vehicle.label ?? "—"}
-            </h2>
-            <span className="text-xs text-zinc-500">{trail.length} points</span>
-          </div>
-          <div className="max-h-[280px] overflow-auto">
-            <table className="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-800">
-              <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-950">
-                <tr className="text-left text-[11px] uppercase tracking-wide text-zinc-500">
-                  <th className="px-3 py-2 font-semibold">Time</th>
-                  <th className="px-3 py-2 font-semibold">Coords</th>
-                  <th className="px-3 py-2 font-semibold">Speed</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                {[...trail].reverse().map((point, revIdx) => {
-                  const idx = trail.length - 1 - revIdx;
-                  const active = mode === "playback" && idx === scrubIndex;
-                  return (
-                    <tr
-                      key={point.id}
-                      className={`cursor-pointer tabular-nums ${
-                        active ? "bg-amber-50 dark:bg-amber-950/30" : ""
-                      }`}
-                      onClick={() => {
-                        if (mode === "playback") {
-                          setPlaying(false);
-                          setScrubIndex(idx);
-                        }
+                  <div className="min-w-[200px] flex-1">
+                    <label className="text-xs text-zinc-500">
+                      {playheadPoint
+                        ? `${new Date(playheadPoint.recordedAt).toLocaleTimeString()} · ${fmt(playheadPoint.speedKph, 0, " km/h")}`
+                        : "Scrub"}
+                    </label>
+                    <input
+                      type="range"
+                      className="mt-1 w-full"
+                      min={0}
+                      max={Math.max(0, playbackTrail.length - 1)}
+                      value={scrubIndex}
+                      onChange={(e) => {
+                        setPlaying(false);
+                        setScrubIndex(Number(e.target.value));
                       }}
-                    >
-                      <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-300">
-                        {new Date(point.recordedAt).toLocaleTimeString()}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-300">
-                        {Number(point.latitude).toFixed(5)},{" "}
-                        {Number(point.longitude).toFixed(5)}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2">
-                        {fmt(point.speedKph, 1)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                    />
+                  </div>
+                </>
+              ) : null}
+              {metrics ? (
+                <p className="text-xs text-zinc-500">
+                  {metrics.pointCount ?? 0} pts · max{" "}
+                  {fmt(
+                    metrics.maxSpeedKph != null
+                      ? Number(metrics.maxSpeedKph)
+                      : null,
+                    0,
+                    " km/h",
+                  )}
+                </p>
+              ) : null}
+            </div>
+            <div className="min-h-0 flex-1">
+              <TrackingMap
+                points={latestSorted}
+                trail={playbackTrail}
+                selectedVehicleId={selected?.vehicle.id}
+                playheadIndex={scrubIndex}
+                fitTrail={playbackTrail.length >= 2}
+              />
+            </div>
+            {playbackTrail.length >= 2 ? (
+              <div className="border-t border-zinc-200 p-3 dark:border-zinc-700">
+                <TrackingSpeedChart
+                  points={playbackTrail}
+                  scrubIndex={scrubIndex}
+                  onScrub={(i) => {
+                    setPlaying(false);
+                    setScrubIndex(i);
+                  }}
+                />
+              </div>
+            ) : null}
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

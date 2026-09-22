@@ -7,6 +7,21 @@ export default async function HelpPage() {
   
   const faqs = [
     {
+      question: "How do I connect a GPS tracker to a vehicle?",
+      answer:
+        "Open Live Tracking → Set up tracker (or /tracking/setup). Enter the IMEI printed on the tracker sticker (usually 15 digits), bind it to a vehicle, then SMS SERVER,0,<host>,7700# to the unit’s SIM so it reports to VIT. Wait until the wizard shows the first signal.",
+    },
+    {
+      question: "Which number do I use — IMEI or SIM?",
+      answer:
+        "Always bind the IMEI on the device label/barcode, not the SIM ICCID or phone number. That IMEI must match what the tracker sends on TCP port 7700.",
+    },
+    {
+      question: "How do I replay a vehicle’s route?",
+      answer:
+        "On Live Tracking, select the vehicle and click Replay today, or open Trips & parking and use Day / Segments Replay. Use the scrubber and speed chart to explain where the vehicle was.",
+    },
+    {
       question: "How do I add a new driver?",
       answer: "Navigate to the Drivers page and click 'Add Driver'. Fill in the required information including name, email, and password. You can also upload driver documents and profile pictures."
     },

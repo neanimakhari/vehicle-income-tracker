@@ -75,11 +75,23 @@ Capability notes:
 
 ## Micodus MV55G onboarding
 
-1. Bind IMEI (or JT808 terminal ID the unit sends) in tenant-admin → vehicle.
-2. Micro SIM + carrier APN SMS.
-3. `SERVER,0,<droplet-public-ip>,7700#`
-4. Confirm live map / WS; if decode fails, check gps-ingest logs for hex dumps.
-5. Optional: Micodus vendor app for side-by-side on the first unit only.
+Use tenant-admin **Set up tracker** (`/tracking/setup`) — guided checklist:
+
+1. Choose vehicle.
+2. Enter the **IMEI on the tracker sticker** (usually 15 digits under the barcode — not the SIM number).
+3. Bind IMEI to the vehicle.
+4. Confirm SIM + APN / data.
+5. SMS `SERVER,0,<MICODUS_HOST>,7700#` (copy from the wizard; host from `NEXT_PUBLIC_MICODUS_HOST`).
+6. Wait outdoors until first heartbeat/GPS appears.
+7. Optional alarm SMS: `SPEED,80#`, `ACCALM,1#`, `PWRALM,1#`.
+
+Manual equivalent: bind in Live Tracking, then `SERVER,0,<droplet-public-ip>,7700#`.
+
+## Live Tracking UX (v1.2)
+
+- Fleet status chips (Moving / Idle / Offline / Alerts)
+- Vehicle story panel: status line, gauges, recent events, Replay / Setup / Commands
+- Replay opens as a focused overlay (scrubber + speed chart), not a Live|Playback toggle
 
 ## Tracker analytics + day reconciliation
 
