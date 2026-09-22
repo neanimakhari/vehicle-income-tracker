@@ -204,31 +204,176 @@ This invite expires in 48 hours. Do not share the link.`;
     return this.send({ to, subject, text, html });
   }
 
-  /** Fleet tracking alert to tenant report recipients. */
+  /** Fleet tracking alert to tenant report recipients (tenant-branded). */
   async sendTrackingAlert(payload: {
     to: string | string[];
     tenantSlug: string;
+    tenantName?: string;
     trigger: string;
     message: string;
+    ruleName?: string | null;
+    severity?: string | null;
+    vehicleLabel?: string | null;
+    registrationNumber?: string | null;
+    vehicleId?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    speedKph?: number | null;
+    recordedAt?: Date | string | null;
+    mapsUrl?: string | null;
+    trackingUrl?: string | null;
+    brand?: {
+      displayName?: string;
+      primaryColor?: string;
+      accentColor?: string;
+      logoUrl?: string;
+    } | null;
   }): Promise<{ sent: boolean }> {
-    const when = new Date().toISOString();
-    const subject = `[VIT ${payload.tenantSlug}] ${payload.trigger}: ${payload.message}`.slice(
-      0,
-      180,
-    );
+    const escape = (v: unknown) =>
+      String(v ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    const triggerLabels: Record<string, string> = {
+      engine_start: 'Vehicle started',
+      engine_stop: 'Vehicle stopped',
+      overspeed: 'Overspeed',
+      power_loss: 'Power loss',
+      low_voltage: 'Low voltage',
+      offline: 'Tracker offline',
+    };
+    const triggerLabel =
+      triggerLabels[payload.trigger] ??
+      payload.trigger.replace(/_/g, ' ');
+
+    const whenRaw = payload.recordedAt
+      ? new Date(payload.recordedAt)
+      : new Date();
+    const whenJhb = whenRaw.toLocaleString('en-ZA', {
+      timeZone: 'Africa/Johannesburg',
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
+    const whenIso = whenRaw.toISOString();
+
+    const headerName =
+      payload.brand?.displayName ||
+      payload.tenantName ||
+      payload.tenantSlug;
+    const primary = payload.brand?.primaryColor || '#0d9488';
+    const accent = payload.brand?.accentColor || '#14b8a6';
+    const logoHtml = payload.brand?.logoUrl
+      ? `<img src="${escape(payload.brand.logoUrl)}" alt="" width="56" height="56" style="display:block;margin:0 auto 10px;border-radius:12px;background:rgba(255,255,255,0.15);padding:6px" />`
+      : `<div style="width:48px;height:48px;margin:0 auto 10px;border-radius:50%;background:rgba(15,23,42,0.2);line-height:48px;font-weight:800;letter-spacing:0.06em">V</div>`;
+
+    const vehicle =
+      payload.vehicleLabel?.trim() ||
+      (payload.vehicleId ? `Vehicle ${payload.vehicleId.slice(0, 8)}…` : 'Unknown vehicle');
+    const reg = payload.registrationNumber?.trim() || null;
+    const mapsUrl =
+      payload.mapsUrl ||
+      (payload.latitude != null &&
+      payload.longitude != null &&
+      Number.isFinite(Number(payload.latitude)) &&
+      Number.isFinite(Number(payload.longitude))
+        ? `https://www.google.com/maps?q=${Number(payload.latitude)},${Number(payload.longitude)}`
+        : null);
+    const trackingUrl =
+      payload.trackingUrl ||
+      (payload.vehicleId
+        ? `https://vit-admin.vehinc.co.za/tracking?vehicleId=${encodeURIComponent(payload.vehicleId)}`
+        : 'https://vit-admin.vehinc.co.za/tracking');
+    const coords =
+      payload.latitude != null && payload.longitude != null
+        ? `${Number(payload.latitude).toFixed(5)}, ${Number(payload.longitude).toFixed(5)}`
+        : null;
+    const speed =
+      payload.speedKph != null && Number.isFinite(Number(payload.speedKph))
+        ? `${Number(payload.speedKph).toFixed(0)} km/h`
+        : null;
+    const severity = (payload.severity || 'info').toLowerCase();
+    const severityColor =
+      severity === 'critical'
+        ? '#b91c1c'
+        : severity === 'warning'
+          ? '#b45309'
+          : primary;
+
+    const subject =
+      `[${headerName}] ${triggerLabel}: ${vehicle}`.slice(0, 180);
+
     const text = [
-      `Tenant: ${payload.tenantSlug}`,
-      `Trigger: ${payload.trigger}`,
+      `${headerName} — fleet tracking alert`,
+      '',
+      `Alert: ${triggerLabel}`,
+      `Rule: ${payload.ruleName || triggerLabel}`,
       `Message: ${payload.message}`,
-      `Time: ${when}`,
-    ].join('\n');
-    const html = `<!DOCTYPE html><html><body style="font-family:sans-serif">
-      <h2>Fleet tracking alert</h2>
-      <p><strong>Tenant:</strong> ${payload.tenantSlug}</p>
-      <p><strong>Trigger:</strong> ${payload.trigger}</p>
-      <p><strong>Message:</strong> ${String(payload.message).replace(/</g, '&lt;')}</p>
-      <p><strong>Time:</strong> ${when}</p>
-    </body></html>`;
+      `Vehicle: ${vehicle}${reg ? ` (${reg})` : ''}`,
+      speed ? `Speed: ${speed}` : null,
+      coords ? `Location: ${coords}` : null,
+      mapsUrl ? `Map: ${mapsUrl}` : null,
+      `Time (JHB): ${whenJhb}`,
+      `Open: ${trackingUrl}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const row = (label: string, value: string) => `
+      <tr>
+        <td style="padding:10px 12px;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;width:34%;border-bottom:1px solid #e5e7eb">${escape(label)}</td>
+        <td style="padding:10px 12px;font-size:15px;color:#111827;font-weight:600;border-bottom:1px solid #e5e7eb">${value}</td>
+      </tr>`;
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+</head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111827">
+  <div style="width:100%;background:#0f172a;padding:24px 12px">
+    <div style="max-width:600px;margin:0 auto;background:#f9fafb;border-radius:16px;overflow:hidden;box-shadow:0 20px 40px rgba(15,23,42,0.35)">
+      <div style="background:linear-gradient(135deg, ${accent} 0%, ${primary} 100%);color:#f9fafb;padding:28px 24px 22px;text-align:center">
+        ${logoHtml}
+        <div style="font-size:20px;font-weight:700;letter-spacing:0.03em">${escape(headerName)}</div>
+        <div style="font-size:13px;opacity:0.92;margin-top:4px">Fleet tracking alert</div>
+        <div style="display:inline-block;margin-top:12px;padding:5px 12px;border-radius:999px;background:rgba(15,23,42,0.35);font-size:11px;text-transform:uppercase;letter-spacing:0.08em">${escape(triggerLabel)}</div>
+      </div>
+      <div style="padding:26px 24px 8px;background:#f9fafb">
+        <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.5">
+          ${escape(payload.message || triggerLabel)}
+        </p>
+        <table style="width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+          ${row('Vehicle', escape(vehicle))}
+          ${reg ? row('Registration', escape(reg)) : ''}
+          ${row('Severity', `<span style="color:${severityColor}">${escape(severity)}</span>`)}
+          ${speed ? row('Speed', escape(speed)) : ''}
+          ${row('Time (Johannesburg)', escape(whenJhb))}
+          ${coords ? row('Coordinates', escape(coords)) : row('Location', 'Not available for this event')}
+        </table>
+        <div style="text-align:center;margin:22px 0 8px">
+          ${
+            mapsUrl
+              ? `<a href="${escape(mapsUrl)}" style="display:inline-block;margin:0 6px 10px;padding:12px 20px;background:${primary};color:#ecfeff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px">Open location on map</a>`
+              : ''
+          }
+          <a href="${escape(trackingUrl)}" style="display:inline-block;margin:0 6px 10px;padding:12px 20px;background:#0f172a;color:#f8fafc;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px">Open live tracking</a>
+        </div>
+        <p style="font-size:12px;color:#6b7280;margin:8px 0 0">
+          Rule: ${escape(payload.ruleName || triggerLabel)} · Tenant: ${escape(payload.tenantSlug)} · UTC ${escape(whenIso)}
+        </p>
+      </div>
+      <div style="padding:16px 24px 22px;text-align:center;color:#9ca3af;font-size:11px;background:#f3f4f6">
+        <div>${escape(headerName)} · Vehicle Income Tracker</div>
+        <div>You receive this because you are a tracking alert recipient for this fleet.</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
     return this.send({ to: payload.to, subject, text, html });
   }
 

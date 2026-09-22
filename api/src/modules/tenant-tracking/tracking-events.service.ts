@@ -4,6 +4,9 @@ import { TenantContextService } from '../../tenancy/tenant-context.service';
 import { TenantScopeService } from '../../tenancy/tenant-scope.service';
 import { CommercialService } from '../commercial/commercial.service';
 import { EmailService } from '../email/email.service';
+import { BrandService } from '../tenants/brand.service';
+import { letterheadFromPolicy } from '../tenants/brand.util';
+import { TenantsService } from '../tenants/tenants.service';
 import { TenantReportRecipientsService } from '../tenants/tenant-report-recipients.service';
 import { TrackingGateway } from './tracking.gateway';
 import { johannesburgToday } from './tracking-analytics.formulas';
@@ -47,6 +50,8 @@ export class TrackingEventsService {
     private readonly email: EmailService,
     private readonly recipients: TenantReportRecipientsService,
     private readonly gateway: TrackingGateway,
+    private readonly brandService: BrandService,
+    private readonly tenantsService: TenantsService,
   ) {}
 
   private schema() {
@@ -343,7 +348,15 @@ export class TrackingEventsService {
 
   private async maybeFireRule(
     eventType: string,
-    dto: { vehicleId?: string | null; message?: string | null },
+    dto: {
+      vehicleId?: string | null;
+      message?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
+      speedKph?: number | null;
+      severity?: string | null;
+      recordedAt?: Date | string | null;
+    },
   ) {
     const slug = this.slug();
     if (!(await this.commercial.hasModule(slug, 'tracking_alerts'))) return;
@@ -395,7 +408,17 @@ export class TrackingEventsService {
         : [];
       if (channels.includes('email')) {
         try {
-          await this.sendAlertEmail(slug, String(message), trigger);
+          await this.sendAlertEmail(slug, {
+            message: String(message),
+            trigger,
+            ruleName: rule.name ?? null,
+            vehicleId: dto.vehicleId ?? null,
+            latitude: dto.latitude ?? null,
+            longitude: dto.longitude ?? null,
+            speedKph: dto.speedKph ?? null,
+            severity: dto.severity ?? null,
+            recordedAt: dto.recordedAt ?? new Date(),
+          });
         } catch (err) {
           this.logger.warn(`Alert email failed: ${String(err)}`);
         }
@@ -403,19 +426,97 @@ export class TrackingEventsService {
     }
   }
 
-  private async sendAlertEmail(slug: string, message: string, trigger: string) {
+  private async sendAlertEmail(
+    slug: string,
+    detail: {
+      message: string;
+      trigger: string;
+      ruleName?: string | null;
+      vehicleId?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
+      speedKph?: number | null;
+      severity?: string | null;
+      recordedAt?: Date | string | null;
+    },
+  ) {
     let emails: string[] = [];
     try {
       emails = await this.recipients.listActiveEmails(slug);
     } catch (err) {
       this.logger.warn(`Recipient lookup failed: ${String(err)}`);
     }
+
+    let vehicleLabel: string | null = null;
+    let registrationNumber: string | null = null;
+    if (detail.vehicleId) {
+      try {
+        const rows = await this.dataSource.query(
+          `SELECT "label", "registration_number" AS "registrationNumber"
+           FROM "${this.schema()}"."vehicles"
+           WHERE "id" = $1
+           LIMIT 1`,
+          [detail.vehicleId],
+        );
+        vehicleLabel = rows[0]?.label ?? null;
+        registrationNumber = rows[0]?.registrationNumber ?? null;
+      } catch (err) {
+        this.logger.warn(`Vehicle lookup for alert email failed: ${String(err)}`);
+      }
+    }
+
+    let tenantName = slug;
+    let brand: {
+      displayName?: string;
+      primaryColor?: string;
+      accentColor?: string;
+      logoUrl?: string;
+    } | null = null;
+    try {
+      const tenant = await this.tenantsService.findBySlug(slug);
+      tenantName = tenant.name || tenant.slug;
+      const policy = await this.brandService.policyForSlug(slug);
+      const lh = letterheadFromPolicy(policy, tenantName);
+      brand = {
+        displayName: lh.displayName,
+        primaryColor: lh.primaryColor,
+        accentColor: lh.accentColor,
+        logoUrl: lh.logoUrl,
+      };
+    } catch (err) {
+      this.logger.warn(`Brand lookup for alert email failed: ${String(err)}`);
+    }
+
+    const lat =
+      detail.latitude != null ? Number(detail.latitude) : null;
+    const lon =
+      detail.longitude != null ? Number(detail.longitude) : null;
+    const mapsUrl =
+      lat != null &&
+      lon != null &&
+      Number.isFinite(lat) &&
+      Number.isFinite(lon)
+        ? `https://www.google.com/maps?q=${lat},${lon}`
+        : null;
+
     if (emails.length) {
       await this.email.sendTrackingAlert({
         to: emails,
         tenantSlug: slug,
-        trigger,
-        message,
+        tenantName,
+        trigger: detail.trigger,
+        message: detail.message,
+        ruleName: detail.ruleName,
+        severity: detail.severity,
+        vehicleLabel,
+        registrationNumber,
+        vehicleId: detail.vehicleId,
+        latitude: lat,
+        longitude: lon,
+        speedKph: detail.speedKph,
+        recordedAt: detail.recordedAt,
+        mapsUrl,
+        brand,
       });
       return;
     }
@@ -423,7 +524,7 @@ export class TrackingEventsService {
       method: 'TRACKING_ALERT',
       status: 200,
       path: `/tenant/${slug}/tracking/alerts`,
-      message,
+      message: `${detail.trigger}: ${detail.message} (${vehicleLabel || detail.vehicleId || 'unknown vehicle'})`,
     });
   }
 
