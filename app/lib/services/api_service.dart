@@ -454,6 +454,26 @@ class ApiService {
     return _decodeObject(response, errorPrefix: 'Failed to fetch expiry status');
   }
 
+  /// Driver panic / incident alert to tenant admins.
+  Future<Map<String, dynamic>> createIncident({
+    String? vehicle,
+    double? lat,
+    double? lng,
+    String? note,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/tenant/incidents'),
+      headers: _authHeaders(contentType: true),
+      body: jsonEncode({
+        if (vehicle != null && vehicle.isNotEmpty) 'vehicle': vehicle,
+        if (lat != null) 'lat': lat,
+        if (lng != null) 'lng': lng,
+        if (note != null && note.isNotEmpty) 'note': note,
+      }),
+    );
+    return _decodeObject(response, errorPrefix: 'Failed to send panic alert');
+  }
+
   /// Public platform banner (no auth). Returns enabled/severity/message/blockWrites.
   Future<Map<String, dynamic>?> fetchActiveAnnouncement() async {
     try {

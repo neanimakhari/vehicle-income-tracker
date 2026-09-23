@@ -517,6 +517,21 @@ export class TenantSchemasService {
       )`,
     );
     await this.dataSource.query(
+      `CREATE TABLE IF NOT EXISTS "${schemaName}"."incidents" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "driver_id" uuid NOT NULL,
+        "vehicle" varchar NULL,
+        "lat" double precision NULL,
+        "lng" double precision NULL,
+        "note" text NULL,
+        "status" varchar NOT NULL DEFAULT 'open',
+        "created_at" timestamptz NOT NULL DEFAULT now(),
+        "acked_at" timestamptz NULL,
+        "acked_by" uuid NULL,
+        "closed_at" timestamptz NULL
+      )`,
+    );
+    await this.dataSource.query(
       `INSERT INTO "${schemaName}"."notification_categories" ("name","description","is_default")
        SELECT x.name, x.description, true
        FROM (VALUES

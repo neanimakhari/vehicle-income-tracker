@@ -31,6 +31,7 @@ import { TenantTransportModule } from './modules/tenant-transport/tenant-transpo
 import { EmailModule } from './modules/email/email.module';
 import { TenantEventsModule } from './modules/tenant-events/tenant-events.module';
 import { TenantTrackingModule } from './modules/tenant-tracking/tenant-tracking.module';
+import { TenantIncidentsModule } from './modules/tenant-incidents/tenant-incidents.module';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { TenantTrackingModule } from './modules/tenant-tracking/tenant-tracking.
     TenantNotificationsModule,
     TenantEventsModule,
     TenantTrackingModule,
+    TenantIncidentsModule,
     CommercialModule,
     TenantTransportModule,
     PlatformAdminModule,

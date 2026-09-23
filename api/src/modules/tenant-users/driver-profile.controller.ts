@@ -119,6 +119,12 @@ export class DriverProfileController {
     return this.driverProfileService.getProfile(id);
   }
 
+  @Get(':id/scorecard')
+  @Roles('TENANT_ADMIN')
+  getDriverScorecard(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.driverProfileService.getScorecard(id);
+  }
+
   @Get('profile/expiry-status')
   @Roles('TENANT_USER')
   getMyExpiryStatus(@Req() req: { user: { sub: string } }) {

@@ -440,6 +440,165 @@ export class DriverProfileService {
     return date <= in60Days;
   }
 
+  /**
+   * Admin-first driver score: docs 40% / income consistency 40% / maintenance 20%.
+   */
+  async getScorecard(userId: string): Promise<{
+    driverId: string;
+    periodDays: number;
+    score: number;
+    grade: string;
+    docs: { score: number; weight: number; detail: Record<string, number | null> };
+    income: {
+      score: number;
+      weight: number;
+      daysLogged: number;
+      expectedDays: number;
+      approved: number;
+      rejected: number;
+      pending: number;
+      total: number;
+    };
+    maintenance: {
+      score: number;
+      weight: number;
+      openCount: number;
+      overdueCount: number;
+      vehiclesSampled: number;
+    };
+  }> {
+    const profile = await this.getProfile(userId);
+    const schema = this.tenantScope.getTenantSchema();
+    const periodDays = 30;
+    const expectedDays = 22;
+
+    const docsDetail: Record<string, number | null> = {
+      license: DriverProfileService.docScore(profile.licenseExpiry),
+      prdp: DriverProfileService.docScore(profile.prdpExpiry),
+      medical: DriverProfileService.docScore(profile.medicalCertificateExpiry),
+    };
+    const docScores = Object.values(docsDetail).map((v) =>
+      v == null ? 0 : v,
+    );
+    const docsScore = Math.round(
+      docScores.reduce((a, b) => a + b, 0) / Math.max(docScores.length, 1),
+    );
+
+    const incomeRows = await this.dataSource.query(
+      `SELECT
+         COUNT(*)::int AS total,
+         COUNT(*) FILTER (WHERE approval_status IN ('approved', 'auto'))::int AS approved,
+         COUNT(*) FILTER (WHERE approval_status = 'rejected')::int AS rejected,
+         COUNT(*) FILTER (WHERE approval_status = 'pending')::int AS pending,
+         COUNT(DISTINCT DATE(logged_on AT TIME ZONE 'Africa/Johannesburg'))::int AS days_logged
+       FROM "${schema}"."vehicle_incomes"
+       WHERE driver_id = $1
+         AND logged_on >= now() - ($2 || ' days')::interval`,
+      [userId, String(periodDays)],
+    );
+    const ir = (incomeRows[0] ?? {}) as Record<string, unknown>;
+    const daysLogged = Number(ir.days_logged ?? 0);
+    const approved = Number(ir.approved ?? 0);
+    const rejected = Number(ir.rejected ?? 0);
+    const pending = Number(ir.pending ?? 0);
+    const total = Number(ir.total ?? 0);
+    const consistency = Math.min(1, daysLogged / expectedDays);
+    const decided = approved + rejected;
+    const approvalRate = decided > 0 ? approved / decided : total > 0 ? 0.85 : 0.5;
+    const incomeScore = Math.round(
+      Math.min(100, consistency * 70 + approvalRate * 30),
+    );
+
+    const vehicleRows = await this.dataSource.query(
+      `SELECT DISTINCT vehicle AS label
+       FROM "${schema}"."vehicle_incomes"
+       WHERE driver_id = $1
+         AND logged_on >= now() - ($2 || ' days')::interval
+         AND vehicle IS NOT NULL AND vehicle <> ''
+       LIMIT 20`,
+      [userId, String(periodDays)],
+    );
+    const labels = (vehicleRows as Array<{ label: string }>).map((r) =>
+      String(r.label),
+    );
+    let openCount = 0;
+    let overdueCount = 0;
+    if (labels.length) {
+      const maint = await this.dataSource.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE is_completed = false)::int AS open_count,
+           COUNT(*) FILTER (
+             WHERE is_completed = false
+               AND due_date IS NOT NULL
+               AND due_date < CURRENT_DATE
+           )::int AS overdue_count
+         FROM "${schema}"."maintenance_tasks"
+         WHERE vehicle_label = ANY($1::text[])`,
+        [labels],
+      );
+      openCount = Number(
+        (maint[0] as Record<string, unknown>)?.open_count ?? 0,
+      );
+      overdueCount = Number(
+        (maint[0] as Record<string, unknown>)?.overdue_count ?? 0,
+      );
+    }
+    let maintenanceScore = 100;
+    if (labels.length === 0) {
+      maintenanceScore = 80;
+    } else {
+      maintenanceScore = Math.max(
+        0,
+        100 - overdueCount * 25 - Math.max(0, openCount - overdueCount) * 10,
+      );
+    }
+
+    const score = Math.round(
+      docsScore * 0.4 + incomeScore * 0.4 + maintenanceScore * 0.2,
+    );
+    const grade =
+      score >= 85 ? 'A' : score >= 70 ? 'B' : score >= 55 ? 'C' : score >= 40 ? 'D' : 'F';
+
+    return {
+      driverId: userId,
+      periodDays,
+      score,
+      grade,
+      docs: { score: docsScore, weight: 0.4, detail: docsDetail },
+      income: {
+        score: incomeScore,
+        weight: 0.4,
+        daysLogged,
+        expectedDays,
+        approved,
+        rejected,
+        pending,
+        total,
+      },
+      maintenance: {
+        score: maintenanceScore,
+        weight: 0.2,
+        openCount,
+        overdueCount,
+        vehiclesSampled: labels.length,
+      },
+    };
+  }
+
+  /** Per-document score 0–100; null date → 0. */
+  private static docScore(expiry: Date | string | null | undefined): number {
+    if (expiry == null || expiry === '') return 0;
+    const d = expiry instanceof Date ? expiry : new Date(expiry);
+    if (Number.isNaN(d.getTime())) return 0;
+    const days =
+      (d.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+    if (days < 0) return 0;
+    if (days < 7) return 40;
+    if (days < 30) return 70;
+    if (days < 90) return 85;
+    return 100;
+  }
+
   async getExpiryStatus(userId: string): Promise<{
     expiringCount: number;
     hasPendingRequest: boolean;

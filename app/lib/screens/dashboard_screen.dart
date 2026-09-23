@@ -53,6 +53,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _pendingMaintenanceCount = 0;
   int _documentsExpiringCount = 0;
   int _unreadNotifications = 0;
+  bool _sendingPanic = false;
 
   @override
   void initState() {
@@ -505,6 +506,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                             ),
                           _buildQuickActions(context, isDarkMode),
+                          const SizedBox(height: 16),
+                          _buildPanicButton(isDarkMode),
                           const SizedBox(height: 24),
                           _buildSummaryWidgets(isDarkMode),
                           const SizedBox(height: 24),
@@ -654,6 +657,87 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildPanicButton(bool isDarkMode) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _sendingPanic ? null : _confirmAndSendPanic,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.red.shade700,
+          side: BorderSide(color: Colors.red.shade400),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+        ),
+        icon: Icon(
+          Icons.emergency_outlined,
+          color: Colors.red.shade700,
+        ),
+        label: Text(
+          _sendingPanic ? 'Sending alert…' : 'Panic — alert owner',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: isDarkMode ? Colors.red.shade300 : Colors.red.shade800,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmAndSendPanic() async {
+    final noteController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Send panic alert?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'This notifies your fleet owner immediately. Only use if you need help.',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteController,
+                maxLength: 200,
+                decoration: const InputDecoration(
+                  labelText: 'Optional note',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Send alert'),
+            ),
+          ],
+        );
+      },
+    );
+    final note = noteController.text.trim();
+    noteController.dispose();
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _sendingPanic = true);
+    try {
+      await _api.createIncident(note: note.isEmpty ? null : note);
+      if (!mounted) return;
+      AppToast.success(context, 'Panic alert sent to owner');
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, 'Could not send panic alert', e);
+    } finally {
+      if (mounted) setState(() => _sendingPanic = false);
+    }
   }
 
   Widget _buildActionCard(
