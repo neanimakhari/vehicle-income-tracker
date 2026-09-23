@@ -92,7 +92,7 @@ export function IncomesClient({
   const router = useRouter();
 
   const safeIncomes = Array.isArray(incomes) ? incomes : [];
-  const statusFiltered = useMemo(() => {
+  const statusFiltered = useMemo((): Income[] => {
     if (statusFilter === "missing") {
       const todayIso = new Date().toISOString();
       return (missingVehicleLabels ?? []).map((label) => ({
