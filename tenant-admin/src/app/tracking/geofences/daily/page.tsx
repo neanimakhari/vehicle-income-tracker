@@ -1,3 +1,5 @@
+import { ModuleLocked } from "@/components/module-locked";
+import { hasModule, entitlementList } from "@/lib/entitlements";
 import { requireAuth } from "@/lib/auth";
 import { fetchJson } from "../../../../lib/api";
 import { GeofenceShell } from "@/components/section-tabs";
@@ -9,18 +11,10 @@ export default async function GeofenceDailyPage() {
     entitlements?: string[];
     featureFlags?: string[];
   }>("/tenant/policy");
-  const raw = policy?.entitlements ?? policy?.featureFlags ?? null;
-  const entitled = raw == null ? null : new Set(raw);
-  const has = entitled == null || entitled.has("tracking_geofence");
+  const raw = entitlementList(policy);
+  const has = hasModule(raw, "tracking_geofence");
   if (!has) {
-    return (
-      <div className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
-        <h1 className="text-xl font-semibold">Geofence daily</h1>
-        <p className="mt-2 text-sm text-zinc-600">
-          Module <code>tracking_geofence</code> is not entitled.
-        </p>
-      </div>
-    );
+    return <ModuleLocked title="Geofence daily" moduleKey="tracking_geofence" />;
   }
   const today = new Date().toISOString().slice(0, 10);
   const data = await fetchJson<{ vehicles?: unknown[] }>(

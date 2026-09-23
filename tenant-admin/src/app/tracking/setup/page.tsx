@@ -1,8 +1,10 @@
+import { hasModule, entitlementList } from "@/lib/entitlements";
 import { Suspense } from "react";
 import { requireAuth } from "@/lib/auth";
 import { fetchJson } from "../../../lib/api";
 import { TrackingShell } from "@/components/section-tabs";
 import { TrackerSetupClient } from "./setup-client";
+import { ModuleLocked } from "@/components/module-locked";
 
 type VehicleRow = { id: string; label: string; trackerImei?: string | null };
 
@@ -21,20 +23,12 @@ export default async function TrackerSetupPage({
     entitlements?: string[];
     featureFlags?: string[];
   }>("/tenant/policy");
-  const entitlementsRaw = policy?.entitlements ?? policy?.featureFlags ?? null;
-  const entitled = entitlementsRaw == null ? null : new Set(entitlementsRaw);
-  const hasLive = entitled == null || entitled.has("tracking_live");
-  const showAlerts = entitled == null || entitled.has("tracking_alerts");
+  const entitlementsRaw = entitlementList(policy);
+  const hasLive = hasModule(entitlementsRaw, "tracking_live");
+  const showAlerts = hasModule(entitlementsRaw, "tracking_alerts");
 
   if (!hasLive) {
-    return (
-      <div className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
-        <h1 className="text-xl font-semibold">Set up tracker</h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Requires the <code>tracking_live</code> module on your plan.
-        </p>
-      </div>
-    );
+    return <ModuleLocked title="Set up tracker" moduleKey="tracking_live" />;
   }
 
   const vehicles =

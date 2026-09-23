@@ -1,3 +1,5 @@
+import { ModuleLocked } from "@/components/module-locked";
+import { hasModule, entitlementList } from "@/lib/entitlements";
 import { requireAuth } from "@/lib/auth";
 import { fetchJson } from "../../../lib/api";
 import { TrackingShell } from "@/components/section-tabs";
@@ -9,18 +11,10 @@ export default async function TrackingAlertsPage() {
     entitlements?: string[];
     featureFlags?: string[];
   }>("/tenant/policy");
-  const raw = policy?.entitlements ?? policy?.featureFlags ?? null;
-  const entitled = raw == null ? null : new Set(raw);
-  const has = entitled == null || entitled.has("tracking_alerts");
+  const raw = entitlementList(policy);
+  const has = hasModule(raw, "tracking_alerts");
   if (!has) {
-    return (
-      <div className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
-        <h1 className="text-xl font-semibold">Tracking alerts</h1>
-        <p className="mt-2 text-sm text-zinc-600">
-          Module <code>tracking_alerts</code> is not entitled.
-        </p>
-      </div>
-    );
+    return <ModuleLocked title="Tracking alerts" moduleKey="tracking_alerts" />;
   }
   const [rules, fires, events] = await Promise.all([
     fetchJson<unknown[]>("/tenant/tracking/alert-rules", { tolerate401: true }),

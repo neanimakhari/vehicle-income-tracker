@@ -57,7 +57,7 @@ export default async function RootLayout({
   let tenantName: string | null = null;
   let brand: PolicyBrand | null = null;
   let logoSrc = "/vit-logo.png";
-  let entitlements: string[] | null = null;
+  let entitlements: string[] = [];
   let platformAnnouncement: {
     enabled?: boolean;
     severity?: string;
@@ -90,11 +90,14 @@ export default async function RootLayout({
       if (brand?.mode === "custom" && brand.logoUrl) {
         logoSrc = brand.logoUrl;
       }
-      entitlements = policy?.entitlements ?? policy?.featureFlags ?? null;
+      // Fail-closed: missing/failed policy ⇒ empty entitlements (hide gated nav)
+      entitlements = policy?.entitlements ?? policy?.featureFlags ?? [];
+      if (!Array.isArray(entitlements)) entitlements = [];
       platformAnnouncement = announcement;
     } catch (err) {
       pendingMfaUsers = null;
       tenantName = null;
+      entitlements = [];
     }
   } else {
     // Path login (/{slug}/login): apply brand before auth via public policy

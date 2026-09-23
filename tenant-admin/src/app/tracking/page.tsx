@@ -1,7 +1,9 @@
+import { hasModule, entitlementList } from "@/lib/entitlements";
 import { requireAuth } from "@/lib/auth";
 import { fetchJson } from "../../lib/api";
 import { TrackingShell } from "@/components/section-tabs";
 import { TrackingClient } from "./tracking-client";
+import { ModuleLocked } from "@/components/module-locked";
 
 type TrackingPoint = {
   id: string;
@@ -60,20 +62,19 @@ export default async function TrackingPage({
     featureFlags?: string[];
   }>("/tenant/policy");
 
-  const entitlementsRaw = policy?.entitlements ?? policy?.featureFlags ?? null;
+  const entitlementsRaw = entitlementList(policy);
   const tenantSlug = policy?.tenantSlug ?? "";
-  const entitled = entitlementsRaw == null ? null : new Set(entitlementsRaw);
-  const hasLive = entitled == null || entitled.has("tracking_live");
-  const showAlerts = entitled == null || entitled.has("tracking_alerts");
+  const hasLive = hasModule(entitlementsRaw, "tracking_live");
+  const showAlerts = hasModule(entitlementsRaw, "tracking_alerts");
+
+  if (!hasLive) {
+    return <ModuleLocked title="Live Tracking" moduleKey="tracking_live" />;
+  }
 
   const [latest, vehicles, devices] = await Promise.all([
-    hasLive
-      ? fetchJson<TrackingPoint[]>("/tenant/tracking/latest")
-      : Promise.resolve([] as TrackingPoint[]),
+    fetchJson<TrackingPoint[]>("/tenant/tracking/latest"),
     fetchJson<VehicleRow[]>("/tenant/vehicles"),
-    hasLive
-      ? fetchJson<DeviceRow[]>("/tenant/tracking/devices")
-      : Promise.resolve([] as DeviceRow[]),
+    fetchJson<DeviceRow[]>("/tenant/tracking/devices"),
   ]);
 
   return (

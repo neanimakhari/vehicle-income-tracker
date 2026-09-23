@@ -1,7 +1,9 @@
+import { hasModule, entitlementList } from "@/lib/entitlements";
 import { requireAuth } from "@/lib/auth";
 import { fetchJson } from "../../../lib/api";
 import { TrackingShell } from "@/components/section-tabs";
 import { TrackingReconcileClient } from "./reconcile-client";
+import { ModuleLocked } from "@/components/module-locked";
 
 function todayJhb(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -20,9 +22,13 @@ export default async function TrackingReconciliationPage() {
     entitlements?: string[];
     featureFlags?: string[];
   }>("/tenant/policy");
-  const entitlementsRaw = policy?.entitlements ?? policy?.featureFlags ?? null;
-  const entitled = entitlementsRaw == null ? null : new Set(entitlementsRaw);
-  const showAlerts = entitled == null || entitled.has("tracking_alerts");
+  const entitlementsRaw = entitlementList(policy);
+  const hasLive = hasModule(entitlementsRaw, "tracking_live");
+  const showAlerts = hasModule(entitlementsRaw, "tracking_alerts");
+
+  if (!hasLive) {
+    return <ModuleLocked title="Reconciliation" moduleKey="tracking_live" />;
+  }
 
   const data = await fetchJson<{
     vehicles?: Array<Record<string, unknown>>;

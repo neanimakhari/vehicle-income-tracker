@@ -1,6 +1,8 @@
 import { requireAuth } from "@/lib/auth";
 import { fetchJson, getApiUrl, getAuthHeaders } from "../../lib/api";
 import { revalidatePath } from "next/cache";
+import { entitlementList, hasModule } from "@/lib/entitlements";
+import { ModuleLocked } from "@/components/module-locked";
 
 async function fetchTrips() {
   const trips = await fetchJson<
@@ -20,6 +22,14 @@ async function fetchTrips() {
 
 export default async function TripsPage() {
   await requireAuth();
+  const policy = await fetchJson<{
+    entitlements?: string[];
+    featureFlags?: string[];
+  }>("/tenant/policy");
+  if (!hasModule(entitlementList(policy), "trips")) {
+    return <ModuleLocked title="Trips" moduleKey="trips" />;
+  }
+
   const trips = await fetchTrips();
 
   async function createTrip(formData: FormData) {

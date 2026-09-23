@@ -1,0 +1,62 @@
+---
+description: Production deploy on DigitalOcean droplet — RAM-safe rebuild workflow
+alwaysApply: true
+---
+
+# VIT production deploy
+
+Droplet: `root@104.248.42.192` · repo `/opt/vehicle_income_tracker` · SSH key `~/.ssh/vit_deploy_ed25519`  
+Services: `api` (vit-api), `tenant-admin` (vit-admin), `system-admin` (vit-platform), `gps-ingest`
+
+## When shipping
+
+1. Push the release branch to origin first.
+2. On the droplet, check out **that branch** (do not blindly reset to `main` — `redeploy.sh` without `--skip-pull` checks out `main`).
+3. Set `NEXT_PUBLIC_APP_VERSION` in `deploy/.env` to match package versions before building frontends.
+4. Rebuild **one service at a time**. Prefer `--use-cache` unless deps/Dockerfile changed.
+
+## RAM (1GB droplet) — required
+
+Next/Nest builds OOM if siblings stay up. **Stop containers before build**, then start again after.
+
+- Prefer **2GB RAM (+ swap)** for production rebuilds; 1GB works only with full stop + swap.
+- After hours / user OK with downtime: stop **all** (`api`, `tenant-admin`, `system-admin`, `gps-ingest`) — fastest.
+- Otherwise: at least stop frontends not being served; never build `tenant-admin` with everything hot on 1GB.
+- Ensure swap exists (`/swapfile` + `/swapfile2`); keep ~2–3GB swap.
+- `docker compose stop` does **not** wipe volumes or intentional log retention. Avoid `down -v`.
+
+## Mail
+
+After deploy (or when debugging alerts/resets), verify SMTP actually sends:
+
+```bash
+curl -sS -X POST https://vit-api.vehinc.co.za/v1/email/test \
+  -H 'Content-Type: application/json' \
+  -H "X-Email-Test-Secret: <EMAIL_TEST_SECRET from deploy/.env>" \
+  -d '{"to":"you@example.com"}'
+```
+
+Expect `{ "sent": true }`. If `sent: false`, check `EMAIL_*` in `deploy/.env` (not sandbox / empty password).
+
+## Canonical commands
+
+```bash
+ssh -o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/vit_deploy_ed25519 root@104.248.42.192
+cd /opt/vehicle_income_tracker
+git fetch --all --prune
+git checkout -f <branch> && git reset --hard origin/<branch>
+# bump NEXT_PUBLIC_APP_VERSION in deploy/.env if needed
+cd deploy && chmod +x ./redeploy.sh
+docker compose -f docker-compose.yml stop api tenant-admin system-admin gps-ingest
+NODE_OPTIONS=--max-old-space-size=768 ./redeploy.sh --skip-pull --services api --use-cache
+NODE_OPTIONS=--max-old-space-size=768 ./redeploy.sh --skip-pull --services tenant-admin --use-cache
+docker compose -f docker-compose.yml up -d
+```
+
+Smoke: `curl` API `/v1/health`, admin `/login`, and any new endpoints for the ship.
+
+## Do not
+
+- Build `api` + both Next apps in one compose build on this droplet size.
+- Force `--no-cache` unless necessary (slower, more RAM).
+- Commit secrets, `.env`, or Mailgun/SMTP passwords into the rule or git.

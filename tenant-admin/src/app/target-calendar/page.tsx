@@ -1,9 +1,19 @@
 import { requireAuth } from "@/lib/auth";
 import { fetchJson } from "@/lib/api";
 import { TargetCalendarClient } from "./target-calendar-client";
+import { entitlementList, hasModule } from "@/lib/entitlements";
+import { ModuleLocked } from "@/components/module-locked";
 
 export default async function TargetCalendarPage() {
   await requireAuth();
+  const policy = await fetchJson<{
+    entitlements?: string[];
+    featureFlags?: string[];
+  }>("/tenant/policy");
+  if (!hasModule(entitlementList(policy), "target_calendar")) {
+    return <ModuleLocked title="Target Calendar" moduleKey="target_calendar" />;
+  }
+
   const [rules, drivers] = await Promise.all([
     fetchJson<
       Array<{

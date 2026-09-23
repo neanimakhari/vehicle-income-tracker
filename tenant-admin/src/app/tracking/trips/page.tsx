@@ -1,7 +1,9 @@
+import { hasModule, entitlementList } from "@/lib/entitlements";
 import { requireAuth } from "@/lib/auth";
 import { fetchJson } from "../../../lib/api";
 import { TrackingShell } from "@/components/section-tabs";
 import { TripsReportClient } from "./trips-client";
+import { ModuleLocked } from "@/components/module-locked";
 
 function todayJhb(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -20,10 +22,9 @@ export default async function TrackingTripsPage() {
     entitlements?: string[];
     featureFlags?: string[];
   }>("/tenant/policy");
-  const entitlementsRaw = policy?.entitlements ?? policy?.featureFlags ?? null;
-  const entitled = entitlementsRaw == null ? null : new Set(entitlementsRaw);
-  const hasLive = entitled == null || entitled.has("tracking_live");
-  const showAlerts = entitled == null || entitled.has("tracking_alerts");
+  const entitlementsRaw = entitlementList(policy);
+  const hasLive = hasModule(entitlementsRaw, "tracking_live");
+  const showAlerts = hasModule(entitlementsRaw, "tracking_alerts");
 
   const data = hasLive
     ? await fetchJson<{ vehicles?: Array<Record<string, unknown>> }>(
@@ -33,14 +34,7 @@ export default async function TrackingTripsPage() {
     : null;
 
   if (!hasLive) {
-    return (
-      <div className="rounded-lg border border-zinc-200 p-6 dark:border-zinc-800">
-        <h1 className="text-xl font-semibold">Trips & parking</h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Requires the <code>tracking_live</code> module.
-        </p>
-      </div>
-    );
+    return <ModuleLocked title="Trips & parking" moduleKey="tracking_live" />;
   }
 
   return (

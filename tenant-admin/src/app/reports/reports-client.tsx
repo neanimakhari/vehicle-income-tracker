@@ -79,6 +79,7 @@ export function ReportsClient({
   fuelEfficiencyDrivers,
   advancedInsights,
   incomeStreams,
+  canAdvanced = false,
 }: {
   summary: Summary | null;
   topVehicles: VehicleStat[];
@@ -99,6 +100,7 @@ export function ReportsClient({
     totalPetrol: number;
     netIncome: number;
   }>;
+  canAdvanced?: boolean;
 }) {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const COLORS = useMemo(() => getBrandChartColors(), []);
@@ -423,30 +425,43 @@ export function ReportsClient({
       </div>
 
       {/* Advanced Custom Report Builder */}
-      <AdvancedReportBuilder />
+      {canAdvanced ? (
+        <>
+          <AdvancedReportBuilder />
 
-      <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="card p-6">
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">Advanced Insights</h3>
+              <ul className="space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
+                <li>Top 5 vehicles: {advancedInsights.topVehicles.map((v) => v.vehicle).join(", ") || "—"}</li>
+                <li>Worst fuel efficiency: {advancedInsights.worstFuelEfficiency.map((v) => `${v.vehicle} (${v.kmPerLitre.toFixed(2)} km/L)`).join(", ") || "—"}</li>
+                <li>Idle vehicles (14d): {advancedInsights.idleVehicles.join(", ") || "None"}</li>
+              </ul>
+            </div>
+            <div className="card p-6">
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">Profit per Vehicle</h3>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={advancedInsights.profitPerVehicle}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="vehicle" />
+                  <YAxis />
+                  <Tooltip formatter={(value: number | undefined) => value != null ? formatCurrency(value) : ''} />
+                  <Bar dataKey="profit" fill={primary} name="Profit" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </>
+      ) : (
         <div className="card p-6">
-          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">Advanced Insights</h3>
-          <ul className="space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
-            <li>Top 5 vehicles: {advancedInsights.topVehicles.map((v) => v.vehicle).join(", ") || "—"}</li>
-            <li>Worst fuel efficiency: {advancedInsights.worstFuelEfficiency.map((v) => `${v.vehicle} (${v.kmPerLitre.toFixed(2)} km/L)`).join(", ") || "—"}</li>
-            <li>Idle vehicles (14d): {advancedInsights.idleVehicles.join(", ") || "None"}</li>
-          </ul>
+          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Advanced reports</h3>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+            Advanced insights and the custom report builder require the{" "}
+            <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">reports_advanced</code> module.
+            Upgrade your plan to unlock them.
+          </p>
         </div>
-        <div className="card p-6">
-          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">Profit per Vehicle</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={advancedInsights.profitPerVehicle}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="vehicle" />
-              <YAxis />
-              <Tooltip formatter={(value: number | undefined) => value != null ? formatCurrency(value) : ''} />
-              <Bar dataKey="profit" fill={primary} name="Profit" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      )}
 
       {/* Detailed Tables */}
       <div className="grid gap-6 md:grid-cols-2">

@@ -22,6 +22,7 @@ import {
   CalendarDays,
   Pentagon,
 } from "lucide-react";
+import { hasModule } from "@/lib/entitlements";
 
 const MODULE_NAV: Record<string, string> = {
   "/trips": "trips",
@@ -56,8 +57,6 @@ export function Navigation({
   entitlements?: string[] | null;
 }) {
   const pathname = usePathname();
-  // null entitlements = unknown/legacy unrestricted (show all)
-  const allowed = entitlements == null ? null : new Set(entitlements);
 
   const navItems = [
     { href: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -81,8 +80,7 @@ export function Navigation({
   ].filter((item) => {
     const moduleKey = MODULE_NAV[item.href];
     if (!moduleKey) return true;
-    if (allowed == null) return true;
-    return allowed.has(moduleKey);
+    return hasModule(entitlements, moduleKey);
   });
 
   return (

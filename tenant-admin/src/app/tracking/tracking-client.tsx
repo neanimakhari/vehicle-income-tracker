@@ -1,5 +1,6 @@
 "use client";
 
+import { hasModule } from "@/lib/entitlements";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -163,13 +164,9 @@ export function TrackingClient({
   initialTo?: string;
   initialVehicleId?: string;
 }) {
-  const entitled = useMemo(
-    () => (entitlements == null ? null : new Set(entitlements)),
-    [entitlements],
-  );
-  const hasLive = entitled == null || entitled.has("tracking_live");
-  const hasHistory = entitled == null || entitled.has("tracking_history");
-  const hasObd = entitled == null || entitled.has("tracking_obd");
+  const hasLive = hasModule(entitlements, "tracking_live");
+  const hasHistory = hasModule(entitlements, "tracking_history");
+  const hasObd = hasModule(entitlements, "tracking_obd");
 
   const [replayOpen, setReplayOpen] = useState(
     hasHistory && initialMode === "playback",

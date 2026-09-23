@@ -1,6 +1,8 @@
 import { requireAuth } from "@/lib/auth";
 import { fetchJson, getApiUrl, getAuthHeaders } from "../../lib/api";
 import { revalidatePath } from "next/cache";
+import { entitlementList, hasModule } from "@/lib/entitlements";
+import { ModuleLocked } from "@/components/module-locked";
 
 async function fetchCategories() {
   const categories = await fetchJson<Array<{ id: string; name: string; description: string | null }>>(
@@ -25,6 +27,14 @@ async function fetchNotifications() {
 
 export default async function NotificationsPage() {
   await requireAuth();
+  const policy = await fetchJson<{
+    entitlements?: string[];
+    featureFlags?: string[];
+  }>("/tenant/policy");
+  if (!hasModule(entitlementList(policy), "notifications")) {
+    return <ModuleLocked title="Notifications" moduleKey="notifications" />;
+  }
+
   const [categories, notifications] = await Promise.all([fetchCategories(), fetchNotifications()]);
 
   async function createCategory(formData: FormData) {
