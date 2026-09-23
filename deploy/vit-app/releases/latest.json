@@ -1,10 +1,10 @@
 {
   "platform": "android",
   "channel": "prod",
-  "versionName": "1.0.10",
-  "versionCode": 11,
+  "versionName": "1.0.11",
+  "versionCode": 12,
   "minSupportedVersionCode": 1,
-  "sha256": "f500ad079e235fd41b3fbbf2d6f90248ada5b787fcd5c441a43bebce81061931",
-  "releaseNotes": "OneSignal: request push permission on login/cold start so devices can subscribe.",
-  "publishedAt": "2026-09-23T09:18:11.000Z"
+  "sha256": "af99e2274d5746710111735c4e3b20c2877add74551c58076ca1339750e8e781",
+  "releaseNotes": "Remove OneSignal setup dialog; show admin notifications in Alerts.",
+  "publishedAt": "2026-09-23T09:52:04.000Z"
 }

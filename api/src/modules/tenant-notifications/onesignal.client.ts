@@ -167,7 +167,19 @@ export class OneSignalClient {
   private flattenErrors(errors: unknown): string[] {
     if (!errors) return [];
     if (Array.isArray(errors)) return errors.map(String);
-    if (typeof errors === 'object') return [JSON.stringify(errors)];
+    if (typeof errors === 'object' && errors !== null) {
+      const obj = errors as Record<string, unknown>;
+      const invalid = obj.invalid_aliases as
+        | { external_id?: string[] }
+        | undefined;
+      if (invalid?.external_id?.length) {
+        const n = invalid.external_id.length;
+        return [
+          `${n} recipient${n === 1 ? '' : 's'} have not opened the app or allowed notifications yet`,
+        ];
+      }
+      if (typeof obj.message === 'string') return [obj.message];
+    }
     return [String(errors)];
   }
 }

@@ -19,6 +19,43 @@ type SendResult = {
   };
 };
 
+function humanPushFeedback(res: SendResult): string {
+  const push = res.push;
+  if (!push) return `Saved (${res.status ?? "ok"}).`;
+
+  if (!push.configured || !push.enabled) {
+    return `Saved as ${res.status ?? "recorded"}. Push not sent yet — OneSignal credentials pending (${push.reason ?? "disabled"}).`;
+  }
+  if (push.skipped) {
+    return `Saved (${res.status}). ${push.reason ?? "Push skipped"} · ${push.recipientCount} recipients resolved.`;
+  }
+
+  const unsubscribed = (push.errors ?? []).some((e) =>
+    /not subscribed|have not opened the app/i.test(e),
+  );
+  if (unsubscribed && (res.status === "sent_no_devices" || !push.onesignalId)) {
+    return (
+      `Saved for ${push.recipientCount} recipient(s), but no phone has opted into push yet. ` +
+      `Drivers must open the latest app, sign in, and allow notifications — then send again.`
+    );
+  }
+
+  if (res.status === "push_partial" || (push.onesignalId && push.errors?.length)) {
+    const detail = push.errors?.[0];
+    return (
+      `Sent to devices that are subscribed` +
+      (detail ? ` — ${detail}` : "") +
+      `. Tip: target Drivers only if admins do not use the mobile app.`
+    );
+  }
+
+  if (res.status === "push_failed") {
+    return `Could not send push${push.errors?.[0] ? `: ${push.errors[0]}` : ""}. Message was still saved.`;
+  }
+
+  return `Sent to ${push.recipientCount} recipient(s).`;
+}
+
 export function SendNotificationForm({
   categories,
   sendNotification,
@@ -42,38 +79,7 @@ export function SendNotificationForm({
             setError(res.error ?? "Send failed");
             return;
           }
-          const push = res.push;
-          if (!push) {
-            setFeedback(`Saved (${res.status ?? "ok"}).`);
-            return;
-          }
-          if (!push.configured || !push.enabled) {
-            setFeedback(
-              `Saved as ${res.status ?? "recorded"}. Push not sent yet — OneSignal credentials pending (${push.reason ?? "disabled"}).`,
-            );
-            return;
-          }
-          if (push.skipped) {
-            setFeedback(
-              `Saved (${res.status}). ${push.reason ?? "Push skipped"} · ${push.recipientCount} recipients resolved.`,
-            );
-            return;
-          }
-          const unsubscribed = (push.errors ?? []).some((e) =>
-            /not subscribed/i.test(e),
-          );
-          if (unsubscribed || res.status === "sent_no_devices") {
-            setFeedback(
-              `Saved for ${push.recipientCount} recipient(s), but no phone has opted into push yet. ` +
-                `Drivers must install app 1.0.10+, open it, sign in, and allow notifications — then send again.`,
-            );
-            return;
-          }
-          setFeedback(
-            `Push ${res.status ?? "sent"} to ${push.recipientCount} recipient(s)` +
-              (push.onesignalId ? ` · OneSignal id ${push.onesignalId}` : "") +
-              (push.errors?.length ? ` · warnings: ${push.errors.join("; ")}` : ""),
-          );
+          setFeedback(humanPushFeedback(res));
         });
       }}
     >
@@ -85,10 +91,15 @@ export function SendNotificationForm({
           </option>
         ))}
       </select>
-      <select name="targetRole" className="input w-full px-3 py-2 text-sm" disabled={pending}>
-        <option value="">All roles</option>
-        <option value="TENANT_ADMIN">Tenant admins</option>
+      <select
+        name="targetRole"
+        className="input w-full px-3 py-2 text-sm"
+        defaultValue="TENANT_USER"
+        disabled={pending}
+      >
         <option value="TENANT_USER">Drivers</option>
+        <option value="TENANT_ADMIN">Tenant admins</option>
+        <option value="">All roles</option>
       </select>
       <input
         name="title"

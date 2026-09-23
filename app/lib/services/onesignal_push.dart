@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 /// Official OneSignal App ID for Vehinc / VIT (from OneSignal dashboard).
@@ -12,11 +11,6 @@ class OneSignalService {
   static final OneSignalService instance = OneSignalService._();
 
   bool _initialized = false;
-
-  /// Retained for the app lifetime — OneSignal stores observers weakly.
-  void Function(OSPushSubscriptionChangedState)? _pushSubscriptionObserver;
-
-  bool _verificationDialogShown = false;
 
   bool get isInitialized => _initialized;
 
@@ -96,80 +90,6 @@ class OneSignalService {
   ) {
     OneSignal.Notifications.addForegroundWillDisplayListener(handler);
   }
-
-  static bool isServerAssignedSubscriptionId(String? id) =>
-      id != null && id.isNotEmpty && !id.startsWith('local-');
-
-  /// Register push-subscription observer and show the required verification dialog once.
-  /// Must be called with a [BuildContext] under [MaterialApp]. Keeps the observer alive
-  /// via [_pushSubscriptionObserver] (weak storage in the SDK).
-  void setupPushSubscriptionVerification(BuildContext context) {
-    if (!_initialized) return;
-
-    void maybeShow(String? subscriptionId) {
-      if (!isServerAssignedSubscriptionId(subscriptionId)) return;
-      if (_verificationDialogShown) return;
-      if (!context.mounted) return;
-      _verificationDialogShown = true;
-      _showIntegrationCompleteDialog(context);
-    }
-
-    _pushSubscriptionObserver ??= (state) {
-      maybeShow(state.current.id);
-    };
-    OneSignal.User.pushSubscription.addObserver(_pushSubscriptionObserver!);
-
-    // ID may already be assigned before the observer attaches.
-    maybeShow(OneSignal.User.pushSubscription.id);
-  }
-
-  void _showIntegrationCompleteDialog(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Your OneSignal SDK integration is complete!'),
-        content: const Text(
-          'You can now send Push Notifications & In-App Messages through OneSignal. '
-          'Tap below to enable push notifications.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              requestPermission(fallbackToSettings: true);
-            },
-            child: const Text('Got it'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Host widget that wires the required push-subscription verification dialog.
-class OneSignalVerificationHost extends StatefulWidget {
-  const OneSignalVerificationHost({super.key, required this.child});
-
-  final Widget child;
-
-  @override
-  State<OneSignalVerificationHost> createState() =>
-      _OneSignalVerificationHostState();
-}
-
-class _OneSignalVerificationHostState extends State<OneSignalVerificationHost> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      OneSignalService.instance.setupPushSubscriptionVerification(context);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) => widget.child;
 }
 
 /// Back-compat aliases used by earlier scaffold hooks.

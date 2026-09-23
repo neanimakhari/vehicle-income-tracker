@@ -26,6 +26,29 @@ class _AlertsScreenState extends State<AlertsScreen> {
     setState(() => _loading = true);
     _alerts.clear();
     try {
+      // Admin / fleet notifications first (in-app inbox)
+      try {
+        final notifications = await _api.fetchTenantNotifications();
+        for (final n in notifications) {
+          final title = n['title']?.toString();
+          final message = n['message']?.toString();
+          if (title == null || title.isEmpty) continue;
+          final createdAt = DateTime.tryParse(n['createdAt']?.toString() ?? '');
+          final ageLabel = createdAt != null
+              ? _formatAlertDate(createdAt)
+              : null;
+          _alerts.add(
+            _AlertItem(
+              title: title,
+              body: ageLabel != null
+                  ? '${message ?? ''}\n$ageLabel'.trim()
+                  : (message ?? ''),
+              severity: AlertSeverity.medium,
+            ),
+          );
+        }
+      } catch (_) {}
+
       final policy = await _api.fetchTenantPolicy();
       final requireMfaUsers = policy['requireMfaUsers'] == true;
       if (requireMfaUsers && Session.mfaEnabled != true) {

@@ -101,15 +101,39 @@ export class TenantNotificationsService {
     };
   }
 
-  async listNotifications(limit = 50): Promise<NotificationDto[]> {
+  async listNotifications(opts?: {
+    actorUserId?: string | null;
+    actorRole?: string | null;
+    limit?: number;
+  }): Promise<NotificationDto[]> {
     const schema = this.tenantScope.getTenantSchema();
+    const limit = Math.min(Math.max(opts?.limit ?? 50, 1), 200);
+    const role = opts?.actorRole ?? null;
+    const userId = opts?.actorUserId ?? null;
+
+    // Drivers only see notifications aimed at them (or all drivers / everyone).
+    if (role === 'TENANT_USER' && userId) {
+      const rows = await this.dataSource.query(
+        `SELECT id, category_id, title, message, target_role, target_user_id,
+                status, created_by, created_at
+         FROM "${schema}"."notifications"
+         WHERE (target_user_id IS NULL OR target_user_id = $1)
+           AND (target_role IS NULL OR target_role = 'TENANT_USER')
+           AND status <> 'pending'
+         ORDER BY created_at DESC
+         LIMIT $2`,
+        [userId, limit],
+      );
+      return rows.map((r: Record<string, unknown>) => this.mapNotification(r));
+    }
+
     const rows = await this.dataSource.query(
       `SELECT id, category_id, title, message, target_role, target_user_id,
               status, created_by, created_at
        FROM "${schema}"."notifications"
        ORDER BY created_at DESC
        LIMIT $1`,
-      [Math.min(Math.max(limit, 1), 200)],
+      [limit],
     );
     return rows.map((r: Record<string, unknown>) => this.mapNotification(r));
   }

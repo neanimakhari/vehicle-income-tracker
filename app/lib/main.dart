@@ -54,7 +54,7 @@ class VITApp extends StatelessWidget {
             AppTheme.dark(primaryColor: brand.primaryDarkColor ?? brand.primaryColor),
             brand,
           ),
-          home: const OneSignalVerificationHost(child: InitialRoute()),
+          home: const InitialRoute(),
         );
       },
     );

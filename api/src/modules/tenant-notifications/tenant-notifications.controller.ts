@@ -100,8 +100,12 @@ export class TenantNotificationsController {
     ModuleEntitlementGuard,
   )
   @Roles('TENANT_ADMIN', 'TENANT_USER')
-  list() {
-    return this.notifications.listNotifications();
+  list(@Req() req: Request) {
+    const user = req.user as { sub?: string; role?: string } | undefined;
+    return this.notifications.listNotifications({
+      actorUserId: user?.sub ?? null,
+      actorRole: user?.role ?? null,
+    });
   }
 
   @Post('send')

@@ -1,7 +1,7 @@
 # OneSignal push notifications (tenant-admin)
 
 **Branch:** `feature/onesignal-notifications`  
-**Status:** Live on production API; FCM service account configured in OneSignal; mobile **1.0.10+11**.  
+**Status:** Live on production API; FCM service account configured in OneSignal; mobile **1.0.11+12**.  
 **Sender:** Tenant Admin → `POST /tenant/notifications/send` → Nest → OneSignal REST.
 
 ---
@@ -82,7 +82,9 @@ Do **not** add `google-services.json` / Google Services Gradle plugin for OneSig
 
 1. **Done on this branch** — API module, OneSignal client (no-op until enabled), env placeholders, plan doc, tenant-admin send feedback, Flutter prep stubs.
 2. **When credentials arrive** — set env, enable flag, rebuild api only; add `onesignal_flutter` + `OneSignal.login(userId)` on driver login; smoke-send from tenant-admin.
-3. **Later** — mark-read inbox, deep links, wire tracking/missing-income into the centre, iOS APNs.
+3. **Next** — mark-read inbox, deep links from push, wire tracking/missing-income into the centre, iOS APNs.
+
+In-app: driver **Alerts** lists recent tenant notifications (push is separate).
 
 ---
 
