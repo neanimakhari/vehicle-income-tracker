@@ -581,7 +581,7 @@ export function TrackingClient({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700 dark:text-teal-300">
-            Fleet map · v1.2.3
+            Fleet map · v1.2.4
           </p>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
             Live Tracking
@@ -617,12 +617,29 @@ export function TrackingClient({
             {dayStory.starts} starts · {dayStory.trips} trip segments
             {dayStory.offline > 0 ? ` · ${dayStory.offline} offline` : ""}
           </p>
-          <Link
-            href="/tracking/trips"
-            className="shrink-0 text-xs font-semibold text-teal-800 underline-offset-2 hover:underline dark:text-teal-200"
-          >
-            Full day → Trips & parking
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            {hasHistory ? (
+              <button
+                type="button"
+                className="shrink-0 text-xs font-semibold text-teal-800 underline-offset-2 hover:underline dark:text-teal-200 disabled:opacity-50"
+                disabled={busy === "playback" || !selectedId}
+                onClick={() =>
+                  loadPlayback({
+                    day: todayJhb(),
+                    vehicleId: selectedId ?? undefined,
+                  })
+                }
+              >
+                {busy === "playback" ? "Loading…" : "Replay selected · today"}
+              </button>
+            ) : null}
+            <Link
+              href="/tracking/trips"
+              className="shrink-0 text-xs font-semibold text-teal-800 underline-offset-2 hover:underline dark:text-teal-200"
+            >
+              Full day → Trips & parking
+            </Link>
+          </div>
         </div>
       ) : null}
 
