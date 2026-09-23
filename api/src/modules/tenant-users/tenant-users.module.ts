@@ -19,11 +19,14 @@ import { DriverProfileService } from './driver-profile.service';
 import { EmailModule } from '../email/email.module';
 import { WebhooksModule } from '../webhooks/webhooks.module';
 import { TenantsModule } from '../tenants/tenants.module';
+import { CommercialModule } from '../commercial/commercial.module';
+import { TenantNotificationsModule } from '../tenant-notifications/tenant-notifications.module';
 import { TenantMobileAppController } from './tenant-mobile-app.controller';
 import { PublicMobileAppController } from '../tenants/public-mobile-app.controller';
 import { MobileAppDownloadService } from './mobile-app-download.service';
 import { DriverEmailIndex } from './driver-email-index.entity';
 import { DriverEmailIndexService } from './driver-email-index.service';
+import { DocumentExpirySchedulerService } from './document-expiry-scheduler.service';
 
 @Module({
   imports: [
@@ -33,6 +36,8 @@ import { DriverEmailIndexService } from './driver-email-index.service';
     AuthModule,
     EmailModule,
     WebhooksModule,
+    CommercialModule,
+    TenantNotificationsModule,
     TypeOrmModule.forFeature([
       Tenant,
       TenantUser,
@@ -57,6 +62,7 @@ import { DriverEmailIndexService } from './driver-email-index.service';
     DriverProfileService,
     MobileAppDownloadService,
     DriverEmailIndexService,
+    DocumentExpirySchedulerService,
   ],
   exports: [DriverProfileService, MobileAppDownloadService, DriverEmailIndexService],
 })

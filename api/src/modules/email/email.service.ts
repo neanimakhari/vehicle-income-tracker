@@ -1142,5 +1142,51 @@ This invite expires in 48 hours. Do not share the link.`;
     }
     return lastResult;
   }
+
+  async sendDocumentExpiryReminder(payload: {
+    to: string | string[];
+    tenantName: string;
+    driverName: string;
+    documentLabel: string;
+    expiryDate: string;
+    daysRemaining: number;
+  }): Promise<{ sent: boolean }> {
+    const escape = (v: unknown) =>
+      String(v ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    const when =
+      payload.daysRemaining < 0
+        ? `expired ${Math.abs(payload.daysRemaining)} day(s) ago`
+        : payload.daysRemaining === 0
+          ? 'expires today'
+          : `expires in ${payload.daysRemaining} day(s)`;
+    const subject = `${payload.documentLabel} ${when} — ${payload.driverName} (${payload.tenantName})`;
+    const html = `
+      <!DOCTYPE html><html><body style="font-family:sans-serif;color:#18181b;">
+        <h2 style="color:#0d9488;">Document expiry reminder</h2>
+        <p><strong>${escape(payload.driverName)}</strong>'s
+          <strong>${escape(payload.documentLabel)}</strong> ${escape(when)}
+          (${escape(payload.expiryDate)}).</p>
+        <p>Please update documents in VIT to avoid fines or downtime.</p>
+        <p style="color:#71717a;font-size:12px;">Automated message from VIT · ${escape(payload.tenantName)}</p>
+      </body></html>`;
+    const text = [
+      subject,
+      '',
+      `${payload.driverName}'s ${payload.documentLabel} ${when} (${payload.expiryDate}).`,
+      'Update documents in VIT.',
+    ].join('\n');
+
+    const recipients = Array.isArray(payload.to) ? payload.to : [payload.to];
+    let lastResult = { sent: false };
+    for (const recipient of recipients) {
+      lastResult = await this.send({ to: recipient, subject, html, text });
+    }
+    return lastResult;
+  }
 }
 
