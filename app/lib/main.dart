@@ -20,9 +20,11 @@ import 'screens/change_password_screen.dart';
 import 'theme.dart';
 import 'widgets/app_update_prompt.dart';
 import 'services/brand_theme_controller.dart';
+import 'services/onesignal_push.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await OneSignalPushBootstrap.init();
   await Session.load();
   await SecuritySettings.load();
   if (Platform.isAndroid) {

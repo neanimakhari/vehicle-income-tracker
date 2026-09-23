@@ -24,6 +24,7 @@ import { TenantReportsModule } from './modules/tenant-reports/tenant-reports.mod
 import { HealthModule } from './health/health.module';
 import { TenantMaintenanceModule } from './modules/tenant-maintenance/tenant-maintenance.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
+import { TenantNotificationsModule } from './modules/tenant-notifications/tenant-notifications.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CommercialModule } from './modules/commercial/commercial.module';
 import { TenantTransportModule } from './modules/tenant-transport/tenant-transport.module';
@@ -63,6 +64,7 @@ import { TenantTrackingModule } from './modules/tenant-tracking/tenant-tracking.
     TenantReportsModule,
     TenantMaintenanceModule,
     WebhooksModule,
+    TenantNotificationsModule,
     TenantEventsModule,
     TenantTrackingModule,
     CommercialModule,

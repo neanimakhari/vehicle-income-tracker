@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../services/session.dart';
 import '../services/security_settings.dart';
 import '../services/brand_theme_controller.dart';
+import '../services/onesignal_push.dart';
 import '../theme.dart';
 import '../utils/app_toast.dart';
 import '../widgets/brand_logo.dart';
@@ -122,6 +123,11 @@ class _LoginScreenState extends State<LoginScreen> {
       Session.mfaEnabled = result['user']?['mfaEnabled'] as bool?;
       Session.tenantId = result['user']?['tenantId'] as String? ?? tenantHint;
       Session.tenantName = result['tenantName'] as String? ?? result['user']?['tenantName'] as String?;
+      // OneSignal: bind push identity to JWT sub (no-op until ONESIGNAL_APP_ID + SDK wired).
+      final uid = Session.userId;
+      if (uid != null && uid.isNotEmpty) {
+        await OneSignalPushBootstrap.loginUser(uid);
+      }
       Session.rememberMe = true;
       Session.mustChangePassword = result['user']?['mustChangePassword'] as bool? ?? false;
       await Session.save();
