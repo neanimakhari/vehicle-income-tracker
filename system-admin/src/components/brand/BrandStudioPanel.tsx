@@ -41,6 +41,23 @@ import {
   brandUploadLogo,
 } from "@/app/tenants/brand-actions";
 
+/** Auth-gated draft assets must go through same-origin Next proxy (img tags cannot send Bearer). */
+function studioAssetUrl(
+  tenantId: string,
+  kind: "logo-file" | "login-bg-file",
+  apiUrl?: string | null,
+): string | undefined {
+  if (!apiUrl) return undefined;
+  let v: string | null = null;
+  try {
+    v = new URL(apiUrl).searchParams.get("v");
+  } catch {
+    v = null;
+  }
+  const qs = v ? `?v=${encodeURIComponent(v)}` : `?v=${Date.now()}`;
+  return `/api/tenants/${encodeURIComponent(tenantId)}/brand/${kind}${qs}`;
+}
+
 type Studio = {
   entitled: boolean;
   brandMode: string;
@@ -161,8 +178,12 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
 
   const draftView: BrandDraft = {
     ...draftFields(),
-    logoUrl: studio?.draft?.logoUrl,
-    loginBackgroundUrl: studio?.draft?.loginBackgroundUrl,
+    logoUrl: studioAssetUrl(tenantId, "logo-file", studio?.draft?.logoUrl),
+    loginBackgroundUrl: studioAssetUrl(
+      tenantId,
+      "login-bg-file",
+      studio?.draft?.loginBackgroundUrl,
+    ),
   };
 
   async function run(
@@ -377,7 +398,7 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
           </label>
           <div className="sm:col-span-2 space-y-1.5">
             <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              Logo (png / jpeg / webp, max 2 MB) — stored as base64 in the database
+              Logo (png / jpeg / webp, max 2 MB)
             </span>
             <div className="flex flex-wrap gap-2">
               <label className="btn btn-secondary flex cursor-pointer gap-2 px-4 py-2.5">
@@ -420,12 +441,12 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
                 </button>
               ) : null}
             </div>
-            {studio.draft?.logoUrl ? (
+            {draftView.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={studio.draft.logoUrl}
+                src={draftView.logoUrl}
                 alt="Logo preview"
-                className="mt-2 h-12 w-auto rounded border border-zinc-200 bg-white object-contain p-1 dark:border-zinc-600"
+                className="mt-2 h-12 w-auto max-w-full rounded border border-zinc-200 bg-white object-contain p-1 dark:border-zinc-600"
               />
             ) : null}
           </div>
@@ -474,6 +495,14 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
                 </button>
               ) : null}
             </div>
+            {draftView.loginBackgroundUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={draftView.loginBackgroundUrl}
+                alt="Login background preview"
+                className="mt-2 h-24 w-full max-w-md rounded border border-zinc-200 bg-zinc-100 object-cover dark:border-zinc-600 dark:bg-zinc-800"
+              />
+            ) : null}
           </div>
         </div>
 
