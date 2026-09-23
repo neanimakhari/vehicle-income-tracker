@@ -244,18 +244,27 @@ export default async function IncomesPage() {
     }
   }
 
-  async function approveIncome(id: string): Promise<{ success: boolean; error?: string }> {
+  async function approveIncome(
+    id: string,
+    reason?: string | null,
+  ): Promise<{ success: boolean; error?: string }> {
     "use server";
     if (!id) return { success: false, error: "Invalid id" };
     try {
       const res = await fetch(`${getApiUrl()}/tenant/incomes/${id}/approve`, {
         method: "PATCH",
-        headers: { ...(await getAuthHeaders()) },
+        headers: {
+          "Content-Type": "application/json",
+          ...(await getAuthHeaders()),
+        },
+        body: JSON.stringify({ reason: reason?.trim() || null }),
       });
       revalidatePath("/incomes");
+      revalidatePath(`/incomes/${id}`);
       if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { message?: string };
-        return { success: false, error: err.message ?? "Failed to approve" };
+        const err = (await res.json().catch(() => ({}))) as { message?: string | string[] };
+        const msg = Array.isArray(err.message) ? err.message.join(" ") : err.message;
+        return { success: false, error: msg ?? "Failed to approve" };
       }
       return { success: true };
     } catch (e) {
@@ -264,18 +273,29 @@ export default async function IncomesPage() {
     }
   }
 
-  async function rejectIncome(id: string): Promise<{ success: boolean; error?: string }> {
+  async function rejectIncome(
+    id: string,
+    reason: string,
+  ): Promise<{ success: boolean; error?: string }> {
     "use server";
     if (!id) return { success: false, error: "Invalid id" };
+    const trimmed = reason?.trim() || "";
+    if (!trimmed) return { success: false, error: "A reject reason is required" };
     try {
       const res = await fetch(`${getApiUrl()}/tenant/incomes/${id}/reject`, {
         method: "PATCH",
-        headers: { ...(await getAuthHeaders()) },
+        headers: {
+          "Content-Type": "application/json",
+          ...(await getAuthHeaders()),
+        },
+        body: JSON.stringify({ reason: trimmed }),
       });
       revalidatePath("/incomes");
+      revalidatePath(`/incomes/${id}`);
       if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { message?: string };
-        return { success: false, error: err.message ?? "Failed to reject" };
+        const err = (await res.json().catch(() => ({}))) as { message?: string | string[] };
+        const msg = Array.isArray(err.message) ? err.message.join(" ") : err.message;
+        return { success: false, error: msg ?? "Failed to reject" };
       }
       return { success: true };
     } catch (e) {

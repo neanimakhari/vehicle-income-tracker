@@ -7,6 +7,7 @@ import '../services/security_settings.dart';
 import '../services/offline_queue.dart';
 import '../theme.dart';
 import '../services/brand_theme_controller.dart';
+import '../services/tenant_events_service.dart';
 import '../widgets/confirmation_dialog.dart';
 import '../widgets/brand_logo.dart';
 import '../screens/login_screen.dart';
@@ -16,23 +17,31 @@ import '../screens/audit_screen.dart';
 import '../screens/alerts_screen.dart';
 import '../screens/change_password_screen.dart';
 import '../screens/transport_screen.dart';
+import '../screens/settings_screen.dart';
+import '../screens/offline_queue_screen.dart';
 
-/// Performs logout: confirmation, clear session/security/offline queue, then navigate to login.
+/// Performs logout: confirmation (incl. unsynced warn), clear session/security/offline queue,
+/// then navigate to login while resolving remembered tenant brand (no VIT flash).
 Future<void> _performLogout(BuildContext context) async {
   final navigator = Navigator.of(context, rootNavigator: true);
+  final pending = await OfflineQueue.pendingCount();
+  final message = pending > 0
+      ? 'Are you sure you want to logout? $pending unsynced income(s) will be discarded.'
+      : 'Are you sure you want to logout? You will need to login again to access the app.';
   final confirmed = await ConfirmationDialog.show(
     context: context,
     title: 'Logout',
-    message: 'Are you sure you want to logout? You will need to login again to access the app.',
+    message: message,
     confirmText: 'Logout',
     cancelText: 'Cancel',
     isDestructive: true,
   );
   if (confirmed != true) return;
+  TenantEventsService.instance.stop();
   await Session.clearForLogout();
   await SecuritySettings.clear();
   await OfflineQueue.clearQueue();
-  BrandThemeController.instance.resetToVit();
+  // Do not leave brand stuck in loading — LoginScreen resolves with timeout.
   navigator.pushAndRemoveUntil(
     MaterialPageRoute(builder: (_) => const LoginScreen()),
     (_) => false,
@@ -46,13 +55,22 @@ String _formatTenantDisplay(String? tenantId) {
   return parts.map((s) => s.isEmpty ? '' : '${s[0].toUpperCase()}${s.length > 1 ? s.substring(1).toLowerCase() : ''}').join(' ');
 }
 
-/// Pitch black sidebar: true black background, near-black tiles.
+/// Pitch black sidebar by default; `sidebarStyle: colored` tints with brand primary.
 class _MenuColors {
   static const Color background = Color(0xFF000000);
   static const Color tileBackground = Color(0xFF0A0A0A);
   static const Color text = Colors.white;
   static const Color textSecondary = Color(0xFFB0B0B0);
   static const Color alertDot = Color(0xFFFF9800);
+
+  static Color drawerBackground(BrandThemeController brand) {
+    if (brand.isCustom &&
+        brand.sidebarStyle == 'colored' &&
+        brand.primaryColor != null) {
+      return brand.primaryColor!;
+    }
+    return background;
+  }
 }
 
 class AppSidebar extends StatelessWidget {
@@ -79,8 +97,13 @@ class AppSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Drawer(
-      backgroundColor: _MenuColors.background,
+    return ListenableBuilder(
+      listenable: BrandThemeController.instance,
+      builder: (context, _) {
+        final brand = BrandThemeController.instance;
+        final drawerBg = _MenuColors.drawerBackground(brand);
+        return Drawer(
+      backgroundColor: drawerBg,
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -90,10 +113,7 @@ class AppSidebar extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
               child: Row(
                 children: [
-                  ListenableBuilder(
-                    listenable: BrandThemeController.instance,
-                    builder: (context, _) => const BrandLogo(size: 40),
-                  ),
+                  const BrandLogo(size: 40),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -110,21 +130,17 @@ class AppSidebar extends StatelessWidget {
                             color: _MenuColors.text,
                           ),
                         ),
-                        ListenableBuilder(
-                          listenable: BrandThemeController.instance,
-                          builder: (context, _) {
-                            final name = BrandThemeController.instance.displayName ??
-                                Session.tenantName ??
-                                _formatTenantDisplay(Session.tenantId);
-                            return Text(
-                              name,
-                              style: textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            );
-                          },
+                        Text(
+                          brand.displayName ??
+                              Session.tenantName ??
+                              _formatTenantDisplay(Session.tenantId),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: brand.isCustom && brand.sidebarStyle == 'colored'
+                                ? Colors.white
+                                : Theme.of(context).colorScheme.primary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -231,6 +247,22 @@ class AppSidebar extends StatelessWidget {
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
               },
             ),
+            _ListTile(
+              icon: Icons.palette_outlined,
+              label: 'Appearance',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+              },
+            ),
+            _ListTile(
+              icon: Icons.cloud_upload_outlined,
+              label: 'Pending sync',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const OfflineQueueScreen()));
+              },
+            ),
             _LogoutTile(
               icon: Icons.logout_rounded,
               label: 'Sign Out',
@@ -305,6 +337,8 @@ class AppSidebar extends StatelessWidget {
           ],
         ),
       ),
+    );
+      },
     );
   }
 

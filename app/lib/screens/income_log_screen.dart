@@ -10,6 +10,7 @@ import '../theme.dart';
 import '../utils/app_toast.dart';
 import '../widgets/sidebar.dart';
 import '../widgets/confirmation_dialog.dart';
+import 'offline_queue_screen.dart';
 
 class IncomeLogScreen extends StatefulWidget {
   const IncomeLogScreen({super.key, this.onBack, this.openDrawer});
@@ -348,7 +349,31 @@ class _IncomeLogScreenState extends State<IncomeLogScreen> {
           'loggedOn': loggedOn,
         });
         if (!mounted) return;
-        AppToast.info(context, 'Saved offline. Will sync when online.');
+        // Clear form like success path
+        _driverController.clear();
+        _incomeController.clear();
+        _startingKmController.clear();
+        _endKmController.clear();
+        _petrolCostController.clear();
+        _petrolLitresController.clear();
+        _expenseDetailController.clear();
+        _expenseAmountController.clear();
+        _expenseImageBase64 = null;
+        _petrolSlipBase64 = null;
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Saved offline. Will sync when online.'),
+            action: SnackBarAction(
+              label: 'View pending',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const OfflineQueueScreen()),
+                );
+              },
+            ),
+          ),
+        );
         return;
       }
       if (!mounted) return;

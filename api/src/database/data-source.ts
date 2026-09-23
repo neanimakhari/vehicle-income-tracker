@@ -48,6 +48,7 @@ import { AddTrackingGeofences1700000000041 } from './migrations/1700000000041-ad
 import { AddFenceTemplates1700000000042 } from './migrations/1700000000042-add-fence-templates';
 import { AddTrackingEventsAndAlarmDepth1700000000043 } from './migrations/1700000000043-add-tracking-events-and-alarm-depth';
 import { AddNotificationInboxDepth1700000000044 } from './migrations/1700000000044-add-notification-inbox-depth';
+import { AddIncomeEventsDisputeTrail1700000000045 } from './migrations/1700000000045-add-income-events-dispute-trail';
 
 export default new DataSource({
   type: 'postgres',
@@ -104,5 +105,6 @@ export default new DataSource({
     AddFenceTemplates1700000000042,
     AddTrackingEventsAndAlarmDepth1700000000043,
     AddNotificationInboxDepth1700000000044,
+    AddIncomeEventsDisputeTrail1700000000045,
   ],
 });

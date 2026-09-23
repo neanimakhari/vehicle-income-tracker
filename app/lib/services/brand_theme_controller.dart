@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Post-login tenant brand colors / logo / typography. Reset to VIT on logout.
+enum BrandResolveState { idle, loading, ready, fallback }
+
+/// Tenant brand colors / logo / typography.
+/// VIT is only applied as a true fallback after resolve fails or there is no tenant.
 class BrandThemeController extends ChangeNotifier {
   BrandThemeController._();
   static final BrandThemeController instance = BrandThemeController._();
+
+  BrandResolveState resolveState = BrandResolveState.idle;
 
   Color? primaryColor;
   Color? accentColor;
@@ -17,31 +22,94 @@ class BrandThemeController extends ChangeNotifier {
   String? sidebarStyle;
   bool isCustom = false;
 
+  bool get isResolving => resolveState == BrandResolveState.loading;
+  bool get isBrandReady =>
+      resolveState == BrandResolveState.ready ||
+      resolveState == BrandResolveState.fallback;
+
+  void beginResolve() {
+    if (resolveState == BrandResolveState.loading) return;
+    resolveState = BrandResolveState.loading;
+    notifyListeners();
+  }
+
+  /// Always ends in [ready] or [fallback] — never leave UI stuck on loading.
+  Future<void> resolveRememberedTenant(
+    Future<Map<String, dynamic>> Function(String slug) fetchPolicy,
+    String? slug, {
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
+    if (slug == null || slug.isEmpty) {
+      resetToVit(asFallback: true);
+      return;
+    }
+    beginResolve();
+    try {
+      final policy = await fetchPolicy(slug).timeout(timeout);
+      applyFromPolicy(policy);
+    } catch (_) {
+      // Keep any previously applied chrome if we have it; otherwise VIT.
+      if (isCustom && primaryColor != null) {
+        resolveState = BrandResolveState.ready;
+        notifyListeners();
+      } else {
+        resetToVit(asFallback: true);
+      }
+    }
+  }
+
   void applyFromPolicy(Map<String, dynamic> policy) {
     final brand = policy['brand'];
+    // Incomplete policy (e.g. no tenant context) must not wipe a good brand.
     if (brand is! Map) {
-      resetToVit();
+      if (isCustom && primaryColor != null) {
+        resolveState = BrandResolveState.ready;
+        notifyListeners();
+      } else {
+        resetToVit(asFallback: true);
+      }
       return;
     }
     final mode = brand['mode']?.toString();
     if (mode != 'custom') {
-      resetToVit();
+      resetToVit(asFallback: true);
       return;
     }
     final primaryHex = brand['primaryColor']?.toString();
     final accentHex = brand['accentColor']?.toString();
     final darkHex = brand['primaryDarkColor']?.toString();
     primaryColor = _parseHex(primaryHex) ?? primaryColor;
-    accentColor = _parseHex(accentHex);
-    primaryDarkColor = _parseHex(darkHex);
-    logoUrl = brand['logoUrl']?.toString();
-    loginBackgroundUrl = brand['loginBackgroundUrl']?.toString();
-    displayName = brand['displayName']?.toString();
-    fontFamily = brand['fontFamily']?.toString();
-    borderRadius = brand['borderRadius']?.toString();
-    sidebarStyle = brand['sidebarStyle']?.toString();
+    accentColor = _parseHex(accentHex) ?? accentColor;
+    primaryDarkColor = _parseHex(darkHex) ?? primaryDarkColor;
+    final nextLogo = brand['logoUrl']?.toString();
+    if (nextLogo != null && nextLogo.isNotEmpty) logoUrl = nextLogo;
+    final nextBg = brand['loginBackgroundUrl']?.toString();
+    if (nextBg != null && nextBg.isNotEmpty) loginBackgroundUrl = nextBg;
+    final nextName = brand['displayName']?.toString();
+    if (nextName != null && nextName.isNotEmpty) displayName = nextName;
+    fontFamily = brand['fontFamily']?.toString() ?? fontFamily;
+    borderRadius = brand['borderRadius']?.toString() ?? borderRadius;
+    sidebarStyle = brand['sidebarStyle']?.toString() ?? sidebarStyle;
     isCustom = primaryColor != null;
+    resolveState = BrandResolveState.ready;
     notifyListeners();
+  }
+
+  /// Fetch authenticated policy and apply brand; keep current chrome on failure.
+  Future<void> hydrateFromAuthenticatedPolicy(
+    Future<Map<String, dynamic>> Function() fetchPolicy,
+  ) async {
+    try {
+      final policy = await fetchPolicy().timeout(const Duration(seconds: 15));
+      applyFromPolicy(policy);
+    } catch (_) {
+      if (isCustom && primaryColor != null) {
+        resolveState = BrandResolveState.ready;
+        notifyListeners();
+      } else {
+        resetToVit(asFallback: true);
+      }
+    }
   }
 
   /// Apply public brand-chrome (pre-login) for a remembered tenant.
@@ -49,7 +117,9 @@ class BrandThemeController extends ChangeNotifier {
     applyFromPolicy({'brand': chrome});
   }
 
-  void resetToVit() {
+  /// [asFallback] marks VIT as resolved fallback (safe to paint UI).
+  /// Without it, only clears chrome — prefer [beginResolve] + fetch instead of flashing VIT.
+  void resetToVit({bool asFallback = false}) {
     primaryColor = null;
     accentColor = null;
     primaryDarkColor = null;
@@ -60,6 +130,8 @@ class BrandThemeController extends ChangeNotifier {
     borderRadius = null;
     sidebarStyle = null;
     isCustom = false;
+    resolveState =
+        asFallback ? BrandResolveState.fallback : BrandResolveState.idle;
     notifyListeners();
   }
 

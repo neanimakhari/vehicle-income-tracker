@@ -51,8 +51,8 @@ type Props = {
   createIncome: (formData: FormData) => Promise<{ success: boolean; error?: string }>;
   updateIncome: (formData: FormData) => Promise<unknown>;
   deleteIncome: (formData: FormData) => Promise<unknown>;
-  approveIncome: (id: string) => Promise<{ success: boolean; error?: string }>;
-  rejectIncome: (id: string) => Promise<{ success: boolean; error?: string }>;
+  approveIncome: (id: string, reason?: string | null) => Promise<{ success: boolean; error?: string }>;
+  rejectIncome: (id: string, reason: string) => Promise<{ success: boolean; error?: string }>;
 };
 
 function SortIcon({ current, dir }: { current: boolean; dir: SortDir | null }) {
@@ -410,8 +410,16 @@ export function IncomesClient({
                                   type="button"
                                   disabled={actionLoading === income.id}
                                   onClick={async () => {
+                                    const reason = window.prompt(
+                                      "Why are you rejecting this income? (required)",
+                                    );
+                                    if (reason == null) return;
+                                    if (!reason.trim()) {
+                                      alert("A reject reason is required");
+                                      return;
+                                    }
                                     setActionLoading(income.id);
-                                    const r = await rejectIncome(income.id);
+                                    const r = await rejectIncome(income.id, reason.trim());
                                     setActionLoading(null);
                                     if (r?.success) router.refresh();
                                     else if (r?.error) alert(r.error);

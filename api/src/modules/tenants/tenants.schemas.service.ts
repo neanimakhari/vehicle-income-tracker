@@ -503,6 +503,20 @@ export class TenantSchemasService {
       )`,
     );
     await this.dataSource.query(
+      `CREATE TABLE IF NOT EXISTS "${schemaName}"."income_events" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "income_id" uuid NULL
+          REFERENCES "${schemaName}"."vehicle_incomes"("id") ON DELETE SET NULL,
+        "actor_user_id" uuid NULL,
+        "actor_role" varchar NULL,
+        "action" varchar NOT NULL,
+        "reason" text NULL,
+        "before" jsonb NULL,
+        "after" jsonb NULL,
+        "created_at" timestamptz NOT NULL DEFAULT now()
+      )`,
+    );
+    await this.dataSource.query(
       `INSERT INTO "${schemaName}"."notification_categories" ("name","description","is_default")
        SELECT x.name, x.description, true
        FROM (VALUES
