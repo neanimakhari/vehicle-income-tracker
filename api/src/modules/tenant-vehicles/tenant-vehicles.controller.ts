@@ -201,6 +201,13 @@ export class TenantVehiclesController {
     return this.tenantVehiclesService.findAll();
   }
 
+  @Get(':id/health')
+  @UseGuards(JwtAuthGuard, RolesGuard, TenantContextGuard, TenantAccessGuard)
+  @Roles('TENANT_ADMIN', 'TENANT_USER')
+  getHealth(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.tenantVehiclesService.getHealth(id);
+  }
+
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard, TenantContextGuard, TenantAccessGuard)
   @Roles('TENANT_ADMIN')

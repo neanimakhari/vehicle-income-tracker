@@ -3,7 +3,7 @@ import { requireAuth } from "@/lib/auth";
 import { fetchJson, getApiUrl, getAuthHeaders } from "../../../lib/api";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Save, Car, FileText, Shield, User, Calendar } from "lucide-react";
+import { ArrowLeft, Save, Car, FileText, Shield, User, Calendar, Gauge } from "lucide-react";
 
 function formatDateForInput(dateValue: string | null | undefined): string {
   if (!dateValue) return "";
@@ -111,6 +111,17 @@ export default async function VehicleDetailPage({
     notFound();
   }
   const ownerAddress = parseOwnerAddress(vehicle.ownerAddress);
+  const health = await fetchJson<{
+    tripKm: number;
+    fuelRand: number;
+    expenseRand: number;
+    maintenanceRand: number;
+    totalCostRand: number;
+    costPerKm: number | null;
+    odometer: number | null;
+    maintenanceOpen: number;
+    periodDays: number;
+  }>(`/tenant/vehicles/${id}/health`).catch(() => null);
 
   async function updateVehicle(formData: FormData) {
     "use server";
@@ -252,6 +263,63 @@ export default async function VehicleDetailPage({
           </p>
         </div>
       </div>
+
+      {health ? (
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-1 flex items-center gap-2">
+            <Gauge className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+            Vehicle health
+          </h2>
+          <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+            Last {health.periodDays} days from income logs (label match).
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                Cost / km
+              </p>
+              <p className="mt-1 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+                {health.costPerKm != null
+                  ? `R ${health.costPerKm.toFixed(2)}`
+                  : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                Trip km
+              </p>
+              <p className="mt-1 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+                {Math.round(health.tripKm).toLocaleString()}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                Total cost
+              </p>
+              <p className="mt-1 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+                R {health.totalCostRand.toFixed(0)}
+              </p>
+              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                Fuel R{health.fuelRand.toFixed(0)} · Exp R{health.expenseRand.toFixed(0)} · Maint R
+                {health.maintenanceRand.toFixed(0)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                Open maintenance
+              </p>
+              <p className="mt-1 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+                {health.maintenanceOpen}
+              </p>
+              {health.odometer != null ? (
+                <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                  Odo {Math.round(health.odometer).toLocaleString()} km
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <form action={updateVehicle} className="space-y-6">
         {/* Basic Information */}

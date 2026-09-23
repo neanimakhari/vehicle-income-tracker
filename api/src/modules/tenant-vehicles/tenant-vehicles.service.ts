@@ -210,5 +210,99 @@ export class TenantVehiclesService {
       return { deleted: true };
     });
   }
+
+  /**
+   * Cost-per-km + maintenance snapshot for a vehicle (last 30 days incomes).
+   * Distance from income odometer; costs = petrol + income-line expenses + completed maintenance.
+   */
+  async getHealth(id: string): Promise<{
+    vehicleId: string;
+    label: string;
+    registrationNumber: string;
+    periodDays: number;
+    tripKm: number;
+    fuelRand: number;
+    expenseRand: number;
+    maintenanceRand: number;
+    totalCostRand: number;
+    costPerKm: number | null;
+    odometer: number | null;
+    maintenanceOpen: number;
+    maintenanceOverdue: number;
+  }> {
+    const schema = this.tenantScope.getTenantSchema();
+    const rows = await this.dataSource.query(
+      `SELECT id, label, registration_number FROM "${schema}"."vehicles" WHERE id = $1 LIMIT 1`,
+      [id],
+    );
+    if (!rows.length) throw new NotFoundException('Vehicle not found');
+    const v = rows[0] as {
+      id: string;
+      label: string;
+      registration_number: string;
+    };
+    const label = String(v.label);
+    const periodDays = 30;
+
+    const incomeAgg = await this.dataSource.query(
+      `SELECT
+         COALESCE(SUM(GREATEST(COALESCE(end_km,0) - COALESCE(starting_km,0), 0)), 0)::float AS trip_km,
+         COALESCE(SUM(COALESCE(petrol_poured, 0)), 0)::float AS fuel_rand,
+         COALESCE(SUM(COALESCE(expense_price, 0)), 0)::float AS expense_rand,
+         MAX(end_km) AS odometer
+       FROM "${schema}"."vehicle_incomes"
+       WHERE vehicle = $1
+         AND logged_on >= now() - ($2 || ' days')::interval`,
+      [label, String(periodDays)],
+    );
+    const ia = incomeAgg[0] as Record<string, unknown>;
+    const tripKm = Number(ia.trip_km ?? 0);
+    const fuelRand = Number(ia.fuel_rand ?? 0);
+    const expenseRand = Number(ia.expense_rand ?? 0);
+    const odometer = ia.odometer != null ? Number(ia.odometer) : null;
+
+    const maintCost = await this.dataSource.query(
+      `SELECT COALESCE(SUM(COALESCE(cost, 0)), 0)::float AS maintenance_rand
+       FROM "${schema}"."maintenance_tasks"
+       WHERE (vehicle_label = $1 OR vehicle_id::text = $2)
+         AND is_completed = true
+         AND COALESCE(completed_at, updated_at) >= now() - ($3 || ' days')::interval`,
+      [label, id, String(periodDays)],
+    );
+
+    let maintenanceRand = Number(
+      (maintCost[0] as Record<string, unknown>)?.maintenance_rand ?? 0,
+    );
+    if (!Number.isFinite(maintenanceRand)) maintenanceRand = 0;
+
+    const openRows = await this.dataSource.query(
+      `SELECT COUNT(*)::int AS open_count
+       FROM "${schema}"."maintenance_tasks"
+       WHERE (vehicle_label = $1 OR vehicle_id::text = $2)
+         AND is_completed = false`,
+      [label, id],
+    );
+
+    const totalCostRand = fuelRand + expenseRand + maintenanceRand;
+    const costPerKm = tripKm > 0 ? totalCostRand / tripKm : null;
+
+    return {
+      vehicleId: id,
+      label,
+      registrationNumber: String(v.registration_number),
+      periodDays,
+      tripKm,
+      fuelRand,
+      expenseRand,
+      maintenanceRand,
+      totalCostRand,
+      costPerKm,
+      odometer,
+      maintenanceOpen: Number(
+        (openRows[0] as Record<string, unknown>)?.open_count ?? 0,
+      ),
+      maintenanceOverdue: 0,
+    };
+  }
 }
 

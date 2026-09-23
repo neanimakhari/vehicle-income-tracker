@@ -64,6 +64,25 @@ export default async function DriverProfilePage({
   const { id } = await params;
   const profile = await fetchDriverProfile(id);
   const documents = await fetchDriverDocuments(id);
+  const scorecard = await fetchJson<{
+    score: number;
+    grade: string;
+    periodDays: number;
+    docs: { score: number };
+    income: {
+      score: number;
+      daysLogged: number;
+      expectedDays: number;
+      approved: number;
+      rejected: number;
+      total: number;
+    };
+    maintenance: {
+      score: number;
+      openCount: number;
+      overdueCount: number;
+    };
+  }>(`/tenant/drivers/${id}/scorecard`).catch(() => null);
 
   if (!profile) {
     notFound();
@@ -263,6 +282,59 @@ export default async function DriverProfilePage({
           Driver Profile: {profile.firstName} {profile.lastName}
         </h1>
       </div>
+
+      {scorecard ? (
+        <div className="mb-6 rounded-lg border border-zinc-200 bg-white p-4 sm:p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                Scorecard
+              </h2>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                Last {scorecard.periodDays} days · docs 40% · income 40% · maintenance 20%
+              </p>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-semibold text-zinc-900 dark:text-zinc-50">
+                {scorecard.score}
+              </span>
+              <span className="rounded-md bg-teal-50 px-2 py-0.5 text-sm font-semibold text-teal-800 dark:bg-teal-950/50 dark:text-teal-200">
+                {scorecard.grade}
+              </span>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-md border border-zinc-100 p-3 dark:border-zinc-800">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Docs</p>
+              <p className="mt-1 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+                {scorecard.docs.score}
+              </p>
+            </div>
+            <div className="rounded-md border border-zinc-100 p-3 dark:border-zinc-800">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Income</p>
+              <p className="mt-1 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+                {scorecard.income.score}
+              </p>
+              <p className="mt-0.5 text-xs text-zinc-500">
+                {scorecard.income.daysLogged}/{scorecard.income.expectedDays} days ·{" "}
+                {scorecard.income.approved} ok / {scorecard.income.rejected} rejected
+              </p>
+            </div>
+            <div className="rounded-md border border-zinc-100 p-3 dark:border-zinc-800">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Maintenance
+              </p>
+              <p className="mt-1 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+                {scorecard.maintenance.score}
+              </p>
+              <p className="mt-0.5 text-xs text-zinc-500">
+                {scorecard.maintenance.openCount} open · {scorecard.maintenance.overdueCount}{" "}
+                overdue
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Profile Picture Section */}
       <div className="mb-6 rounded-lg border border-zinc-200 bg-white p-4 sm:p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">

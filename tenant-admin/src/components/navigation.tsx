@@ -21,6 +21,7 @@ import {
   MapPinned,
   CalendarDays,
   Pentagon,
+  AlertTriangle,
 } from "lucide-react";
 import { hasModule } from "@/lib/entitlements";
 
@@ -62,6 +63,7 @@ export function Navigation({
     { href: "/", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/drivers", icon: Users, label: "Drivers" },
     { href: "/expiry-requests", icon: FileCheck, label: "Expiry Requests" },
+    { href: "/incidents", icon: AlertTriangle, label: "Incidents" },
     { href: "/incomes", icon: DollarSign, label: "Vehicle Incomes" },
     { href: "/expenses", icon: Receipt, label: "Expenses" },
     { href: "/vehicles", icon: Car, label: "Vehicles" },
