@@ -80,24 +80,30 @@ export class TenantReportsService {
       );
       const missingIncomeVehicles = Number(missingVehiclesRaw?.[0]?.total ?? 0);
 
+      // Money totals: only auto + approved (align with getDailyTargets).
+      const approvedOnly = `COALESCE(approval_status, 'auto') IN ('auto', 'approved')`;
+
       if (actor?.role === 'TENANT_USER' && actor.sub) {
         const [incomeRaw, expenseRaw, incomeCountRaw] = await Promise.all([
           queryRunner.query(
             `SELECT COALESCE(SUM(income), 0) AS total
              FROM vehicle_incomes
-             WHERE driver_id = $1`,
+             WHERE driver_id = $1
+               AND ${approvedOnly}`,
             [actor.sub],
           ),
           queryRunner.query(
             `SELECT COALESCE(SUM(expense_price), 0) AS total
              FROM vehicle_incomes
-             WHERE driver_id = $1`,
+             WHERE driver_id = $1
+               AND ${approvedOnly}`,
             [actor.sub],
           ),
           queryRunner.query(
             `SELECT COUNT(*) AS total
              FROM vehicle_incomes
-             WHERE driver_id = $1`,
+             WHERE driver_id = $1
+               AND ${approvedOnly}`,
             [actor.sub],
           ),
         ]);
@@ -119,13 +125,16 @@ export class TenantReportsService {
         await Promise.all([
           queryRunner.query(
             `SELECT COALESCE(SUM(income), 0) AS total
-             FROM vehicle_incomes`,
+             FROM vehicle_incomes
+             WHERE ${approvedOnly}`,
           ),
           queryRunner.query(
             `SELECT COALESCE(SUM(amount), 0) AS total
              FROM expenses`,
           ),
-          queryRunner.query(`SELECT COUNT(*) AS total FROM vehicle_incomes`),
+          queryRunner.query(
+            `SELECT COUNT(*) AS total FROM vehicle_incomes WHERE ${approvedOnly}`,
+          ),
           queryRunner.query(`SELECT COUNT(*) AS total FROM expenses`),
         ]);
 

@@ -92,11 +92,19 @@ export function IncomesClient({
   const router = useRouter();
 
   const safeIncomes = Array.isArray(incomes) ? incomes : [];
-  const missingSet = useMemo(
-    () => new Set((missingVehicleLabels ?? []).map((label) => label.toLowerCase())),
-    [missingVehicleLabels],
-  );
   const statusFiltered = useMemo(() => {
+    if (statusFilter === "missing") {
+      const todayIso = new Date().toISOString();
+      return (missingVehicleLabels ?? []).map((label) => ({
+        id: `missing:${label}`,
+        vehicle: label,
+        driverName: "—",
+        income: 0,
+        loggedOn: todayIso,
+        approvalStatus: "missing",
+        incomeStream: "general",
+      }));
+    }
     let list = safeIncomes;
     if (streamFilter === "operations") {
       list = list.filter((i) => (i.incomeStream ?? "general") !== "scholar");
@@ -106,11 +114,8 @@ export function IncomesClient({
     if (statusFilter === "pending") {
       return list.filter((i) => (i.approvalStatus ?? "auto") === "pending");
     }
-    if (statusFilter === "missing") {
-      return list.filter((i) => missingSet.has(String(i.vehicle ?? "").toLowerCase()));
-    }
     return list;
-  }, [safeIncomes, statusFilter, missingSet, streamFilter]);
+  }, [safeIncomes, statusFilter, missingVehicleLabels, streamFilter]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -299,7 +304,7 @@ export function IncomesClient({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200 bg-white dark:divide-zinc-800 dark:bg-zinc-950">
-                  {safeIncomes.length === 0 ? (
+                  {statusFilter !== "missing" && safeIncomes.length === 0 ? (
                     <tr>
                       <td colSpan={10} className="px-4 py-12">
                         <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 p-8 text-center">
@@ -311,12 +316,15 @@ export function IncomesClient({
                   ) : sorted.length === 0 ? (
                     <tr>
                       <td colSpan={10} className="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
-                        No records match your search.
+                        {statusFilter === "missing"
+                          ? "All active vehicles have income logged for today."
+                          : "No records match your search."}
                       </td>
                     </tr>
                   ) : (
                     paginated.map((income) => {
                       const status = income.approvalStatus ?? "auto";
+                      const isMissingRow = status === "missing";
                       return (
                       <tr key={income.id}>
                         <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-zinc-900 dark:text-zinc-50">
@@ -330,12 +338,13 @@ export function IncomesClient({
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">{income.endKm ?? "—"}</td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm">
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                            status === "missing" ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200" :
                             status === "pending" ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200" :
                             status === "approved" || status === "auto" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200" :
                             status === "rejected" ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200" :
                             "bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300"
                           }`}>
-                            {status === "auto" ? "Auto" : status.charAt(0).toUpperCase() + status.slice(1)}
+                            {status === "auto" ? "Auto" : status === "missing" ? "Missing" : status.charAt(0).toUpperCase() + status.slice(1)}
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm">
@@ -377,6 +386,10 @@ export function IncomesClient({
                         </td>
                         <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                           <div className="flex items-center justify-end gap-2 flex-wrap">
+                            {isMissingRow ? (
+                              <span className="text-xs text-amber-700 dark:text-amber-300">No entry today</span>
+                            ) : (
+                              <>
                             {status === "pending" && (
                               <>
                                 <button
@@ -429,6 +442,8 @@ export function IncomesClient({
                                 Delete
                               </button>
                             </form>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>

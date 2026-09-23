@@ -8,6 +8,7 @@ import { TenantContextService } from '../../tenancy/tenant-context.service';
 import { TenantAwareRepository } from '../../tenancy/tenant-aware.repository';
 import { TenantUser } from '../tenant-users/tenant-user.entity';
 import { WebhooksService } from '../webhooks/webhooks.service';
+import { TenantsService } from '../tenants/tenants.service';
 
 type CreateIncomePayload = {
   vehicle: string;
@@ -28,6 +29,12 @@ type CreateIncomePayload = {
   scholarPaymentId?: string;
 };
 
+export type MissingVehicleRow = {
+  id: string;
+  label: string;
+  registrationNumber: string;
+};
+
 @Injectable()
 export class TenantIncomesService {
   constructor(
@@ -36,7 +43,68 @@ export class TenantIncomesService {
     private readonly auditService: AuditService,
     private readonly tenantContext: TenantContextService,
     private readonly webhooksService: WebhooksService,
+    private readonly tenantsService: TenantsService,
   ) {}
+
+  /**
+   * Active vehicles with no income row for the given local day (tenant timezone).
+   * Any logged row counts (including pending) — missing means nothing submitted.
+   */
+  async findMissingVehicles(date?: string): Promise<{
+    date: string;
+    timezone: string;
+    missingCount: number;
+    vehicles: MissingVehicleRow[];
+  }> {
+    const tenantSlug = this.tenantContext.getTenantId();
+    if (!tenantSlug) {
+      throw new BadRequestException('Tenant context missing');
+    }
+    const tenant = await this.tenantsService.findBySlug(tenantSlug);
+    const timezone = tenant.missingIncomeTimezone || 'Africa/Johannesburg';
+    const localDate =
+      date && /^\d{4}-\d{2}-\d{2}$/.test(date)
+        ? date
+        : new Intl.DateTimeFormat('en-CA', {
+            timeZone: timezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          }).format(new Date());
+
+    const schema = this.tenantScope.getTenantSchema();
+    const rows: Array<{
+      id: string;
+      label: string;
+      registrationNumber: string;
+    }> = await this.dataSource.query(
+      `
+      SELECT
+        v.id,
+        v.label,
+        v.registration_number AS "registrationNumber"
+      FROM "${schema}"."vehicles" v
+      LEFT JOIN "${schema}"."vehicle_incomes" vi
+        ON vi.vehicle = v.label
+        AND DATE((vi.logged_on AT TIME ZONE 'UTC') AT TIME ZONE $1) = $2::date
+      WHERE v.is_active = true
+        AND vi.id IS NULL
+      ORDER BY v.label ASC
+      `,
+      [timezone, localDate],
+    );
+
+    return {
+      date: localDate,
+      timezone,
+      missingCount: rows.length,
+      vehicles: rows.map((r) => ({
+        id: String(r.id),
+        label: String(r.label ?? ''),
+        registrationNumber: String(r.registrationNumber ?? ''),
+      })),
+    };
+  }
 
   async findAll(actor?: { sub?: string; role?: string }): Promise<TenantIncome[]> {
     const tenantRepo = new TenantAwareRepository(

@@ -1042,5 +1042,105 @@ This invite expires in 48 hours. Do not share the link.`;
       html,
     });
   }
+
+  /** Missing daily income reminder or next-morning escalation. */
+  async sendMissingIncomeReminder(payload: {
+    to: string | string[];
+    tenantName: string;
+    reminderDate: string;
+    reminderType: 'cutoff' | 'escalation';
+    vehicles: Array<{ label: string; registrationNumber?: string }>;
+    brand?: {
+      displayName?: string;
+      primaryColor?: string;
+      accentColor?: string;
+      logoUrl?: string;
+    } | null;
+  }): Promise<{ sent: boolean }> {
+    const escape = (v: unknown) =>
+      String(v ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    const headerName =
+      payload.brand?.displayName?.trim() || payload.tenantName || 'VIT';
+    const primary = payload.brand?.primaryColor || '#0d9488';
+    const isEscalation = payload.reminderType === 'escalation';
+    const subject = isEscalation
+      ? `Escalation: missing income for ${payload.reminderDate} — ${headerName}`
+      : `Reminder: log income for ${payload.reminderDate} — ${headerName}`;
+
+    const vehicleList = payload.vehicles
+      .map((v) => {
+        const reg = v.registrationNumber ? ` (${escape(v.registrationNumber)})` : '';
+        return `<li style="margin:4px 0;">${escape(v.label)}${reg}</li>`;
+      })
+      .join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <style>
+          body { margin:0; padding:0; background:#0f172a; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height:1.6; color:#111827; }
+          .wrapper { width:100%; background:#0f172a; padding:24px 12px; }
+          .container { max-width:600px; margin:0 auto; background:#f9fafb; border-radius:16px; overflow:hidden; box-shadow:0 20px 40px rgba(15,23,42,0.35); }
+          .header { background:${primary}; color:#f9fafb; padding:28px 24px 20px; }
+          .brand-title { font-size:20px; font-weight:700; }
+          .pill { display:inline-block; margin-top:10px; padding:4px 10px; border-radius:999px; background:rgba(15,23,42,0.45); font-size:11px; text-transform:uppercase; letter-spacing:0.08em; }
+          .content { padding:28px 24px 24px; }
+          .title { font-size:20px; font-weight:600; margin:0 0 8px; color:#020617; }
+          .lead { font-size:14px; color:#4b5563; margin:0 0 16px; }
+          .list { margin:0; padding-left:20px; color:#1f2937; font-size:14px; }
+          .footer { padding:18px 24px 24px; text-align:center; color:#9ca3af; font-size:11px; background:#f3f4f6; }
+        </style>
+      </head>
+      <body>
+        <div class="wrapper">
+          <div class="container">
+            <div class="header">
+              <div class="brand-title">${escape(headerName)}</div>
+              <div class="pill">${isEscalation ? 'Missing income escalation' : 'Missing income reminder'}</div>
+            </div>
+            <div class="content">
+              <h1 class="title">${isEscalation ? 'Still missing income' : 'Please log today\'s income'}</h1>
+              <p class="lead">
+                ${isEscalation
+                  ? `The following active vehicle(s) still have no income logged for <strong>${escape(payload.reminderDate)}</strong>.`
+                  : `Cutoff has passed and the following active vehicle(s) have no income logged for <strong>${escape(payload.reminderDate)}</strong>.`}
+              </p>
+              <ul class="list">${vehicleList || '<li>No vehicle details</li>'}</ul>
+              <p class="lead" style="margin-top:18px;">
+                Open the VIT app or tenant admin to submit income. This notice is sent once per day.
+              </p>
+            </div>
+            <div class="footer">
+              Automated message from VIT · ${escape(payload.tenantName)}
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = [
+      subject,
+      '',
+      `Date: ${payload.reminderDate}`,
+      `Vehicles: ${payload.vehicles.map((v) => v.label).join(', ') || '(none)'}`,
+      '',
+      'Please log income in VIT.',
+    ].join('\n');
+
+    const recipients = Array.isArray(payload.to) ? payload.to : [payload.to];
+    let lastResult = { sent: false };
+    for (const recipient of recipients) {
+      lastResult = await this.send({ to: recipient, subject, html, text });
+    }
+    return lastResult;
+  }
 }
 
