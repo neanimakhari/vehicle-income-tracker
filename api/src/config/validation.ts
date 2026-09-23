@@ -41,5 +41,9 @@ export const validationSchema = Joi.object({
   BOOTSTRAP_TOKEN_FILE: Joi.string().allow('').optional(),
   RATE_LIMIT_TTL: Joi.number().default(60),
   RATE_LIMIT_LIMIT: Joi.number().default(100),
+  ONESIGNAL_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
+  ONESIGNAL_APP_ID: Joi.string().allow('').optional(),
+  ONESIGNAL_REST_API_KEY: Joi.string().allow('').optional(),
+  ONESIGNAL_REST_API_KEY_FILE: Joi.string().allow('').optional(),
 });
 

@@ -60,6 +60,11 @@ class IngestPointDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
+  backupBatteryLevel?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
   coolantC?: number;
 
   @IsOptional()
@@ -82,6 +87,39 @@ class IngestPointDto {
   gpsFixOk?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  overspeed?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  alarmFlags?: number;
+
+  @IsOptional()
+  @IsString()
+  alarmExt?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  gsmSignal?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  msgId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  canOdometerKm?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  canSpeedKph?: number;
+
+  @IsOptional()
   @IsString()
   recordedAt?: string;
 
@@ -92,6 +130,20 @@ class IngestPointDto {
   @IsOptional()
   @IsString()
   rawPayload?: string;
+}
+
+class DeviceSeenDto {
+  @IsString()
+  @IsNotEmpty()
+  imei: string;
+}
+
+function assertIngestSecret(secret: string | undefined) {
+  const expected =
+    process.env.GPS_INGEST_SECRET ?? process.env.TRACKING_INGEST_SECRET;
+  if (!expected || secret !== expected) {
+    throw new UnauthorizedException('Invalid ingest secret');
+  }
 }
 
 /** Internal ingest for gps-ingest sidecar (shared secret). */
@@ -105,11 +157,7 @@ export class TrackingIngestController {
     @Headers('x-ingest-secret') secret: string | undefined,
     @Body() dto: IngestPointDto,
   ) {
-    const expected =
-      process.env.GPS_INGEST_SECRET ?? process.env.TRACKING_INGEST_SECRET;
-    if (!expected || secret !== expected) {
-      throw new UnauthorizedException('Invalid ingest secret');
-    }
+    assertIngestSecret(secret);
     const recordedAt =
       dto.recordedAt != null && dto.recordedAt !== ''
         ? new Date(dto.recordedAt)
@@ -124,10 +172,18 @@ export class TrackingIngestController {
       fuelRateLph: dto.fuelRateLph,
       fuelLevelPercent: dto.fuelLevelPercent,
       externalVoltage: dto.externalVoltage,
+      backupBatteryLevel: dto.backupBatteryLevel,
       coolantC: dto.coolantC,
       odometerKm: dto.odometerKm,
       engineLoadPercent: dto.engineLoadPercent,
       satellites: dto.satellites,
+      overspeed: dto.overspeed,
+      alarmFlags: dto.alarmFlags,
+      alarmExt: dto.alarmExt,
+      gsmSignal: dto.gsmSignal,
+      msgId: dto.msgId,
+      canOdometerKm: dto.canOdometerKm,
+      canSpeedKph: dto.canSpeedKph,
       source: dto.source ?? 'obd',
       rawPayload: dto.rawPayload,
       gpsFixOk: dto.gpsFixOk ?? true,
@@ -136,5 +192,14 @@ export class TrackingIngestController {
           ? recordedAt
           : undefined,
     });
+  }
+
+  @Post('device-seen')
+  deviceSeen(
+    @Headers('x-ingest-secret') secret: string | undefined,
+    @Body() dto: DeviceSeenDto,
+  ) {
+    assertIngestSecret(secret);
+    return this.tracking.touchDeviceSeen(dto.imei);
   }
 }

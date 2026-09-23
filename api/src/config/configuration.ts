@@ -63,6 +63,15 @@ export default () => ({
     from: process.env.EMAIL_FROM ?? 'noreply@vit.com',
     testSecret: process.env.EMAIL_TEST_SECRET,
   },
+  onesignal: {
+    /** Set true only after App ID + REST API key are configured. */
+    enabled: process.env.ONESIGNAL_ENABLED === 'true',
+    appId: process.env.ONESIGNAL_APP_ID ?? '',
+    restApiKey: readSecret(
+      process.env.ONESIGNAL_REST_API_KEY,
+      process.env.ONESIGNAL_REST_API_KEY_FILE,
+    ),
+  },
   appUrls: {
     frontend: process.env.FRONTEND_URL ?? 'http://localhost:3002',
     tenantAdmin: process.env.TENANT_ADMIN_APP_URL ?? process.env.FRONTEND_URL ?? 'http://localhost:3002',

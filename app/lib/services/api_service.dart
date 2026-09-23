@@ -285,6 +285,36 @@ class ApiService {
     return data.cast<Map<String, dynamic>>();
   }
 
+  Future<int> fetchNotificationsUnreadCount() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/tenant/notifications/unread-count'),
+      headers: _authHeaders(),
+    );
+    if (response.statusCode == 403 || response.statusCode == 404) return 0;
+    final data = await _decodeObject(response, errorPrefix: 'Failed to fetch unread count');
+    return int.tryParse(data['count']?.toString() ?? '') ?? 0;
+  }
+
+  Future<void> markNotificationRead(String id) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/tenant/notifications/$id/read'),
+      headers: _authHeaders(contentType: true),
+    );
+    if (response.statusCode >= 400) {
+      await _decodeObject(response, errorPrefix: 'Failed to mark notification read');
+    }
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/tenant/notifications/read-all'),
+      headers: _authHeaders(contentType: true),
+    );
+    if (response.statusCode >= 400) {
+      await _decodeObject(response, errorPrefix: 'Failed to mark all read');
+    }
+  }
+
   Future<Map<String, dynamic>> setupMfa() async {
     final response = await http.post(
       Uri.parse('$baseUrl/tenant/auth/mfa/setup'),
@@ -328,6 +358,9 @@ class ApiService {
       headers: {
         'X-Tenant-Id': tenantId,
       },
+    ).timeout(
+      const Duration(seconds: 8),
+      onTimeout: () => throw Exception('Brand policy request timed out'),
     );
     return _decodeObject(response, errorPrefix: 'Failed to fetch tenant policy');
   }

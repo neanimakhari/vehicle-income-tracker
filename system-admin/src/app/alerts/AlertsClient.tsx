@@ -11,6 +11,9 @@ const ALERT_TYPES = [
   { value: "tenant_updated", label: "Tenant updated" },
   { value: "failed_login_spike", label: "Failed login spike" },
   { value: "tenant_near_limit", label: "Tenant near limit" },
+  { value: "ops_5xx", label: "API 5xx" },
+  { value: "host_memory", label: "Host memory" },
+  { value: "host_disk", label: "Host disk" },
 ] as const;
 
 type AlertItem = {
@@ -43,7 +46,7 @@ export function AlertsClient({ alerts }: { alerts: AlertItem[] }) {
           Platform Alerts
         </h1>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Recent tenant creation, updates, and platform-level events. Optional email digest can be enabled later.
+          Tenant events, failed-login spikes, API 5xx trail, and host resource warnings.
         </p>
       </div>
 

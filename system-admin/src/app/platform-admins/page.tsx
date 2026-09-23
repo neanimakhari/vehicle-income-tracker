@@ -1,5 +1,5 @@
 import { revalidatePath } from "next/cache";
-import { requireAuth } from "@/lib/auth";
+import { requirePlatformAdmin } from "@/lib/auth";
 import { fetchJson, getApiUrl, getAuthHeaders } from "../../lib/api";
 import { PlatformAdminsClient } from "./PlatformAdminsClient";
 
@@ -9,7 +9,7 @@ async function fetchAdmins() {
 }
 
 export default async function PlatformAdminsPage() {
-  await requireAuth();
+  await requirePlatformAdmin();
   const admins = await fetchAdmins();
 
   async function createPlatformAdmin(formData: FormData): Promise<{ success: boolean; error?: string }> {

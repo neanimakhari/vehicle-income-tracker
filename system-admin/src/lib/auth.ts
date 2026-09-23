@@ -68,6 +68,16 @@ export async function requireAuth(): Promise<string> {
   return token;
 }
 
+/** PLATFORM_ADMIN only — SYS users are redirected home. */
+export async function requirePlatformAdmin(): Promise<string> {
+  const token = await requireAuth();
+  const role = await getAuthRole();
+  if (role !== "PLATFORM_ADMIN") {
+    redirect("/?error=forbidden");
+  }
+  return token;
+}
+
 /** Decode JWT payload for UI role checks (not for authorization). */
 export async function getAuthRole(): Promise<string | null> {
   const token = await getAuthToken();

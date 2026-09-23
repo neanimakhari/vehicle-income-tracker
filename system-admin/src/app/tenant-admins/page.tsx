@@ -1,5 +1,5 @@
 import { revalidatePath } from "next/cache";
-import { requireAuth } from "@/lib/auth";
+import { requirePlatformAdmin } from "@/lib/auth";
 import { fetchJson, getApiUrl, getAuthHeaders } from "../../lib/api";
 import { TenantAdminsClient } from "./TenantAdminsClient";
 
@@ -33,7 +33,7 @@ function ensureTenantOptions(
 }
 
 export default async function TenantAdminsPage() {
-  await requireAuth();
+  await requirePlatformAdmin();
   const [tenantsRaw, admins] = await Promise.all([fetchTenants(), fetchTenantAdmins()]);
   const tenants = ensureTenantOptions(tenantsRaw, admins);
 

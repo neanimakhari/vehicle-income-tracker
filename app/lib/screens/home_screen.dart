@@ -25,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _driverDisplayName;
   bool? _emailVerified;
   bool _showExpiryBadge = false;
+  int _unreadAlerts = 0;
   Map<String, dynamic>? _announcement;
   bool _announcementDismissed = false;
 
@@ -36,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadDriverDisplayName();
     _loadExpiryStatus();
     _loadAnnouncement();
+    _loadUnreadAlerts();
     _pages = [
       DashboardScreen(openDrawer: () => _scaffoldKey.currentState?.openDrawer()),
       IncomeLogScreen(onBack: _handleBackToHome, openDrawer: () => _scaffoldKey.currentState?.openDrawer()),
@@ -104,6 +106,17 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<void> _loadUnreadAlerts() async {
+    if (Session.accessToken == null) return;
+    try {
+      final count = await ApiService().fetchNotificationsUnreadCount();
+      if (!mounted) return;
+      setState(() => _unreadAlerts = count);
+    } catch (_) {
+      if (mounted) setState(() => _unreadAlerts = 0);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -116,11 +129,15 @@ class _HomeScreenState extends State<HomeScreen> {
       drawer: AppSidebar(
         onSelect: (index) {
           setState(() => _index = index);
-          if (index == 0) _loadExpiryStatus();
+          if (index == 0) {
+            _loadExpiryStatus();
+            _loadUnreadAlerts();
+          }
         },
         driverDisplayName: _driverDisplayName ?? Session.email ?? 'Driver',
         emailVerified: _emailVerified,
         showExpiryBadge: _showExpiryBadge,
+        unreadAlerts: _unreadAlerts,
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {

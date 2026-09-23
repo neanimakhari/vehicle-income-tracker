@@ -14,6 +14,7 @@ import { ApiTags } from '@nestjs/swagger';
 import {
   IsArray,
   IsBoolean,
+  IsEmail,
   IsIn,
   IsNumber,
   IsObject,
@@ -30,6 +31,8 @@ import { TenantContextGuard } from '../../tenancy/guards/tenant-context.guard';
 import { TenantAccessGuard } from '../../tenancy/guards/tenant-access.guard';
 import { ModuleEntitlementGuard } from '../commercial/module-entitlement.guard';
 import { RequiresModule } from '../commercial/requires-module.decorator';
+import { TenantReportRecipientsService } from '../tenants/tenant-report-recipients.service';
+import { TenantContextService } from '../../tenancy/tenant-context.service';
 import { GeofenceService } from './geofence.service';
 import { johannesburgToday } from './tracking-analytics.formulas';
 
@@ -254,6 +257,12 @@ class AlertRuleDto {
     'off_corridor_minutes',
     'rank_dwell_minutes',
     'enter_rank',
+    'overspeed',
+    'engine_start',
+    'engine_stop',
+    'power_loss',
+    'low_voltage',
+    'offline',
   ])
   trigger: string;
 
@@ -286,6 +295,30 @@ class SettingsDto {
   @IsOptional()
   @IsNumber()
   geofenceHysteresisSamples?: number;
+
+  @IsOptional()
+  @IsNumber()
+  overspeedKph?: number;
+
+  @IsOptional()
+  @IsNumber()
+  lowVoltageThreshold?: number;
+
+  @IsOptional()
+  @IsNumber()
+  offlineMinutes?: number;
+
+  @IsOptional()
+  @IsNumber()
+  idleAlertMinutes?: number;
+
+  @IsOptional()
+  @IsString()
+  quietHoursStart?: string | null;
+
+  @IsOptional()
+  @IsString()
+  quietHoursEnd?: string | null;
 }
 
 class RecalcDto {
@@ -497,5 +530,79 @@ export class GeofenceAlertController {
   @Roles('TENANT_ADMIN')
   remove(@Param('id') id: string) {
     return this.geofences.deleteAlertRule(id);
+  }
+}
+
+class AlertRecipientDto {
+  @IsEmail()
+  email: string;
+
+  @IsOptional()
+  @IsString()
+  label?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
+class UpdateAlertRecipientDto {
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  label?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
+@Controller('tenant/tracking/alert-recipients')
+@ApiTags('tenant-tracking-alerts')
+@RequiresModule('tracking_alerts')
+@UseGuards(
+  JwtAuthGuard,
+  RolesGuard,
+  TenantContextGuard,
+  TenantAccessGuard,
+  ModuleEntitlementGuard,
+)
+export class AlertRecipientsController {
+  constructor(
+    private readonly recipients: TenantReportRecipientsService,
+    private readonly tenantContext: TenantContextService,
+  ) {}
+
+  private slug() {
+    const slug = this.tenantContext.getTenantId();
+    if (!slug) throw new Error('Tenant context missing');
+    return slug;
+  }
+
+  @Get()
+  @Roles('TENANT_ADMIN')
+  list() {
+    return this.recipients.listByTenantSlug(this.slug());
+  }
+
+  @Post()
+  @Roles('TENANT_ADMIN')
+  create(@Body() dto: AlertRecipientDto) {
+    return this.recipients.create(this.slug(), dto);
+  }
+
+  @Patch(':id')
+  @Roles('TENANT_ADMIN')
+  update(@Param('id') id: string, @Body() dto: UpdateAlertRecipientDto) {
+    return this.recipients.update(this.slug(), id, dto);
+  }
+
+  @Delete(':id')
+  @Roles('TENANT_ADMIN')
+  remove(@Param('id') id: string) {
+    return this.recipients.remove(this.slug(), id);
   }
 }

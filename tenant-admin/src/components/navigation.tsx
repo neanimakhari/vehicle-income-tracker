@@ -20,26 +20,34 @@ import {
   GraduationCap,
   MapPinned,
   CalendarDays,
-  Activity,
-  Scale,
   Pentagon,
-  BellRing,
-  ListTree,
 } from "lucide-react";
+import { hasModule } from "@/lib/entitlements";
 
 const MODULE_NAV: Record<string, string> = {
   "/trips": "trips",
   "/scholar-payments": "scholar_payments",
   "/transport": "scholar_payments",
   "/tracking": "tracking_live",
-  "/tracking/analytics": "tracking_live",
-  "/tracking/reconciliation": "tracking_live",
   "/tracking/geofences": "tracking_geofence",
-  "/tracking/geofences/events": "tracking_geofence",
-  "/tracking/alerts": "tracking_alerts",
   "/notifications": "notifications",
   "/target-calendar": "target_calendar",
 };
+
+function isNavActive(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  if (href === "/tracking") {
+    return (
+      pathname === "/tracking" ||
+      (pathname.startsWith("/tracking/") &&
+        !pathname.startsWith("/tracking/geofences"))
+    );
+  }
+  if (href === "/tracking/geofences") {
+    return pathname.startsWith("/tracking/geofences");
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function Navigation({
   onLinkClick,
@@ -49,35 +57,21 @@ export function Navigation({
   entitlements?: string[] | null;
 }) {
   const pathname = usePathname();
-  // null entitlements = unknown/legacy unrestricted (show all)
-  const allowed = entitlements == null ? null : new Set(entitlements);
 
   const navItems = [
     { href: "/", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/drivers", icon: Users, label: "Drivers" },
-    { href: "/expiry-requests", icon: FileCheck, label: "Expiry requests" },
+    { href: "/expiry-requests", icon: FileCheck, label: "Expiry Requests" },
     { href: "/incomes", icon: DollarSign, label: "Vehicle Incomes" },
     { href: "/expenses", icon: Receipt, label: "Expenses" },
     { href: "/vehicles", icon: Car, label: "Vehicles" },
     { href: "/maintenance", icon: Wrench, label: "Maintenance" },
     { href: "/trips", icon: Route, label: "Trips" },
-    { href: "/transport", icon: GraduationCap, label: "Scholar & staff" },
+    { href: "/transport", icon: GraduationCap, label: "Scholar & Staff" },
     { href: "/tracking", icon: MapPinned, label: "Live Tracking" },
-    { href: "/tracking/analytics", icon: Activity, label: "Tracker analytics" },
-    {
-      href: "/tracking/reconciliation",
-      icon: Scale,
-      label: "Day reconciliation",
-    },
     { href: "/tracking/geofences", icon: Pentagon, label: "Geofences" },
-    {
-      href: "/tracking/geofences/events",
-      icon: ListTree,
-      label: "Geofence events",
-    },
-    { href: "/tracking/alerts", icon: BellRing, label: "Tracking alerts" },
     { href: "/reports", icon: BarChart3, label: "Reports" },
-    { href: "/target-calendar", icon: CalendarDays, label: "Target calendar" },
+    { href: "/target-calendar", icon: CalendarDays, label: "Target Calendar" },
     { href: "/audit", icon: FileText, label: "Audit Trail" },
     { href: "/mfa", icon: Shield, label: "Security (MFA)" },
     { href: "/sessions", icon: Smartphone, label: "Sessions" },
@@ -86,19 +80,14 @@ export function Navigation({
   ].filter((item) => {
     const moduleKey = MODULE_NAV[item.href];
     if (!moduleKey) return true;
-    if (allowed == null) return true;
-    return allowed.has(moduleKey);
+    return hasModule(entitlements, moduleKey);
   });
 
   return (
     <nav className="mt-6 px-4 space-y-1">
       {navItems.map((item) => {
         const Icon = item.icon;
-        const isActive =
-          pathname === item.href ||
-          (item.href !== "/" &&
-            item.href !== "/tracking" &&
-            pathname.startsWith(`${item.href}/`));
+        const isActive = isNavActive(pathname, item.href);
 
         return (
           <Link

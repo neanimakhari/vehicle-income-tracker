@@ -1,12 +1,13 @@
 {
   "name": "gps-ingest",
-  "version": "1.1.0",
+  "version": "1.2.5",
   "private": true,
   "description": "TCP GPS ingest sidecar for VIT — text mocks + Micodus/Huabao binary",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "simulate": "node src/mock-simulator.js",
+    "simulate:micodus": "node src/micodus-simulator.js",
     "test": "node --test test/**/*.test.js",
     "health": "node -e \"fetch('http://127.0.0.1:'+(process.env.HEALTH_PORT||9088)+'/health').then(r=>r.json()).then(console.log)\""
   },

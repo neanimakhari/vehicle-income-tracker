@@ -57,7 +57,7 @@ export default async function RootLayout({
   let tenantName: string | null = null;
   let brand: PolicyBrand | null = null;
   let logoSrc = "/vit-logo.png";
-  let entitlements: string[] | null = null;
+  let entitlements: string[] = [];
   let platformAnnouncement: {
     enabled?: boolean;
     severity?: string;
@@ -90,11 +90,14 @@ export default async function RootLayout({
       if (brand?.mode === "custom" && brand.logoUrl) {
         logoSrc = brand.logoUrl;
       }
-      entitlements = policy?.entitlements ?? policy?.featureFlags ?? null;
+      // Fail-closed: missing/failed policy ⇒ empty entitlements (hide gated nav)
+      entitlements = policy?.entitlements ?? policy?.featureFlags ?? [];
+      if (!Array.isArray(entitlements)) entitlements = [];
       platformAnnouncement = announcement;
     } catch (err) {
       pendingMfaUsers = null;
       tenantName = null;
+      entitlements = [];
     }
   } else {
     // Path login (/{slug}/login): apply brand before auth via public policy
@@ -216,13 +219,18 @@ export default async function RootLayout({
                         <div className="text-lg font-bold text-white truncate">
                           {tenantName || "VIT Tenant"}
                         </div>
-            <div className="text-xs text-teal-400 font-medium" style={{ color: 'var(--brand-accent, #2dd4bf)' }}>
-              Admin Console
-            </div>
+                        <div
+                          className="text-xs font-medium text-zinc-400"
+                          style={{
+                            color: "var(--brand-on-dark, var(--brand-accent, #a1a1aa))",
+                          }}
+                        >
+                          Admin Console
+                        </div>
                       </div>
                     </Link>
                   </div>
-                  <div className="flex-1 overflow-y-auto">
+                  <div className="sidebar-scroll flex-1 overflow-y-auto">
                     <Navigation entitlements={entitlements} />
                   </div>
                   <div className="shrink-0 p-4 border-t border-zinc-800 space-y-2">

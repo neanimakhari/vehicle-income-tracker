@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.4+5
+version: 1.0.12+13
 
 environment:
   sdk: ^3.11.0
@@ -51,9 +51,12 @@ dependencies:
   path_provider: ^2.1.5
   open_filex: ^4.7.0
   crypto: ^3.0.6
+  socket_io_client: ^3.0.2
+  onesignal_flutter: 5.5.2
+  # Must be a runtime dep: Flutter still registers the Android plugin in release builds.
+  flutter_native_splash: ^2.4.3
 
 dev_dependencies:
-  flutter_native_splash: ^2.4.3
   flutter_test:
     sdk: flutter
 

@@ -63,7 +63,14 @@ export function MobileSidebar({
               <div className="text-lg font-bold text-white truncate">
                 {tenantName || "VIT Tenant"}
               </div>
-              <div className="text-xs text-teal-400 font-medium">Admin Console</div>
+              <div
+                className="text-xs font-medium text-zinc-400"
+                style={{
+                  color: "var(--brand-on-dark, var(--brand-accent, #a1a1aa))",
+                }}
+              >
+                Admin Console
+              </div>
             </div>
           </Link>
           <button

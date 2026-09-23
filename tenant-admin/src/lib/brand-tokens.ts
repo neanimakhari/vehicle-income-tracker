@@ -13,6 +13,37 @@ export function mixHex(a: string, b: string, t: number): string {
   return `#${ch(ar, br)}${ch(ag, bg)}${ch(ab, bb)}`;
 }
 
+/** Relative luminance 0–1 (sRGB). */
+export function hexLuminance(hex: string): number {
+  const h = hex.replace("#", "").trim();
+  if (h.length < 6) return 0;
+  const toLin = (c: number) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const r = toLin(parseInt(h.slice(0, 2), 16));
+  const g = toLin(parseInt(h.slice(2, 4), 16));
+  const b = toLin(parseInt(h.slice(4, 6), 16));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/**
+ * Color that stays readable on dark zinc sidebars.
+ * Dark brand accents (e.g. Nei-M #1e293b) otherwise become invisible.
+ */
+export function readableOnDark(
+  hex: string | null | undefined,
+  fallback = "#a1a1aa",
+): string {
+  if (!hex || !/^#?[0-9a-fA-F]{6}$/.test(hex.trim())) return fallback;
+  const normalized = hex.startsWith("#") ? hex : `#${hex}`;
+  // Need enough luminance vs ~zinc-900 (#18181b, ~0.01)
+  if (hexLuminance(normalized) < 0.35) {
+    return mixHex(normalized, "#ffffff", 0.72);
+  }
+  return normalized.toLowerCase();
+}
+
 /** Keep in sync with api brand.util + system-admin brand-tokens. */
 export function buildBrandTokens(primaryHex: string, accentHex?: string | null) {
   const primary = primaryHex.toLowerCase();
@@ -20,6 +51,7 @@ export function buildBrandTokens(primaryHex: string, accentHex?: string | null) 
   return {
     primary,
     accent,
+    accentOnDark: readableOnDark(accent),
     primary50: mixHex(primary, "#ffffff", 0.92),
     primary100: mixHex(primary, "#ffffff", 0.8),
     primary200: mixHex(primary, "#ffffff", 0.6),
@@ -84,6 +116,7 @@ export function brandCssVars(brand?: PolicyBrand | null): Record<string, string>
     "--teal-900": t.primary900,
     "--teal-950": t.primary950,
     "--brand-accent": t.accent,
+    "--brand-on-dark": t.accentOnDark,
     "--brand-font": FONT_CSS[font],
     "--brand-radius": RADIUS_PX[radius],
     "--brand-density-pad": density === "compact" ? "0.5rem" : "1rem",

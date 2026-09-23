@@ -1,10 +1,10 @@
 import { revalidatePath } from "next/cache";
-import { requireAuth } from "@/lib/auth";
+import { requirePlatformAdmin } from "@/lib/auth";
 import { fetchJson, getApiUrl, getAuthHeaders } from "../../lib/api";
 import { SysAccountsClient } from "./SysAccountsClient";
 
 export default async function SysAccountsPage() {
-  await requireAuth();
+  await requirePlatformAdmin();
   const accounts =
     (await fetchJson<
       Array<{ id: string; email: string; isActive: boolean; createdAt?: string }>

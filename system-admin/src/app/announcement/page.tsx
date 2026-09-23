@@ -1,5 +1,5 @@
 import { revalidatePath } from "next/cache";
-import { requireAuth } from "@/lib/auth";
+import { requirePlatformAdmin } from "@/lib/auth";
 import { fetchJson, getApiUrl, getAuthHeaders } from "@/lib/api";
 import { AnnouncementClient } from "./AnnouncementClient";
 
@@ -13,7 +13,7 @@ type Announcement = {
 };
 
 export default async function AnnouncementPage() {
-  await requireAuth();
+  await requirePlatformAdmin();
   const data = (await fetchJson<Announcement>("/platform/announcement")) ?? {
     enabled: false,
     severity: "info" as const,

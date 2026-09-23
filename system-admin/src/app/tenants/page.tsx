@@ -54,10 +54,24 @@ export default async function TenantsPage() {
   await requireAuth();
   const role = await getAuthRole();
   const isSys = role === "SYS";
-  const [tenants, admins, usage] = await Promise.all([
+  const [tenants, admins, usage, entitlementSummaries, plans, defaults] = await Promise.all([
     fetchTenants(),
     fetchTenantAdmins(),
     fetchTenantUsage(),
+    fetchJson<
+      Array<{
+        tenantId: string;
+        planId: string | null;
+        planCode: string | null;
+        planName: string | null;
+        moduleCount: number;
+        legacyUnrestricted: boolean;
+      }>
+    >("/platform/commercial/tenants/entitlements-summary"),
+    fetchJson<Array<{ code: string; name: string; isActive?: boolean }>>(
+      "/platform/commercial/plans?all=1",
+    ),
+    fetchJson<{ defaultPlanCode?: string | null }>("/platform/defaults"),
   ]);
 
   async function createTenant(
@@ -79,6 +93,7 @@ export default async function TenantsPage() {
         body: JSON.stringify({
           name,
           slug,
+          planCode: (formData.get("planCode") as string) || undefined,
           contactName: (formData.get("contactName") as string) || undefined,
           contactEmail: (formData.get("contactEmail") as string) || undefined,
           contactPhone: (formData.get("contactPhone") as string) || undefined,
@@ -376,6 +391,13 @@ export default async function TenantsPage() {
       tenants={tenants}
       admins={admins}
       usage={usage}
+      entitlementSummaries={entitlementSummaries ?? []}
+      plans={(plans ?? []).map((p) => ({
+        code: p.code,
+        name: p.name,
+        isActive: p.isActive,
+      }))}
+      defaultPlanCode={defaults?.defaultPlanCode ?? null}
       createTenant={createTenant}
       updateTenant={updateTenant}
       toggleTenant={toggleTenant}

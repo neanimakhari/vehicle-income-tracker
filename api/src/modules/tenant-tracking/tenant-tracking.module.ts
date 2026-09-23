@@ -6,6 +6,7 @@ import { TenancyModule } from '../../tenancy/tenancy.module';
 import { AuditModule } from '../audit/audit.module';
 import { CommercialModule } from '../commercial/commercial.module';
 import { EmailModule } from '../email/email.module';
+import { TenantsModule } from '../tenants/tenants.module';
 import { GpsTrackingPoint } from './gps-tracking-point.entity';
 import { TrackerDevice } from './tracker-device.entity';
 import { TenantTrackingController } from './tenant-tracking.controller';
@@ -19,7 +20,11 @@ import { GeofenceScheduler } from './geofence.scheduler';
 import {
   GeofenceAlertController,
   GeofenceController,
+  AlertRecipientsController,
 } from './geofence.controller';
+import { TrackingEventsService } from './tracking-events.service';
+import { TrackingOfflineScheduler } from './tracking-offline.scheduler';
+import { TenantNotificationsModule } from '../tenant-notifications/tenant-notifications.module';
 
 @Module({
   imports: [
@@ -27,6 +32,8 @@ import {
     AuditModule,
     CommercialModule,
     EmailModule,
+    TenantsModule,
+    TenantNotificationsModule,
     TypeOrmModule.forFeature([GpsTrackingPoint, TrackerDevice]),
     ConfigModule,
     JwtModule.registerAsync({
@@ -41,6 +48,7 @@ import {
     TrackingIngestController,
     GeofenceController,
     GeofenceAlertController,
+    AlertRecipientsController,
   ],
   providers: [
     TenantTrackingService,
@@ -49,7 +57,14 @@ import {
     TrackingAnalyticsScheduler,
     GeofenceService,
     GeofenceScheduler,
+    TrackingEventsService,
+    TrackingOfflineScheduler,
   ],
-  exports: [TenantTrackingService, TrackingAnalyticsService, GeofenceService],
+  exports: [
+    TenantTrackingService,
+    TrackingAnalyticsService,
+    GeofenceService,
+    TrackingEventsService,
+  ],
 })
 export class TenantTrackingModule {}

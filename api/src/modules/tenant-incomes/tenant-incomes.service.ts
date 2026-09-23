@@ -8,6 +8,7 @@ import { TenantContextService } from '../../tenancy/tenant-context.service';
 import { TenantAwareRepository } from '../../tenancy/tenant-aware.repository';
 import { TenantUser } from '../tenant-users/tenant-user.entity';
 import { WebhooksService } from '../webhooks/webhooks.service';
+import { TenantsService } from '../tenants/tenants.service';
 
 type CreateIncomePayload = {
   vehicle: string;
@@ -28,6 +29,12 @@ type CreateIncomePayload = {
   scholarPaymentId?: string;
 };
 
+export type MissingVehicleRow = {
+  id: string;
+  label: string;
+  registrationNumber: string;
+};
+
 @Injectable()
 export class TenantIncomesService {
   constructor(
@@ -36,7 +43,68 @@ export class TenantIncomesService {
     private readonly auditService: AuditService,
     private readonly tenantContext: TenantContextService,
     private readonly webhooksService: WebhooksService,
+    private readonly tenantsService: TenantsService,
   ) {}
+
+  /**
+   * Active vehicles with no income row for the given local day (tenant timezone).
+   * Any logged row counts (including pending) — missing means nothing submitted.
+   */
+  async findMissingVehicles(date?: string): Promise<{
+    date: string;
+    timezone: string;
+    missingCount: number;
+    vehicles: MissingVehicleRow[];
+  }> {
+    const tenantSlug = this.tenantContext.getTenantId();
+    if (!tenantSlug) {
+      throw new BadRequestException('Tenant context missing');
+    }
+    const tenant = await this.tenantsService.findBySlug(tenantSlug);
+    const timezone = tenant.missingIncomeTimezone || 'Africa/Johannesburg';
+    const localDate =
+      date && /^\d{4}-\d{2}-\d{2}$/.test(date)
+        ? date
+        : new Intl.DateTimeFormat('en-CA', {
+            timeZone: timezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          }).format(new Date());
+
+    const schema = this.tenantScope.getTenantSchema();
+    const rows: Array<{
+      id: string;
+      label: string;
+      registrationNumber: string;
+    }> = await this.dataSource.query(
+      `
+      SELECT
+        v.id,
+        v.label,
+        v.registration_number AS "registrationNumber"
+      FROM "${schema}"."vehicles" v
+      LEFT JOIN "${schema}"."vehicle_incomes" vi
+        ON vi.vehicle = v.label
+        AND DATE((vi.logged_on AT TIME ZONE 'UTC') AT TIME ZONE $1) = $2::date
+      WHERE v.is_active = true
+        AND vi.id IS NULL
+      ORDER BY v.label ASC
+      `,
+      [timezone, localDate],
+    );
+
+    return {
+      date: localDate,
+      timezone,
+      missingCount: rows.length,
+      vehicles: rows.map((r) => ({
+        id: String(r.id),
+        label: String(r.label ?? ''),
+        registrationNumber: String(r.registrationNumber ?? ''),
+      })),
+    };
+  }
 
   async findAll(actor?: { sub?: string; role?: string }): Promise<TenantIncome[]> {
     const tenantRepo = new TenantAwareRepository(
@@ -45,10 +113,36 @@ export class TenantIncomesService {
       TenantIncome,
     );
     return tenantRepo.withSchema(repo => {
+      // Omit base64 slips/images from list — detail endpoint still returns full rows.
+      const opts = {
+        order: { loggedOn: 'DESC' as const },
+        select: {
+          id: true,
+          vehicle: true,
+          driverName: true,
+          income: true,
+          startingKm: true,
+          endKm: true,
+          petrolPoured: true,
+          petrolLitres: true,
+          expenseDetail: true,
+          expensePrice: true,
+          driverId: true,
+          loggedOn: true,
+          approvalStatus: true,
+          approvedAt: true,
+          approvedBy: true,
+          incomeStream: true,
+          tripId: true,
+          scholarPaymentId: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      };
       if (actor?.role === 'TENANT_USER' && actor.sub) {
-        return repo.find({ where: { driverId: actor.sub }, order: { loggedOn: 'DESC' } });
+        return repo.find({ ...opts, where: { driverId: actor.sub } });
       }
-      return repo.find({ order: { loggedOn: 'DESC' } });
+      return repo.find(opts);
     });
   }
 
@@ -86,6 +180,28 @@ export class TenantIncomesService {
     return tenantRepo.withSchema(async repo => {
       const qb = repo
         .createQueryBuilder('income')
+        .select([
+          'income.id',
+          'income.vehicle',
+          'income.driverName',
+          'income.income',
+          'income.startingKm',
+          'income.endKm',
+          'income.petrolPoured',
+          'income.petrolLitres',
+          'income.expenseDetail',
+          'income.expensePrice',
+          'income.driverId',
+          'income.loggedOn',
+          'income.approvalStatus',
+          'income.approvedAt',
+          'income.approvedBy',
+          'income.incomeStream',
+          'income.tripId',
+          'income.scholarPaymentId',
+          'income.createdAt',
+          'income.updatedAt',
+        ])
         .orderBy('income.logged_on', 'DESC')
         .skip((pageNum - 1) * limitNum)
         .take(limitNum);

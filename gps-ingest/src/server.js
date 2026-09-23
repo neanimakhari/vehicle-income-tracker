@@ -12,8 +12,10 @@ const http = require("http");
 const { extractFrames, parsePacket } = require("./micodus/frame");
 const { decodePacket } = require("./micodus/decoder");
 const { buildGeneralAck, buildRegisterAck } = require("./micodus/ack");
+const { buildCommand } = require("./micodus/downlink");
 const { MicodusSession } = require("./micodus/session");
 const { createForwarder } = require("./forwarder");
+const { createSessionRegistry } = require("./session-registry");
 
 const TCP_PORT = Number(process.env.TRACKING_TCP_PORT ?? 5023);
 const MICODUS_PORT = Number(process.env.MICODUS_TCP_PORT ?? 7700);
@@ -35,8 +37,12 @@ const stats = {
   micodusActive: 0,
   micodusFrames: 0,
   micodusUnknown: 0,
+  micodusCommands: 0,
+  micodusCommandsQueued: 0,
   lastMicodusAt: null,
 };
+
+const sessions = createSessionRegistry();
 
 async function postIngest(body) {
   if (!INGEST_SECRET) {
@@ -58,6 +64,43 @@ async function postIngest(body) {
   stats.lastIngestAt = new Date().toISOString();
   stats.lastError = null;
   return res.json();
+}
+
+/** Heartbeat / register / auth — touch lastSeen without a location point. */
+async function postDeviceSeen(imei) {
+  if (!INGEST_SECRET || !imei) return;
+  try {
+    const res = await fetch(`${API_BASE}/v1/internal/tracking/device-seen`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-ingest-secret": INGEST_SECRET,
+      },
+      body: JSON.stringify({ imei: String(imei) }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      stats.lastError = `device-seen ${res.status}: ${text.slice(0, 120)}`;
+    }
+  } catch (err) {
+    stats.lastError = String(err?.message ?? err);
+  }
+}
+
+function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on("data", (c) => chunks.push(c));
+    req.on("end", () => {
+      try {
+        const raw = Buffer.concat(chunks).toString("utf8");
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch (err) {
+        reject(err);
+      }
+    });
+    req.on("error", reject);
+  });
 }
 
 const forwarder = createForwarder({
@@ -169,10 +212,19 @@ function handleMicodusSocket(socket) {
         const decoded = decodePacket(packet);
         session.note(decoded);
 
+        const imei = session.deviceImei() || decoded.imei || packet.terminalId;
+        if (imei) {
+          sessions.register(socket, { imei, terminalId: packet.terminalId });
+        }
+
         // ACK immediately — never wait on Nest
         if (decoded.kind === "register") {
           socket.write(buildRegisterAck(packet.terminalId, packet.serial, 0));
-        } else if (decoded.kind === "heartbeat" || decoded.kind === "auth" || decoded.kind === "location") {
+          postDeviceSeen(imei).catch(() => {});
+        } else if (decoded.kind === "heartbeat" || decoded.kind === "auth") {
+          socket.write(buildGeneralAck(packet.terminalId, packet.serial, packet.msgId, 0));
+          postDeviceSeen(imei).catch(() => {});
+        } else if (decoded.kind === "location") {
           socket.write(buildGeneralAck(packet.terminalId, packet.serial, packet.msgId, 0));
         } else {
           stats.micodusUnknown += 1;
@@ -181,7 +233,6 @@ function handleMicodusSocket(socket) {
         }
 
         if (decoded.kind === "location" && decoded.point) {
-          const imei = session.deviceImei() || decoded.point.imei;
           forwarder.enqueue({ ...decoded.point, imei });
         }
       } catch (err) {
@@ -195,6 +246,7 @@ function handleMicodusSocket(socket) {
     stats.lastError = String(err?.message ?? err);
   });
   socket.on("close", () => {
+    sessions.unregister(socket);
     stats.micodusActive = Math.max(0, stats.micodusActive - 1);
   });
 }
@@ -210,8 +262,10 @@ micodusServer.listen(MICODUS_PORT, MICODUS_BIND, () => {
   console.log(`[gps-ingest] Micodus TCP on ${MICODUS_BIND}:${MICODUS_PORT}`);
 });
 
-const healthServer = http.createServer((req, res) => {
-  if (req.url === "/health" || req.url === "/") {
+const healthServer = http.createServer(async (req, res) => {
+  const url = req.url?.split("?")[0] ?? "";
+
+  if ((url === "/health" || url === "/") && req.method === "GET") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
       JSON.stringify({
@@ -222,11 +276,47 @@ const healthServer = http.createServer((req, res) => {
         secretConfigured: Boolean(INGEST_SECRET),
         queueDepth: forwarder.queueDepth(),
         coalesce: forwarder.stats,
+        sessions: sessions.stats(),
         ...stats,
       }),
     );
     return;
   }
+
+  if (url === "/internal/command" && req.method === "POST") {
+    const secret = req.headers["x-ingest-secret"] || req.headers["x-gps-ingest-secret"];
+    if (!INGEST_SECRET || secret !== INGEST_SECRET) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: "unauthorized" }));
+      return;
+    }
+    try {
+      const body = await readJsonBody(req);
+      const imei = String(body.imei ?? "").trim();
+      if (!imei) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: "imei required" }));
+        return;
+      }
+      const result = sessions.send(imei, (terminalId, serial) =>
+        buildCommand(terminalId, serial, body),
+      );
+      if (result.ok) {
+        stats.micodusCommands += 1;
+        if (result.queued) stats.micodusCommandsQueued += 1;
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(result));
+      } else {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(result));
+      }
+    } catch (err) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: String(err?.message ?? err) }));
+    }
+    return;
+  }
+
   res.writeHead(404);
   res.end();
 });
@@ -247,5 +337,6 @@ module.exports = {
   parseLine,
   postIngest,
   forwarder,
+  sessions,
   stats,
 };

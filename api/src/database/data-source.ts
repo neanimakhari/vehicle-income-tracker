@@ -45,6 +45,9 @@ import { BrandDepthUpgrade1700000000038 } from './migrations/1700000000038-brand
 import { AddGpsTrackingDepth1700000000039 } from './migrations/1700000000039-add-gps-tracking-depth';
 import { AddTrackingAnalyticsDaily1700000000040 } from './migrations/1700000000040-add-tracking-analytics-daily';
 import { AddTrackingGeofences1700000000041 } from './migrations/1700000000041-add-tracking-geofences';
+import { AddFenceTemplates1700000000042 } from './migrations/1700000000042-add-fence-templates';
+import { AddTrackingEventsAndAlarmDepth1700000000043 } from './migrations/1700000000043-add-tracking-events-and-alarm-depth';
+import { AddNotificationInboxDepth1700000000044 } from './migrations/1700000000044-add-notification-inbox-depth';
 
 export default new DataSource({
   type: 'postgres',
@@ -98,5 +101,8 @@ export default new DataSource({
     AddGpsTrackingDepth1700000000039,
     AddTrackingAnalyticsDaily1700000000040,
     AddTrackingGeofences1700000000041,
+    AddFenceTemplates1700000000042,
+    AddTrackingEventsAndAlarmDepth1700000000043,
+    AddNotificationInboxDepth1700000000044,
   ],
 });

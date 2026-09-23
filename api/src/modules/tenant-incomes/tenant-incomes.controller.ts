@@ -110,6 +110,13 @@ export class TenantIncomesController {
     return this.tenantIncomesService.getLastOdometer(vehicle ?? '');
   }
 
+  @Get('missing-vehicles')
+  @UseGuards(JwtAuthGuard, RolesGuard, TenantContextGuard, TenantAccessGuard)
+  @Roles('TENANT_ADMIN', 'TENANT_USER')
+  findMissingVehicles(@Query('date') date?: string) {
+    return this.tenantIncomesService.findMissingVehicles(date);
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard, TenantContextGuard, TenantAccessGuard)
   @Roles('TENANT_ADMIN', 'TENANT_USER')

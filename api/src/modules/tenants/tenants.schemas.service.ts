@@ -243,6 +243,12 @@ export class TenantSchemasService {
         "coolant_c" numeric NULL DEFAULT NULL,
         "engine_load_percent" numeric NULL DEFAULT NULL,
         "overspeed" boolean NULL DEFAULT NULL,
+        "alarm_flags" bigint NULL DEFAULT NULL,
+        "alarm_ext" varchar NULL DEFAULT NULL,
+        "gsm_signal" smallint NULL DEFAULT NULL,
+        "msg_id" int NULL DEFAULT NULL,
+        "can_odometer_km" numeric NULL DEFAULT NULL,
+        "can_speed_kph" numeric NULL DEFAULT NULL,
         "recorded_at" timestamptz NOT NULL,
         "raw_payload" text NULL DEFAULT NULL,
         "created_at" timestamptz NOT NULL DEFAULT now()
@@ -355,6 +361,30 @@ export class TenantSchemasService {
         "updated_at" timestamptz NOT NULL DEFAULT now()
       )
     `);
+    await this.dataSource.query(`
+      ALTER TABLE "${schemaName}"."tenant_tracking_settings"
+        ADD COLUMN IF NOT EXISTS "overspeed_kph" numeric NOT NULL DEFAULT 60,
+        ADD COLUMN IF NOT EXISTS "low_voltage_threshold" numeric NOT NULL DEFAULT 11.5,
+        ADD COLUMN IF NOT EXISTS "offline_minutes" int NOT NULL DEFAULT 15,
+        ADD COLUMN IF NOT EXISTS "idle_alert_minutes" int NOT NULL DEFAULT 20
+    `);
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS "${schemaName}"."tracking_events" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "vehicle_id" uuid NULL,
+        "device_id" varchar NULL,
+        "point_id" uuid NULL,
+        "event_type" varchar NOT NULL,
+        "severity" varchar NOT NULL DEFAULT 'info',
+        "message" text NULL,
+        "payload" jsonb NOT NULL DEFAULT '{}'::jsonb,
+        "latitude" numeric NULL,
+        "longitude" numeric NULL,
+        "speed_kph" numeric NULL,
+        "recorded_at" timestamptz NOT NULL,
+        "created_at" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
     await this.dataSource.query(
       `CREATE TABLE IF NOT EXISTS "${schemaName}"."vehicles" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -447,11 +477,29 @@ export class TenantSchemasService {
         "target_role" varchar NULL,
         "target_user_id" uuid NULL,
         "status" varchar NOT NULL DEFAULT 'sent',
+        "source" varchar NOT NULL DEFAULT 'manual',
+        "deep_link" varchar NULL,
+        "meta" jsonb NOT NULL DEFAULT '{}',
         "created_by" uuid NULL,
         "created_at" timestamptz NOT NULL DEFAULT now(),
         "updated_at" timestamptz NOT NULL DEFAULT now(),
         CONSTRAINT "fk_notifications_category_id" FOREIGN KEY ("category_id")
           REFERENCES "${schemaName}"."notification_categories"("id") ON DELETE SET NULL
+      )`,
+    );
+    await this.dataSource.query(
+      `ALTER TABLE "${schemaName}"."notifications"
+         ADD COLUMN IF NOT EXISTS "source" varchar NOT NULL DEFAULT 'manual',
+         ADD COLUMN IF NOT EXISTS "deep_link" varchar NULL,
+         ADD COLUMN IF NOT EXISTS "meta" jsonb NOT NULL DEFAULT '{}'`,
+    );
+    await this.dataSource.query(
+      `CREATE TABLE IF NOT EXISTS "${schemaName}"."notification_reads" (
+        "notification_id" uuid NOT NULL
+          REFERENCES "${schemaName}"."notifications"("id") ON DELETE CASCADE,
+        "user_id" uuid NOT NULL,
+        "read_at" timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY ("notification_id", "user_id")
       )`,
     );
     await this.dataSource.query(

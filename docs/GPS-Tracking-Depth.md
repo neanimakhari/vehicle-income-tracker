@@ -29,17 +29,69 @@ Branch: `feature/gps-tracking-postgis-timescale` (merged); geofencing on `featur
 ## Local demo
 
 1. Enable modules for tenant (pro plan includes them after migration).
-2. Open Live Tracking → POPIA → Simulate.
-3. Optional: `cd gps-ingest && GPS_INGEST_SECRET=... node src/server.js` then `IMEI=... npm run simulate`.
+2. Open Live Tracking → POPIA → bind a real IMEI (or set `TRACKING_SIMULATE_ENABLED=true` for lab-only simulate).
+3. Optional: `cd gps-ingest && GPS_INGEST_SECRET=... node src/server.js` then `IMEI=... npm run simulate` (engineering only).
 4. Micodus unit tests: `cd gps-ingest && npm test`.
+
+## Micodus depth (alarms + events)
+
+Migration `1700000000043`:
+
+- Extra point columns: `alarm_flags`, `alarm_ext`, `gsm_signal`, `msg_id`, `can_odometer_km`, `can_speed_kph`
+- `tracking_events` stream (engine start/stop, overspeed, power/low voltage, GPS lost/fix, device alarm bits, offline)
+- Settings: `overspeed_kph` (default 60), `low_voltage_threshold`, `offline_minutes`, `idle_alert_minutes`
+- Live ingest sets `overspeed` from tenant speed limit **and** JT808 alarm bits 1/13
+- Alert rule triggers expanded: `overspeed`, `engine_start`, `engine_stop`, `power_loss`, `low_voltage`, `offline`
+- WS event `tracking:alert`; API `GET /tenant/tracking/events`
+- Offline cron every 5 minutes (uses `tracker_devices.last_seen_at`; heartbeats call `POST /v1/internal/tracking/device-seen`)
+- Alert emails go to **tenant report recipients** (ops fallback if none)
+- Trips & parking: `GET /tenant/tracking/trips-report` + UI `/tracking/trips`
+- Simulation is **opt-in** (`TRACKING_SIMULATE_ENABLED=true`); default off in compose
+
+### Device commands (Phase 5 downlink)
+
+- gps-ingest keeps a live Micodus session registry and accepts `POST /internal/command` (shared `GPS_INGEST_SECRET`)
+- Nest: `POST /tenant/tracking/devices/:imei/command` → gps-ingest (`GPS_INGEST_COMMAND_URL`, default `http://gps-ingest:9088`)
+- JT808 `0x8300` text (Micodus SMS-style: `SPEED`, `TIMER`, `SENALM`, `ACCALM`, `PWRALM`, `STATUS`, `MILEAGE`) and `0x8103` params (max speed / intervals)
+- Offline commands are queued briefly and flushed on reconnect; audited as `TRACKING_DEVICE_COMMAND`
+- Tenant-admin Live Tracking shows a Device commands strip when an IMEI is bound
+
+### Enable device-side alarm bits (SMS on unit, one-time)
+
+So JT808 alarm DWORD bits actually fire (not only server overspeed):
+
+```
+SPEED,80#
+ACCALM,1#
+PWRALM,1#
+SENALM,1#
+```
+
+Capability notes:
+
+- GPS + ACC + voltage + odometer work on third-party JT808 today
+- Full CAN (RPM/coolant/fuel rate) fills dynamically when tags `0x81+` appear
+- Capacitive fuel / Micodus cloud-only instrument panels need hardware or vendor path
 
 ## Micodus MV55G onboarding
 
-1. Bind IMEI (or JT808 terminal ID the unit sends) in tenant-admin → vehicle.
-2. Micro SIM + carrier APN SMS.
-3. `SERVER,0,<droplet-public-ip>,7700#`
-4. Confirm live map / WS; if decode fails, check gps-ingest logs for hex dumps.
-5. Optional: Micodus vendor app for side-by-side on the first unit only.
+Use tenant-admin **Set up tracker** (`/tracking/setup`) — guided checklist:
+
+1. Choose vehicle.
+2. Enter the **IMEI on the tracker sticker** (usually 15 digits under the barcode — not the SIM number).
+3. Bind IMEI to the vehicle.
+4. Confirm SIM + APN / data.
+5. SMS `SERVER,0,<MICODUS_HOST>,7700#` (copy from the wizard; host from `NEXT_PUBLIC_MICODUS_HOST`).
+6. Wait outdoors until first heartbeat/GPS appears.
+7. Optional alarm SMS: `SPEED,80#`, `ACCALM,1#`, `PWRALM,1#`.
+
+Manual equivalent: bind in Live Tracking, then `SERVER,0,<droplet-public-ip>,7700#`.
+
+## Live Tracking UX (v1.2)
+
+- Fleet status chips (Moving / Idle / Offline / Alerts)
+- Vehicle story panel: status line, gauges, recent events, Replay / Setup / Commands
+- Replay opens as a focused overlay (scrubber + speed chart), not a Live|Playback toggle
 
 ## Tracker analytics + day reconciliation
 
@@ -52,6 +104,11 @@ Heavy math runs offline via Nest cron; live map / income submit stay insert-only
 
 UI: `/tracking/analytics`, `/tracking/reconciliation`.
 
+### Route playback + gauges
+
+- Live Tracking: **Live | Playback** toggle; day load via `history?from=&to=&limit=2000`; scrubber + playhead; speed-vs-time chart; SVG dials for present values only.
+- Trips page: Day / segment **Replay** deep-links into Playback.
+- History API returns chronological points; recent (no range) still newest-first then reversed.
 ## Geofencing
 
 Modules: `tracking_geofence`, `tracking_alerts` (parent `tracking_live`).

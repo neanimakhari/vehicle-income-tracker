@@ -1,71 +1,44 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { Navigation } from "../navigation";
 
-// usePathname is mocked in vitest.setup to return "/"
+const ALL = [
+  "trips",
+  "scholar_payments",
+  "tracking_live",
+  "tracking_geofence",
+  "notifications",
+  "target_calendar",
+];
+
 describe("Navigation", () => {
-  it("renders Dashboard link", () => {
+  it("renders core links without entitlements prop (fail-closed hides gated)", () => {
     render(<Navigation />);
     expect(screen.getByRole("link", { name: /dashboard/i })).toBeInTheDocument();
-  });
-
-  it("renders Drivers link", () => {
-    render(<Navigation />);
     expect(screen.getByRole("link", { name: /drivers/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /live tracking/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /target calendar/i })).not.toBeInTheDocument();
   });
 
-  it("renders Expiry requests link", () => {
-    render(<Navigation />);
+  it("renders gated links when entitled", () => {
+    render(<Navigation entitlements={ALL} />);
+    expect(screen.getByRole("link", { name: /live tracking/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /target calendar/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /scholar & staff/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /notifications/i })).toBeInTheDocument();
+  });
+
+  it("renders Expiry Requests and Vehicle Incomes", () => {
+    render(<Navigation entitlements={ALL} />);
     expect(screen.getByRole("link", { name: /expiry requests/i })).toBeInTheDocument();
-  });
-
-  it("renders Vehicle Incomes link", () => {
-    render(<Navigation />);
     expect(screen.getByRole("link", { name: /vehicle incomes/i })).toBeInTheDocument();
   });
 
-  it("renders Vehicles link", () => {
-    render(<Navigation />);
-    expect(screen.getByRole("link", { name: /vehicles/i })).toBeInTheDocument();
-  });
-
-  it("renders Maintenance link", () => {
-    render(<Navigation />);
-    expect(screen.getByRole("link", { name: /maintenance/i })).toBeInTheDocument();
-  });
-
-  it("renders Reports link", () => {
-    render(<Navigation />);
-    expect(screen.getByRole("link", { name: /reports/i })).toBeInTheDocument();
-  });
-
-  it("renders Target calendar link", () => {
-    render(<Navigation entitlements={null} />);
-    expect(screen.getByRole("link", { name: /target calendar/i })).toBeInTheDocument();
-  });
-
-  it("renders Audit Trail link", () => {
-    render(<Navigation />);
-    expect(screen.getByRole("link", { name: /audit trail/i })).toBeInTheDocument();
-  });
-
-  it("renders Security (MFA) link", () => {
-    render(<Navigation />);
-    expect(screen.getByRole("link", { name: /security \(mfa\)/i })).toBeInTheDocument();
-  });
-
-  it("renders Tenant Security link", () => {
-    render(<Navigation />);
-    expect(screen.getByRole("link", { name: /tenant security/i })).toBeInTheDocument();
-  });
-
-  it("all nav links have correct hrefs", () => {
-    render(<Navigation />);
+  it("all core nav links have correct hrefs", () => {
+    render(<Navigation entitlements={ALL} />);
     expect(screen.getByRole("link", { name: /dashboard/i })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: /drivers/i })).toHaveAttribute("href", "/drivers");
     expect(screen.getByRole("link", { name: /expiry requests/i })).toHaveAttribute("href", "/expiry-requests");
     expect(screen.getByRole("link", { name: /vehicle incomes/i })).toHaveAttribute("href", "/incomes");
   });
 });
-
-

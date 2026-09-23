@@ -17,13 +17,16 @@ services:
       JWT_REFRESH_SECRET_FILE: /run/secrets/jwt_refresh_secret
       BOOTSTRAP_TOKEN_FILE: /run/secrets/bootstrap_token
       GPS_INGEST_SECRET: ${GPS_INGEST_SECRET:-}
-      TRACKING_SIMULATE_ENABLED: ${TRACKING_SIMULATE_ENABLED:-true}
+      GPS_INGEST_COMMAND_URL: ${GPS_INGEST_COMMAND_URL:-http://gps-ingest:9088}
+      TRACKING_SIMULATE_ENABLED: ${TRACKING_SIMULATE_ENABLED:-false}
     ports:
       - "${API_PORT:-4000}:3000"
     volumes:
       # Private APK store (auth-gated downloads; not served by nginx)
       - /var/www/vit-app-private:/var/www/vit-app-private:ro
       - /var/www/vit-app-private-staging:/var/www/vit-app-private-staging:ro
+      # Optional: enable Docker container stats on /platform/ops/host
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     secrets:
       - postgres_password
       - jwt_secret
@@ -67,7 +70,7 @@ services:
       args:
         API_URL: http://api:3000
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
-        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-1.0.0}
+        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-1.2.8}
     container_name: vit_system_admin
     restart: unless-stopped
     environment:
@@ -85,7 +88,7 @@ services:
       args:
         API_URL: http://api:3000
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
-        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-1.0.0}
+        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-1.2.8}
     container_name: vit_tenant_admin
     restart: unless-stopped
     environment:

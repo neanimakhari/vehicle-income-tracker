@@ -41,10 +41,22 @@ type UsageItem = {
   totalIncome: number;
 };
 
+type EntitlementSummary = {
+  tenantId: string;
+  planId: string | null;
+  planCode: string | null;
+  planName: string | null;
+  moduleCount: number;
+  legacyUnrestricted: boolean;
+};
+
 type TenantsClientProps = {
   tenants: Tenant[];
   admins: TenantAdmin[];
   usage: UsageItem[];
+  entitlementSummaries?: EntitlementSummary[];
+  plans?: Array<{ code: string; name: string; isActive?: boolean }>;
+  defaultPlanCode?: string | null;
   createTenant: (
     formData: FormData,
   ) => Promise<{ success: boolean; error?: string; slug?: string }>;
@@ -111,6 +123,9 @@ export function TenantsClient({
   tenants,
   admins,
   usage,
+  entitlementSummaries = [],
+  plans = [],
+  defaultPlanCode = null,
   createTenant,
   updateTenant,
   toggleTenant,
@@ -140,6 +155,11 @@ export function TenantsClient({
     for (const u of usage) m[u.slug] = u;
     return m;
   }, [usage]);
+  const entitlementBySlug = useMemo(() => {
+    const m: Record<string, EntitlementSummary> = {};
+    for (const e of entitlementSummaries) m[e.tenantId] = e;
+    return m;
+  }, [entitlementSummaries]);
   const filteredTenants = useMemo(() => {
     let list = tenants;
     if (statusFilter === "active") list = list.filter((t) => t.isActive);
@@ -296,6 +316,9 @@ export function TenantsClient({
                     <th scope="col" className="hidden sm:table-cell px-3 py-3 text-left font-semibold text-zinc-900 dark:text-zinc-50">
                       Has admin
                     </th>
+                    <th scope="col" className="hidden md:table-cell px-3 py-3 text-left font-semibold text-zinc-900 dark:text-zinc-50">
+                      Plan
+                    </th>
                     <th scope="col" className="px-3 py-3 text-left font-semibold text-zinc-900 dark:text-zinc-50">
                       Status
                     </th>
@@ -316,7 +339,7 @@ export function TenantsClient({
                 <tbody className="divide-y divide-zinc-200 bg-white dark:divide-zinc-800 dark:bg-zinc-950">
                   {filteredTenants.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                      <td colSpan={10} className="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
                         <p className="font-medium text-zinc-700 dark:text-zinc-300">
                           {tenants.length === 0
                             ? "No tenants yet. Create one below, or run the database seed (see README)."
@@ -327,6 +350,7 @@ export function TenantsClient({
                   )}
                   {filteredTenants.map((tenant) => {
                     const u = usageBySlug[tenant.slug];
+                    const ent = entitlementBySlug[tenant.slug];
                     return (
                     <tr key={tenant.id}>
                       <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-zinc-900 dark:text-zinc-50">
@@ -347,6 +371,26 @@ export function TenantsClient({
                           <span className="inline-flex rounded-full bg-amber-100 px-2 text-xs font-semibold leading-5 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                             No
                           </span>
+                        )}
+                      </td>
+                      <td className="hidden md:table-cell whitespace-nowrap px-3 py-3">
+                        {ent?.legacyUnrestricted ? (
+                          <span
+                            className="inline-flex rounded-full bg-zinc-100 px-2 text-xs font-semibold leading-5 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                            title="No entitlement row — all active modules"
+                          >
+                            Legacy · all
+                          </span>
+                        ) : ent?.planCode ? (
+                          <span
+                            className="inline-flex rounded-full bg-teal-100 px-2 text-xs font-semibold leading-5 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300"
+                            title={`${ent.planName ?? ent.planCode} · ${ent.moduleCount} modules`}
+                          >
+                            {ent.planCode}
+                            <span className="ml-1 font-normal opacity-80">· {ent.moduleCount}</span>
+                          </span>
+                        ) : (
+                          <span className="text-zinc-400">—</span>
                         )}
                       </td>
                       <td className="whitespace-nowrap px-3 py-3">
@@ -540,6 +584,8 @@ export function TenantsClient({
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         createTenant={createTenant}
+        plans={plans}
+        defaultPlanCode={defaultPlanCode}
       />
       <EditTenantModal
         tenant={editTenant}

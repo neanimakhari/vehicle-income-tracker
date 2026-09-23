@@ -155,6 +155,12 @@ export class CommercialController {
     return this.commercialService.updatePlanModules(id, dto.moduleKeys);
   }
 
+  @Get('tenants/entitlements-summary')
+  @Roles('PLATFORM_ADMIN', 'SYS')
+  listTenantEntitlementSummaries() {
+    return this.commercialService.listTenantEntitlementSummaries();
+  }
+
   @Get('tenants/:slug/entitlements')
   @Roles('PLATFORM_ADMIN', 'SYS')
   getTenantEntitlement(@Param('slug') slug: string) {

@@ -1,5 +1,6 @@
 import { fetchJson } from "../../lib/api";
 import { ReportsClient } from "./reports-client";
+import { entitlementList, hasModule } from "@/lib/entitlements";
 
 async function fetchSummary() {
   const summary = await fetchJson<{
@@ -90,15 +91,26 @@ async function fetchIncomeStreams() {
 }
 
 export default async function ReportsPage() {
-  const [summary, topVehicles, driverStats, fuelEfficiencyVehicles, fuelEfficiencyDrivers, advancedInsights, incomeStreams] = await Promise.all([
-    fetchSummary(),
-    fetchTopVehicles(),
-    fetchDriverStats(),
-    fetchFuelEfficiencyVehicles(),
-    fetchFuelEfficiencyDrivers(),
-    fetchAdvancedInsights(),
-    fetchIncomeStreams(),
-  ]);
+  const policy = await fetchJson<{
+    entitlements?: string[];
+    featureFlags?: string[];
+  }>("/tenant/policy", { tolerate401: true });
+  const entitlements = entitlementList(policy);
+  const canAdvanced = hasModule(entitlements, "reports_advanced");
+
+  const [summary, topVehicles, driverStats, fuelEfficiencyVehicles, fuelEfficiencyDrivers, incomeStreams] =
+    await Promise.all([
+      fetchSummary(),
+      fetchTopVehicles(),
+      fetchDriverStats(),
+      fetchFuelEfficiencyVehicles(),
+      fetchFuelEfficiencyDrivers(),
+      fetchIncomeStreams(),
+    ]);
+
+  const advancedInsights = canAdvanced
+    ? await fetchAdvancedInsights()
+    : { topVehicles: [], worstFuelEfficiency: [], idleVehicles: [], profitPerVehicle: [] };
 
   return (
     <ReportsClient
@@ -109,6 +121,7 @@ export default async function ReportsPage() {
       fuelEfficiencyDrivers={fuelEfficiencyDrivers}
       advancedInsights={advancedInsights}
       incomeStreams={incomeStreams}
+      canAdvanced={canAdvanced}
     />
   );
 }

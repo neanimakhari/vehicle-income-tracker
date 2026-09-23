@@ -10,6 +10,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { EmailService } from '../modules/email/email.service';
+import { OpsAlertStore } from '../platform-admin/ops-alert-store';
 
 @Injectable()
 @Catch()
@@ -56,9 +57,19 @@ export class OpsAlertExceptionFilter implements ExceptionFilter {
         `${request.method} ${request.url} → ${status}: ${message}`,
         stack || undefined,
       );
+      const path = request.path || request.url;
+      OpsAlertStore.push({
+        message: `${request.method} ${path} → ${status}: ${message}`.slice(0, 400),
+        metadata: {
+          method: request.method,
+          path,
+          status,
+          detail: message.slice(0, 300),
+        },
+      });
       void this.maybeAlert({
         method: request.method,
-        path: request.path || request.url,
+        path,
         status,
         message,
         stack,

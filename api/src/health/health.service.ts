@@ -8,7 +8,15 @@ export type HealthDetail = {
   status: 'ok' | 'degraded' | 'error';
   db: 'ok' | 'error';
   dbMessage?: string;
-  disk?: { path: string; usedMb: number; totalMb: number; freeMb: number };
+  /** Uploads directory content size — not host free space. */
+  disk?: {
+    path: string;
+    usedMb: number;
+    totalMb: number;
+    freeMb: number;
+    kind: 'uploads_dir';
+    label: string;
+  };
   diskError?: string;
 };
 
@@ -56,6 +64,8 @@ export class HealthService {
           usedMb: Math.round(usedMb * 100) / 100,
           totalMb: 0,
           freeMb: 0,
+          kind: 'uploads_dir',
+          label: 'Uploads directory size (not host free space)',
         };
       }
     } catch (e) {

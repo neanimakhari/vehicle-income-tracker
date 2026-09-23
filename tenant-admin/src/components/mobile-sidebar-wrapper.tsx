@@ -69,7 +69,14 @@ export function MobileSidebarWrapper({
               <div className="truncate text-base font-bold text-white">
                 {tenantName || "VIT Tenant"}
               </div>
-              <div className="text-xs font-medium text-teal-400">Admin Console</div>
+              <div
+                className="text-xs font-medium text-zinc-400"
+                style={{
+                  color: "var(--brand-on-dark, var(--brand-accent, #a1a1aa))",
+                }}
+              >
+                Admin Console
+              </div>
             </div>
           </Link>
           <button
@@ -80,7 +87,7 @@ export function MobileSidebarWrapper({
             <X className="h-6 w-6" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="sidebar-scroll flex-1 overflow-y-auto">
           <Navigation onLinkClick={() => setIsOpen(false)} entitlements={entitlements} />
         </div>
         <div className="shrink-0 space-y-3 border-t border-zinc-800 p-4">

@@ -1,4 +1,5 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'onesignal_push.dart';
 
 class Session {
   static const _tokenKey = 'accessToken';
@@ -134,7 +135,9 @@ class Session {
   }
 
   /// Full clear (e.g. on 401 or account switch). Removes all stored data.
-  static Future<void> clear() async {
+  /// Set [notify] false when replacing session during login (avoids navigating away mid-login).
+  static Future<void> clear({bool notify = true}) async {
+    await OneSignalService.instance.logout();
     await _storage.delete(key: _tokenKey);
     await _storage.delete(key: _refreshTokenKey);
     await _storage.delete(key: _tenantKey);
@@ -161,9 +164,11 @@ class Session {
     sessionTimeoutMinutes = null;
     rememberMe = true;
     mustChangePassword = null;
-    final callback = onCleared;
-    if (callback != null) {
-      callback();
+    if (notify) {
+      final callback = onCleared;
+      if (callback != null) {
+        callback();
+      }
     }
   }
 

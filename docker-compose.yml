@@ -40,6 +40,7 @@ services:
       BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-}
       CORS_ORIGINS: "http://localhost:3001,http://localhost:3002,http://127.0.0.1:3001,http://127.0.0.1:3002"
       GPS_INGEST_SECRET: ${GPS_INGEST_SECRET:-local-dev-ingest-secret}
+      GPS_INGEST_COMMAND_URL: ${GPS_INGEST_COMMAND_URL:-http://gps-ingest:9088}
       TRACKING_SIMULATE_ENABLED: "true"
     ports:
       - "3000:3000"
