@@ -45,6 +45,23 @@ export type HostMetrics = {
     name: string;
     sizeMb: number | null;
     error?: string;
+    host?: string | null;
+    port?: number | null;
+    version?: string | null;
+    uptimeSec?: number | null;
+    maxConnections?: number | null;
+    connections?: {
+      total: number;
+      active: number;
+      idle: number;
+      idleInTransaction: number;
+      waiting: number;
+    } | null;
+    cacheHitRatioPercent?: number | null;
+    transactionsCommitted?: number | null;
+    transactionsRolledBack?: number | null;
+    deadlocks?: number | null;
+    topRelations?: Array<{ schema: string; name: string; sizeMb: number }>;
   };
   docker: {
     available: boolean;
@@ -108,20 +125,18 @@ export class PlatformOpsService {
       );
     }
 
-    let dbSizeMb: number | null = null;
-    let dbError: string | undefined;
-    const dbName =
-      this.configService.get<string>('database.database') ??
-      process.env.DB_DATABASE ??
-      'vit_platform';
-    try {
-      const rows = await this.dataSource.query(
-        `SELECT pg_database_size(current_database())::bigint AS bytes`,
+    const database = await this.collectDatabaseStats();
+    if (database.error) {
+      warnings.push(`Database stats: ${database.error}`);
+    }
+    if (
+      database.connections &&
+      database.maxConnections &&
+      database.connections.total / database.maxConnections >= 0.85
+    ) {
+      warnings.push(
+        `Postgres connections high: ${database.connections.total}/${database.maxConnections}`,
       );
-      const bytes = Number(rows?.[0]?.bytes ?? 0);
-      dbSizeMb = Math.round((bytes / (1024 * 1024)) * 100) / 100;
-    } catch (e) {
-      dbError = e instanceof Error ? e.message : 'DB size query failed';
     }
 
     const docker = await this.tryDockerStats();
@@ -141,7 +156,7 @@ export class PlatformOpsService {
     return {
       collectedAt: new Date().toISOString(),
       scope: 'container',
-      note: 'Metrics from the API process view. Without cgroup limits, memory totals usually match the droplet.',
+      note: 'API/droplet metrics from the API process view. Database block is from Postgres SQL (managed DB host CPU/RAM is not visible here).',
       cpu: {
         cores: os.cpus().length,
         load1: Math.round(load[0] * 100) / 100,
@@ -162,7 +177,7 @@ export class PlatformOpsService {
         root: rootDisk,
         uploads,
       },
-      database: { name: dbName, sizeMb: dbSizeMb, error: dbError },
+      database,
       docker,
       process: {
         uptimeSec: Math.round(process.uptime()),
@@ -171,6 +186,123 @@ export class PlatformOpsService {
       },
       warnings,
     };
+  }
+
+  private async collectDatabaseStats(): Promise<HostMetrics['database']> {
+    const dbName =
+      this.configService.get<string>('database.database') ??
+      process.env.DB_DATABASE ??
+      'vit_platform';
+    const host =
+      this.configService.get<string>('database.host') ??
+      process.env.DB_HOST ??
+      null;
+    const portRaw =
+      this.configService.get<number>('database.port') ??
+      Number(process.env.DB_PORT ?? 5432);
+    const port = Number.isFinite(portRaw) ? Number(portRaw) : null;
+
+    const base: HostMetrics['database'] = {
+      name: dbName,
+      sizeMb: null,
+      host,
+      port,
+    };
+
+    try {
+      const [sizeRows, metaRows, connRows, hitRows, topRows] = await Promise.all([
+        this.dataSource.query(
+          `SELECT pg_database_size(current_database())::bigint AS bytes`,
+        ),
+        this.dataSource.query(`
+          SELECT
+            version() AS version,
+            EXTRACT(EPOCH FROM (now() - pg_postmaster_start_time()))::bigint AS uptime_sec,
+            current_setting('max_connections')::int AS max_connections
+        `),
+        this.dataSource.query(`
+          SELECT
+            count(*)::int AS total,
+            count(*) FILTER (WHERE state = 'active')::int AS active,
+            count(*) FILTER (WHERE state = 'idle')::int AS idle,
+            count(*) FILTER (WHERE state = 'idle in transaction')::int AS idle_in_transaction,
+            count(*) FILTER (WHERE wait_event_type IS NOT NULL AND state = 'active')::int AS waiting
+          FROM pg_stat_activity
+          WHERE datname = current_database()
+        `),
+        this.dataSource.query(`
+          SELECT
+            blks_hit,
+            blks_read,
+            xact_commit,
+            xact_rollback,
+            deadlocks
+          FROM pg_stat_database
+          WHERE datname = current_database()
+        `),
+        this.dataSource.query(`
+          SELECT
+            n.nspname AS schema,
+            c.relname AS name,
+            pg_total_relation_size(c.oid)::bigint AS bytes
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE c.relkind IN ('r', 'm')
+            AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+          ORDER BY pg_total_relation_size(c.oid) DESC
+          LIMIT 5
+        `),
+      ]);
+
+      const bytes = Number(sizeRows?.[0]?.bytes ?? 0);
+      base.sizeMb = Math.round((bytes / (1024 * 1024)) * 100) / 100;
+
+      const meta = metaRows?.[0] ?? {};
+      const ver = String(meta.version ?? '');
+      base.version = ver.split(',')[0]?.trim() || ver.slice(0, 80) || null;
+      base.uptimeSec =
+        meta.uptime_sec != null ? Number(meta.uptime_sec) : null;
+      base.maxConnections =
+        meta.max_connections != null ? Number(meta.max_connections) : null;
+
+      const conn = connRows?.[0];
+      if (conn) {
+        base.connections = {
+          total: Number(conn.total ?? 0),
+          active: Number(conn.active ?? 0),
+          idle: Number(conn.idle ?? 0),
+          idleInTransaction: Number(conn.idle_in_transaction ?? 0),
+          waiting: Number(conn.waiting ?? 0),
+        };
+      }
+
+      const hit = hitRows?.[0];
+      if (hit) {
+        const blksHit = Number(hit.blks_hit ?? 0);
+        const blksRead = Number(hit.blks_read ?? 0);
+        const denom = blksHit + blksRead;
+        base.cacheHitRatioPercent =
+          denom > 0 ? Math.round((blksHit / denom) * 1000) / 10 : null;
+        base.transactionsCommitted = Number(hit.xact_commit ?? 0);
+        base.transactionsRolledBack = Number(hit.xact_rollback ?? 0);
+        base.deadlocks = Number(hit.deadlocks ?? 0);
+      }
+
+      base.topRelations = (topRows ?? []).map(
+        (r: { schema: string; name: string; bytes: string | number }) => ({
+          schema: String(r.schema),
+          name: String(r.name),
+          sizeMb: Math.round((Number(r.bytes) / (1024 * 1024)) * 100) / 100,
+        }),
+      );
+
+      return base;
+    } catch (e) {
+      return {
+        ...base,
+        error: e instanceof Error ? e.message : 'DB stats query failed',
+      };
+    }
   }
 
   getMailStatus(): {

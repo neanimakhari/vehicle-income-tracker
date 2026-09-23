@@ -59,7 +59,28 @@ type HostMetrics = {
     } | null;
     uploads: { path: string; usedMb: number; label: string } | null;
   };
-  database?: { name: string; sizeMb: number | null; error?: string };
+  database?: {
+    name: string;
+    sizeMb: number | null;
+    error?: string;
+    host?: string | null;
+    port?: number | null;
+    version?: string | null;
+    uptimeSec?: number | null;
+    maxConnections?: number | null;
+    connections?: {
+      total: number;
+      active: number;
+      idle: number;
+      idleInTransaction: number;
+      waiting: number;
+    } | null;
+    cacheHitRatioPercent?: number | null;
+    transactionsCommitted?: number | null;
+    transactionsRolledBack?: number | null;
+    deadlocks?: number | null;
+    topRelations?: Array<{ schema: string; name: string; sizeMb: number }>;
+  };
   docker?: {
     available: boolean;
     containers?: Array<{
@@ -77,7 +98,7 @@ type HostMetrics = {
 
 type MailStatus = { configured: boolean; transport: string; from: string };
 
-type HealthPageProps = { searchParams?: Promise<{ cleared?: string }> };
+type HealthPageProps = { searchParams?: Promise<{ cleared?: string; t?: string }> };
 
 function fmtUptime(sec: number): string {
   const h = Math.floor(sec / 3600);
@@ -87,10 +108,21 @@ function fmtUptime(sec: number): string {
   return `${m}m`;
 }
 
+function fmtCollected(iso?: string): string | null {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
 export default async function HealthPage(props: HealthPageProps) {
   await requireAuth();
   const searchParams = await props.searchParams;
   const showCleared = searchParams?.cleared === "1";
+  // searchParams.t is only used as a cache-bust key from Refresh
+  void searchParams?.t;
 
   const [health, host, mail] = await Promise.all([
     fetchJson<HealthDetail>("/health/detailed").catch(() => null),
@@ -147,8 +179,13 @@ export default async function HealthPage(props: HealthPageProps) {
             Health & System
           </h1>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            API, database, host resources, Docker containers, and outbound mail
+            API droplet, Postgres server (SQL), Docker containers, and outbound mail
           </p>
+          {fmtCollected(host?.collectedAt) && (
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              Last collected: {fmtCollected(host?.collectedAt)}
+            </p>
+          )}
         </div>
         <HealthRefreshButton />
       </div>
@@ -227,7 +264,13 @@ export default async function HealthPage(props: HealthPageProps) {
               <div>
                 <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Database</h3>
                 <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                  {healthDetail ? (healthDetail.db === "ok" ? "Connected" : "Error") : host?.database ? "Connected" : "Unknown"}
+                  {healthDetail
+                    ? healthDetail.db === "ok"
+                      ? "Connected"
+                      : "Error"
+                    : host?.database
+                      ? "Connected"
+                      : "Unknown"}
                 </p>
               </div>
             </div>
@@ -240,6 +283,12 @@ export default async function HealthPage(props: HealthPageProps) {
           {host?.database?.sizeMb != null && (
             <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
               {host.database.name}: <span className="font-medium">{host.database.sizeMb} MB</span>
+              {host.database.host ? (
+                <span className="block text-xs text-zinc-500 dark:text-zinc-400">
+                  {host.database.host}
+                  {host.database.port ? `:${host.database.port}` : ""}
+                </span>
+              ) : null}
             </p>
           )}
           {healthDetail && healthDetail.db !== "ok" && healthDetail.dbMessage && (
@@ -280,6 +329,106 @@ export default async function HealthPage(props: HealthPageProps) {
         </div>
       </div>
 
+      {host?.database && (
+        <div className="card p-6">
+          <div className="flex items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-zinc-100 dark:bg-zinc-800">
+              <Database className="h-6 w-6 text-zinc-600 dark:text-zinc-400" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                Postgres server
+              </h3>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                {host.database.version ?? "PostgreSQL"}
+                {host.database.uptimeSec != null
+                  ? ` · uptime ${fmtUptime(host.database.uptimeSec)}`
+                  : ""}
+              </p>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                Managed DB host CPU/RAM is not exposed over SQL — these are Postgres process stats.
+              </p>
+            </div>
+          </div>
+          {host.database.error ? (
+            <p className="mt-4 text-sm text-amber-700 dark:text-amber-400">{host.database.error}</p>
+          ) : (
+            <>
+              <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <dt className="text-zinc-500 dark:text-zinc-400">Database size</dt>
+                  <dd className="font-medium text-zinc-900 dark:text-zinc-50">
+                    {host.database.sizeMb != null ? `${host.database.sizeMb} MB` : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500 dark:text-zinc-400">Connections</dt>
+                  <dd className="font-medium text-zinc-900 dark:text-zinc-50">
+                    {host.database.connections
+                      ? `${host.database.connections.total} / ${host.database.maxConnections ?? "—"}`
+                      : "—"}
+                    {host.database.connections ? (
+                      <span className="block text-xs font-normal text-zinc-500">
+                        {host.database.connections.active} active · {host.database.connections.idle}{" "}
+                        idle
+                        {host.database.connections.idleInTransaction
+                          ? ` · ${host.database.connections.idleInTransaction} idle-in-xact`
+                          : ""}
+                        {host.database.connections.waiting
+                          ? ` · ${host.database.connections.waiting} waiting`
+                          : ""}
+                      </span>
+                    ) : null}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500 dark:text-zinc-400">Cache hit ratio</dt>
+                  <dd className="font-medium text-zinc-900 dark:text-zinc-50">
+                    {host.database.cacheHitRatioPercent != null
+                      ? `${host.database.cacheHitRatioPercent}%`
+                      : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500 dark:text-zinc-400">Txns / deadlocks</dt>
+                  <dd className="font-medium text-zinc-900 dark:text-zinc-50">
+                    {host.database.transactionsCommitted != null
+                      ? `${host.database.transactionsCommitted.toLocaleString()} commit`
+                      : "—"}
+                    {host.database.transactionsRolledBack != null ? (
+                      <span className="block text-xs font-normal text-zinc-500">
+                        {host.database.transactionsRolledBack.toLocaleString()} rollback ·{" "}
+                        {host.database.deadlocks ?? 0} deadlocks
+                      </span>
+                    ) : null}
+                  </dd>
+                </div>
+              </dl>
+              {host.database.topRelations && host.database.topRelations.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                    Largest relations
+                  </h4>
+                  <ul className="mt-2 divide-y divide-zinc-100 text-sm dark:divide-zinc-800">
+                    {host.database.topRelations.map((r) => (
+                      <li
+                        key={`${r.schema}.${r.name}`}
+                        className="flex items-center justify-between gap-3 py-1.5"
+                      >
+                        <span className="truncate font-mono text-zinc-700 dark:text-zinc-300">
+                          {r.schema}.{r.name}
+                        </span>
+                        <span className="shrink-0 text-zinc-500">{r.sizeMb} MB</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       {host && (
         <div className="grid gap-6 md:grid-cols-2">
           <div className="card p-6">
@@ -290,8 +439,8 @@ export default async function HealthPage(props: HealthPageProps) {
               <div>
                 <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">CPU & memory</h3>
                 <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                  {host.cpu?.cores ?? "—"} cores · load {host.cpu?.load1 ?? "—"} / {host.cpu?.load5 ?? "—"} /{" "}
-                  {host.cpu?.load15 ?? "—"}
+                  Droplet / API host · {host.cpu?.cores ?? "—"} cores · load {host.cpu?.load1 ?? "—"} /{" "}
+                  {host.cpu?.load5 ?? "—"} / {host.cpu?.load15 ?? "—"}
                 </p>
               </div>
             </div>
