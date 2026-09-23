@@ -1,7 +1,7 @@
 # OneSignal push notifications (tenant-admin)
 
 **Branch:** `feature/onesignal-notifications`  
-**Status:** Scaffolded — **do not deploy** until OneSignal credentials are set.  
+**Status:** Live on production API; FCM service account configured in OneSignal; mobile **1.0.9+10**.  
 **Sender:** Tenant Admin → `POST /tenant/notifications/send` → Nest → OneSignal REST.
 
 ---
@@ -40,7 +40,7 @@ Optional fallback: `device_bindings.push_token` as OneSignal subscription / play
 |---------|--------|---------|--------|
 | `ONESIGNAL_APP_ID` | `deploy/.env` + Flutter `--dart-define` | App id | Have: `8c514c8b-305c-45b2-ba6f-4ef92fa77ed0` |
 | `ONESIGNAL_REST_API_KEY` | `deploy/.env` only (secret) | Server REST key | Have (stored outside git — not pasted here) |
-| `ONESIGNAL_ENABLED` | `deploy/.env` | `true` to send | Keep `false` until FCM + deploy |
+| `ONESIGNAL_ENABLED` | `deploy/.env` | `true` to send | `true` in prod |
 
 OneSignal dashboard: **Settings → Keys & IDs** for App ID + REST key.
 
