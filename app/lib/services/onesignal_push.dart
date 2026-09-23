@@ -44,6 +44,18 @@ class OneSignalService {
     OneSignal.login(externalUserId);
   }
 
+  /// Login + request notification permission so the device becomes OneSignal-subscribed.
+  /// Call after password login and on cold start when a session is already restored.
+  Future<void> bindUserAndSubscribe(String externalUserId) async {
+    if (!_initialized || externalUserId.isEmpty) return;
+    OneSignal.login(externalUserId);
+    try {
+      await OneSignal.Notifications.requestPermission(true);
+    } catch (e) {
+      debugPrint('OneSignal: requestPermission failed: $e');
+    }
+  }
+
   Future<void> logout() async {
     if (!_initialized) return;
     OneSignal.logout();

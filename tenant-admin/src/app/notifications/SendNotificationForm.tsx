@@ -59,6 +59,16 @@ export function SendNotificationForm({
             );
             return;
           }
+          const unsubscribed = (push.errors ?? []).some((e) =>
+            /not subscribed/i.test(e),
+          );
+          if (unsubscribed || res.status === "sent_no_devices") {
+            setFeedback(
+              `Saved for ${push.recipientCount} recipient(s), but no phone has opted into push yet. ` +
+                `Drivers must install app 1.0.10+, open it, sign in, and allow notifications — then send again.`,
+            );
+            return;
+          }
           setFeedback(
             `Push ${res.status ?? "sent"} to ${push.recipientCount} recipient(s)` +
               (push.onesignalId ? ` · OneSignal id ${push.onesignalId}` : "") +

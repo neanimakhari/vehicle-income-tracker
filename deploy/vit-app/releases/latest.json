@@ -1,10 +1,10 @@
 {
   "platform": "android",
   "channel": "prod",
-  "versionName": "1.0.9",
-  "versionCode": 10,
+  "versionName": "1.0.10",
+  "versionCode": 11,
   "minSupportedVersionCode": 1,
-  "sha256": "a2c6f52e84f1ef8c4d415dbe444e5dd4375a3e2626db99c7f7c8934d9990d2ca",
-  "releaseNotes": "OneSignal push SDK (FCM); open app once after update to register for notifications.",
-  "publishedAt": "2026-09-23T08:50:09.000Z"
+  "sha256": "f500ad079e235fd41b3fbbf2d6f90248ada5b787fcd5c441a43bebce81061931",
+  "releaseNotes": "OneSignal: request push permission on login/cold start so devices can subscribe.",
+  "publishedAt": "2026-09-23T09:18:11.000Z"
 }

@@ -210,9 +210,18 @@ export class TenantNotificationsService {
       return 'recorded'; // saved in DB; push not attempted (credentials pending)
     }
     if (push.skipped && push.recipientCount === 0) return 'sent_no_devices';
+    // OneSignal often returns this when external_ids resolve but no device opted in yet.
+    if (this.isUnsubscribedOnly(push.errors)) return 'sent_no_devices';
     if (push.errors?.length && !push.onesignalId) return 'push_failed';
     if (push.errors?.length && push.onesignalId) return 'push_partial';
     return 'sent';
+  }
+
+  private isUnsubscribedOnly(errors?: string[]): boolean {
+    if (!errors?.length) return false;
+    return errors.every((e) =>
+      /not subscribed|no subscribed|no.*players.*subscribed/i.test(e),
+    );
   }
 
   private normalizeRole(role?: string | null): string | null {

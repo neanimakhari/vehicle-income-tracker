@@ -26,6 +26,11 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await OneSignalService.instance.initialize(appId: kOneSignalAppId);
   await Session.load();
+  // Cold start with saved session: re-bind OneSignal external_id (login screen is skipped).
+  final restoredUserId = Session.userId;
+  if (restoredUserId != null && restoredUserId.isNotEmpty) {
+    await OneSignalService.instance.bindUserAndSubscribe(restoredUserId);
+  }
   await SecuritySettings.load();
   if (Platform.isAndroid) {
     await FlutterWindowManager.addFlags(FlutterWindowManager.FLAG_SECURE);

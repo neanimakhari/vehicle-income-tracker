@@ -1,7 +1,7 @@
 # OneSignal push notifications (tenant-admin)
 
 **Branch:** `feature/onesignal-notifications`  
-**Status:** Live on production API; FCM service account configured in OneSignal; mobile **1.0.9+10**.  
+**Status:** Live on production API; FCM service account configured in OneSignal; mobile **1.0.10+11**.  
 **Sender:** Tenant Admin → `POST /tenant/notifications/send` → Nest → OneSignal REST.
 
 ---
