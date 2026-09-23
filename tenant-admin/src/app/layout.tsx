@@ -216,9 +216,14 @@ export default async function RootLayout({
                         <div className="text-lg font-bold text-white truncate">
                           {tenantName || "VIT Tenant"}
                         </div>
-            <div className="text-xs text-teal-400 font-medium" style={{ color: 'var(--brand-accent, #2dd4bf)' }}>
-              Admin Console
-            </div>
+                        <div
+                          className="text-xs font-medium text-zinc-400"
+                          style={{
+                            color: "var(--brand-on-dark, var(--brand-accent, #a1a1aa))",
+                          }}
+                        >
+                          Admin Console
+                        </div>
                       </div>
                     </Link>
                   </div>

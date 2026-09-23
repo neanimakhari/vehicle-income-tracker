@@ -182,8 +182,8 @@ export function TrackerSetupClient({
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700 dark:text-teal-300">
-          Tracker setup
+        <p className="text-xs font-semibold tracking-wide text-teal-700 dark:text-teal-300">
+          Tracker Setup
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           Connect a GPS tracker

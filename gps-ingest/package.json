@@ -1,6 +1,6 @@
 {
   "name": "gps-ingest",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "private": true,
   "description": "TCP GPS ingest sidecar for VIT — text mocks + Micodus/Huabao binary",
   "main": "src/server.js",

@@ -100,6 +100,21 @@ function statusKind(point: TrackingPoint | null | undefined): FleetFilter | "ok"
   return "idle";
 }
 
+function kindLabel(kind: FleetFilter | "ok"): string {
+  switch (kind) {
+    case "moving":
+      return "Moving";
+    case "idle":
+      return "Idle";
+    case "offline":
+      return "Offline";
+    case "alert":
+      return "Alert";
+    default:
+      return "Ok";
+  }
+}
+
 function TelemetryCell({
   label,
   value,
@@ -580,8 +595,8 @@ export function TrackingClient({
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700 dark:text-teal-300">
-            Fleet map · v1.2.4
+          <p className="text-xs font-semibold tracking-wide text-teal-700 dark:text-teal-300">
+            Fleet Map · v{process.env.NEXT_PUBLIC_APP_VERSION ?? "1.2.5"}
           </p>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
             Live Tracking
@@ -720,8 +735,8 @@ export function TrackingClient({
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate font-medium">{vehicle.label}</span>
-                      <span className="text-[10px] font-semibold uppercase text-zinc-500">
-                        {kind}
+                      <span className="text-[10px] font-semibold text-zinc-500">
+                        {kindLabel(kind)}
                       </span>
                     </div>
                     <div className="mt-0.5 text-xs text-zinc-500">

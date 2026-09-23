@@ -361,6 +361,23 @@ export class TenantTrackingService {
       return repo.save(point);
     });
 
+    // Always stamp device last_seen when we know the IMEI (Vehicles GPS column).
+    const imei = input.deviceId?.trim();
+    if (imei && input.source !== 'simulate') {
+      try {
+        const device = await this.devicesRepo.findOne({ where: { imei } });
+        if (device) {
+          device.lastSeenAt = recordedAt;
+          if (input.vehicleId && !device.vehicleId) {
+            device.vehicleId = input.vehicleId;
+          }
+          await this.devicesRepo.save(device);
+        }
+      } catch {
+        /* device table optional for pure API inserts */
+      }
+    }
+
     try {
       const schema = this.tenantScope.getTenantSchema();
       await this.dataSource.query(

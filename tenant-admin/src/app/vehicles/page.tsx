@@ -13,6 +13,11 @@ type DeviceRow = {
   lastSeenAt: string | null;
 };
 
+type LatestPoint = {
+  vehicleId?: string | null;
+  recordedAt?: string | null;
+};
+
 async function fetchVehicles() {
   const vehicles = await fetchJson<
     Array<{
@@ -35,19 +40,29 @@ async function fetchMissingVehicles() {
 }
 
 async function fetchGpsContext() {
-  const [devices, settings] = await Promise.all([
+  const [devices, settings, latest] = await Promise.all([
     fetchJson<DeviceRow[]>("/tenant/tracking/devices", { tolerate401: true }),
     fetchJson<{ offlineMinutes?: number }>(
       "/tenant/tracking/geofences/settings",
       { tolerate401: true },
     ),
+    fetchJson<LatestPoint[]>("/tenant/tracking/latest", { tolerate401: true }),
   ]);
+  const lastPointAtByVehicle: Record<string, string> = {};
+  if (Array.isArray(latest)) {
+    for (const p of latest) {
+      if (p?.vehicleId && p.recordedAt) {
+        lastPointAtByVehicle[p.vehicleId] = String(p.recordedAt);
+      }
+    }
+  }
   return {
     devices: Array.isArray(devices) ? devices : [],
     offlineMinutes:
       settings?.offlineMinutes != null && Number.isFinite(Number(settings.offlineMinutes))
         ? Number(settings.offlineMinutes)
         : 15,
+    lastPointAtByVehicle,
   };
 }
 
@@ -154,6 +169,7 @@ export default async function VehiclesPage() {
         missingVehicleIds={Array.from(missingVehicleIds)}
         devices={gps.devices}
         offlineMinutes={gps.offlineMinutes}
+        lastPointAtByVehicle={gps.lastPointAtByVehicle}
         onToggle={toggleVehicle}
         onDelete={deleteVehicle}
       />

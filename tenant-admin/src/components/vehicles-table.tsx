@@ -31,6 +31,7 @@ type Props = {
   missingVehicleIds?: string[];
   devices?: Device[];
   offlineMinutes?: number;
+  lastPointAtByVehicle?: Record<string, string>;
   onToggle: (formData: FormData) => Promise<void>;
   onDelete: (formData: FormData) => Promise<void>;
 };
@@ -40,18 +41,36 @@ function SortIcon({ current, dir }: { current: boolean; dir: SortDir | null }) {
   return dir === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
 }
 
+function effectiveLastSeen(
+  vehicle: Vehicle,
+  byVehicle: Map<string, Device>,
+  lastPointAtByVehicle: Record<string, string>,
+): string | null {
+  const imei = vehicle.trackerImei?.trim();
+  if (!imei) return null;
+  const device =
+    byVehicle.get(vehicle.id) ??
+    [...byVehicle.values()].find((d) => d.imei === imei);
+  const candidates = [device?.lastSeenAt, lastPointAtByVehicle[vehicle.id]].filter(
+    Boolean,
+  ) as string[];
+  if (!candidates.length) return null;
+  return candidates.sort(
+    (a, b) => new Date(b).getTime() - new Date(a).getTime(),
+  )[0];
+}
+
 function gpsStatusFor(
   vehicle: Vehicle,
   byVehicle: Map<string, Device>,
   offlineMs: number,
+  lastPointAtByVehicle: Record<string, string>,
 ): GpsStatus {
   const imei = vehicle.trackerImei?.trim();
   if (!imei) return "no_tracker";
-  const device =
-    byVehicle.get(vehicle.id) ??
-    [...byVehicle.values()].find((d) => d.imei === imei);
-  if (!device?.lastSeenAt) return "never_seen";
-  const age = Date.now() - new Date(device.lastSeenAt).getTime();
+  const seen = effectiveLastSeen(vehicle, byVehicle, lastPointAtByVehicle);
+  if (!seen) return "never_seen";
+  const age = Date.now() - new Date(seen).getTime();
   if (Number.isNaN(age) || age > offlineMs) return "offline";
   return "online";
 }
@@ -59,14 +78,11 @@ function gpsStatusFor(
 function lastSeenLabel(
   vehicle: Vehicle,
   byVehicle: Map<string, Device>,
+  lastPointAtByVehicle: Record<string, string>,
 ): string | null {
-  const imei = vehicle.trackerImei?.trim();
-  if (!imei) return null;
-  const device =
-    byVehicle.get(vehicle.id) ??
-    [...byVehicle.values()].find((d) => d.imei === imei);
-  if (!device?.lastSeenAt) return null;
-  const ms = Date.now() - new Date(device.lastSeenAt).getTime();
+  const seen = effectiveLastSeen(vehicle, byVehicle, lastPointAtByVehicle);
+  if (!seen) return null;
+  const ms = Date.now() - new Date(seen).getTime();
   if (Number.isNaN(ms)) return null;
   if (ms < 60_000) return "Just now";
   if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ago`;
@@ -102,6 +118,7 @@ export function VehiclesTable({
   missingVehicleIds = [],
   devices = [],
   offlineMinutes = 15,
+  lastPointAtByVehicle = {},
   onToggle,
   onDelete,
 }: Props) {
@@ -127,7 +144,11 @@ export function VehiclesTable({
       if (statusFilter === "active" && !v.isActive) return false;
       if (statusFilter === "inactive" && v.isActive) return false;
       if (gpsFilter !== "all") {
-        if (gpsStatusFor(v, deviceByVehicle, offlineMs) !== gpsFilter) return false;
+        if (
+          gpsStatusFor(v, deviceByVehicle, offlineMs, lastPointAtByVehicle) !==
+          gpsFilter
+        )
+          return false;
       }
       return true;
     });
@@ -140,15 +161,23 @@ export function VehiclesTable({
       );
     }
     return list;
-  }, [vehicles, statusFilter, gpsFilter, search, deviceByVehicle, offlineMs]);
+  }, [
+    vehicles,
+    statusFilter,
+    gpsFilter,
+    search,
+    deviceByVehicle,
+    offlineMs,
+    lastPointAtByVehicle,
+  ]);
 
   const gpsCounts = useMemo(() => {
     const c = { no_tracker: 0, online: 0, offline: 0, never_seen: 0 };
     for (const v of vehicles) {
-      c[gpsStatusFor(v, deviceByVehicle, offlineMs)] += 1;
+      c[gpsStatusFor(v, deviceByVehicle, offlineMs, lastPointAtByVehicle)] += 1;
     }
     return c;
-  }, [vehicles, deviceByVehicle, offlineMs]);
+  }, [vehicles, deviceByVehicle, offlineMs, lastPointAtByVehicle]);
 
   const sorted = useMemo(() => {
     const list = [...filtered];
@@ -165,8 +194,13 @@ export function VehiclesTable({
           cmp = (a.isActive ? 1 : 0) - (b.isActive ? 1 : 0);
           break;
         case "gps":
-          cmp = gpsStatusFor(a, deviceByVehicle, offlineMs).localeCompare(
-            gpsStatusFor(b, deviceByVehicle, offlineMs),
+          cmp = gpsStatusFor(
+            a,
+            deviceByVehicle,
+            offlineMs,
+            lastPointAtByVehicle,
+          ).localeCompare(
+            gpsStatusFor(b, deviceByVehicle, offlineMs, lastPointAtByVehicle),
           );
           break;
         default:
@@ -175,7 +209,7 @@ export function VehiclesTable({
       return sortDir === "asc" ? cmp : -cmp;
     });
     return list;
-  }, [filtered, sortKey, sortDir, deviceByVehicle, offlineMs]);
+  }, [filtered, sortKey, sortDir, deviceByVehicle, offlineMs, lastPointAtByVehicle]);
 
   const paginated = useMemo(() => {
     const start = pageIndex * pageSize;
@@ -287,8 +321,17 @@ export function VehiclesTable({
                 </thead>
                 <tbody className="divide-y divide-zinc-200 bg-white dark:divide-zinc-800 dark:bg-zinc-950">
                   {paginated.map((vehicle) => {
-                    const gps = gpsStatusFor(vehicle, deviceByVehicle, offlineMs);
-                    const seen = lastSeenLabel(vehicle, deviceByVehicle);
+                    const gps = gpsStatusFor(
+                      vehicle,
+                      deviceByVehicle,
+                      offlineMs,
+                      lastPointAtByVehicle,
+                    );
+                    const seen = lastSeenLabel(
+                      vehicle,
+                      deviceByVehicle,
+                      lastPointAtByVehicle,
+                    );
                     const day = todayJhb();
                     return (
                     <tr key={vehicle.id}>
