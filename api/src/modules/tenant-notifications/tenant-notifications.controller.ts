@@ -5,6 +5,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -118,12 +119,31 @@ export class TenantNotificationsController {
     ModuleEntitlementGuard,
   )
   @Roles('TENANT_ADMIN', 'TENANT_USER')
-  list(@Req() req: Request) {
+  list(
+    @Req() req: Request,
+    @Query('view') view?: string,
+  ) {
     const user = req.user as { sub?: string; role?: string } | undefined;
+    const normalized =
+      view === 'sent' && user?.role === 'TENANT_ADMIN' ? 'sent' : 'inbox';
     return this.notifications.listNotifications({
       actorUserId: user?.sub ?? null,
       actorRole: user?.role ?? null,
+      view: normalized,
     });
+  }
+
+  @Get(':id/reads')
+  @UseGuards(
+    JwtAuthGuard,
+    RolesGuard,
+    TenantContextGuard,
+    TenantAccessGuard,
+    ModuleEntitlementGuard,
+  )
+  @Roles('TENANT_ADMIN')
+  deliveryStats(@Param('id', ParseUUIDPipe) id: string) {
+    return this.notifications.getDeliveryStats(id);
   }
 
   @Post('read-all')

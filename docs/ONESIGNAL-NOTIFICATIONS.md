@@ -38,7 +38,9 @@ Flutter: Alerts inbox + badge; tap push → vitapp:// deep link
 
 | Method | Path | Notes |
 |--------|------|--------|
-| GET | `/tenant/notifications` | Includes `read`, `source`, `deepLink` |
+| GET | `/tenant/notifications` | Inbox (`read`, `source`, `deepLink`); drivers/admins filtered |
+| GET | `/tenant/notifications?view=sent` | Admin compose log + `audienceCount` / `readCount` |
+| GET | `/tenant/notifications/:id/reads` | Who read (names, emails, timestamps) |
 | GET | `/tenant/notifications/unread-count` | Badge |
 | POST | `/tenant/notifications/:id/read` | Mark one |
 | POST | `/tenant/notifications/read-all` | Clear noise |
@@ -69,7 +71,8 @@ Flutter: Alerts inbox + badge; tap push → vitapp:// deep link
 
 1. **Done** — API module, OneSignal client, Flutter SDK, manual send, Alerts list.
 2. **Done** — Mark-read inbox + badge; deep links; auto-alerts as above.
-3. **Later** — iOS APNs; richer admin “who read” analytics.
+3. **Done** — Admin “who read” delivery/read stats on tenant-admin Notifications.
+4. **Later** — iOS APNs; geofence channel UI toggles.
 
 ---
 

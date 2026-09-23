@@ -113,10 +113,36 @@ export class TenantIncomesService {
       TenantIncome,
     );
     return tenantRepo.withSchema(repo => {
+      // Omit base64 slips/images from list — detail endpoint still returns full rows.
+      const opts = {
+        order: { loggedOn: 'DESC' as const },
+        select: {
+          id: true,
+          vehicle: true,
+          driverName: true,
+          income: true,
+          startingKm: true,
+          endKm: true,
+          petrolPoured: true,
+          petrolLitres: true,
+          expenseDetail: true,
+          expensePrice: true,
+          driverId: true,
+          loggedOn: true,
+          approvalStatus: true,
+          approvedAt: true,
+          approvedBy: true,
+          incomeStream: true,
+          tripId: true,
+          scholarPaymentId: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      };
       if (actor?.role === 'TENANT_USER' && actor.sub) {
-        return repo.find({ where: { driverId: actor.sub }, order: { loggedOn: 'DESC' } });
+        return repo.find({ ...opts, where: { driverId: actor.sub } });
       }
-      return repo.find({ order: { loggedOn: 'DESC' } });
+      return repo.find(opts);
     });
   }
 
@@ -154,6 +180,28 @@ export class TenantIncomesService {
     return tenantRepo.withSchema(async repo => {
       const qb = repo
         .createQueryBuilder('income')
+        .select([
+          'income.id',
+          'income.vehicle',
+          'income.driverName',
+          'income.income',
+          'income.startingKm',
+          'income.endKm',
+          'income.petrolPoured',
+          'income.petrolLitres',
+          'income.expenseDetail',
+          'income.expensePrice',
+          'income.driverId',
+          'income.loggedOn',
+          'income.approvalStatus',
+          'income.approvedAt',
+          'income.approvedBy',
+          'income.incomeStream',
+          'income.tripId',
+          'income.scholarPaymentId',
+          'income.createdAt',
+          'income.updatedAt',
+        ])
         .orderBy('income.logged_on', 'DESC')
         .skip((pageNum - 1) * limitNum)
         .take(limitNum);

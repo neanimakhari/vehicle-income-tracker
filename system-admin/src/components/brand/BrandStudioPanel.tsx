@@ -7,6 +7,11 @@ import {
   BrandInlineToast,
   type BrandToast,
   validateBrandImageFile,
+  formatBytes,
+  readLocalImagePreview,
+  type LocalImagePreview,
+  LOGO_HINT,
+  LOGIN_BG_HINT,
 } from "@/components/brand/BrandInlineToast";
 import {
   DENSITY_OPTIONS,
@@ -62,6 +67,15 @@ type Studio = {
   entitled: boolean;
   brandMode: string;
   draft: BrandDraft & { logoUrl?: string; loginBackgroundUrl?: string };
+  live?: {
+    mode?: string;
+    primaryColor?: string;
+    accentColor?: string;
+    displayName?: string;
+    logoUrl?: string;
+    loginBackgroundUrl?: string;
+  };
+  liveFields?: BrandDraft & { logoUrl?: string; loginBackgroundUrl?: string };
   tenantName: string;
   tenantSlug: string;
   primaryContrastWarning?: string | null;
@@ -103,6 +117,9 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [wipeDraftOnReset, setWipeDraftOnReset] = useState(false);
   const [showReplaceConfirm, setShowReplaceConfirm] = useState(false);
+  const [localLogoPreview, setLocalLogoPreview] = useState<LocalImagePreview | null>(null);
+  const [localBgPreview, setLocalBgPreview] = useState<LocalImagePreview | null>(null);
+  const [compareLive, setCompareLive] = useState(false);
 
   const dismissToast = useCallback(() => setToast(null), []);
 
@@ -220,6 +237,7 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
     upload: (fd: FormData) => Promise<{ ok: boolean; error: string | null }>,
     success: string,
     label: string,
+    kind: "logo" | "loginBg",
   ) {
     if (!file) return;
     const err = validateBrandImageFile(file);
@@ -227,9 +245,42 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
       setToast({ type: "error", message: err });
       return;
     }
+    void readLocalImagePreview(file)
+      .then((preview) => {
+        if (kind === "logo") {
+          setLocalLogoPreview((prev) => {
+            if (prev) URL.revokeObjectURL(prev.url);
+            return preview;
+          });
+        } else {
+          setLocalBgPreview((prev) => {
+            if (prev) URL.revokeObjectURL(prev.url);
+            return preview;
+          });
+        }
+      })
+      .catch(() => {
+        /* still upload */
+      });
     const fd = new FormData();
     fd.append("file", file);
-    void run(() => upload(fd), success, label);
+    void run(async () => {
+      const res = await upload(fd);
+      if (res.ok) {
+        if (kind === "logo") {
+          setLocalLogoPreview((prev) => {
+            if (prev) URL.revokeObjectURL(prev.url);
+            return null;
+          });
+        } else {
+          setLocalBgPreview((prev) => {
+            if (prev) URL.revokeObjectURL(prev.url);
+            return null;
+          });
+        }
+      }
+      return res;
+    }, success, label);
   }
 
   if (!studio) {
@@ -400,6 +451,7 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
             <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
               Logo (png / jpeg / webp, max 2 MB)
             </span>
+            <p className="text-[11px] text-zinc-500">{LOGO_HINT}</p>
             <div className="flex flex-wrap gap-2">
               <label className="btn btn-secondary flex cursor-pointer gap-2 px-4 py-2.5">
                 <Upload className="h-4 w-4" />
@@ -417,6 +469,7 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
                       (fd) => brandUploadLogo(tenantId, fd),
                       "Logo uploaded",
                       "Uploading logo…",
+                      "logo",
                     );
                   }}
                 />
@@ -441,7 +494,27 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
                 </button>
               ) : null}
             </div>
-            {draftView.logoUrl ? (
+            {localLogoPreview ? (
+              <div className="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-teal-300 bg-teal-50/50 p-2 dark:border-teal-700 dark:bg-teal-900/20">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={localLogoPreview.url}
+                  alt="Local logo preview"
+                  className="h-12 w-auto max-w-[160px] rounded border border-zinc-200 bg-white object-contain p-1 dark:border-zinc-600"
+                />
+                <div className="text-[11px] text-zinc-600 dark:text-zinc-300">
+                  <div className="font-medium">Local preview (uploading…)</div>
+                  <div>
+                    {localLogoPreview.aspectLabel} · {formatBytes(localLogoPreview.bytes)}
+                  </div>
+                  {localLogoPreview.width > 0 && localLogoPreview.width < 128 ? (
+                    <div className="text-amber-700 dark:text-amber-300">
+                      Small image — may look soft on retina.
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : draftView.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={draftView.logoUrl}
@@ -454,6 +527,7 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
             <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
               Login background (png / jpeg / webp, max 2 MB)
             </span>
+            <p className="text-[11px] text-zinc-500">{LOGIN_BG_HINT}</p>
             <div className="flex flex-wrap gap-2">
               <label className="btn btn-secondary flex cursor-pointer gap-2 px-4 py-2.5">
                 <Upload className="h-4 w-4" />
@@ -471,6 +545,7 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
                       (fd) => brandUploadLoginBg(tenantId, fd),
                       "Login background uploaded",
                       "Uploading login background…",
+                      "loginBg",
                     );
                   }}
                 />
@@ -495,7 +570,19 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
                 </button>
               ) : null}
             </div>
-            {draftView.loginBackgroundUrl ? (
+            {localBgPreview ? (
+              <div className="mt-2 space-y-1">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={localBgPreview.url}
+                  alt="Local login background preview"
+                  className="h-24 w-full max-w-md rounded border border-dashed border-teal-300 object-cover dark:border-teal-700"
+                />
+                <p className="text-[11px] text-zinc-500">
+                  Local preview · {localBgPreview.aspectLabel} · {formatBytes(localBgPreview.bytes)}
+                </p>
+              </div>
+            ) : draftView.loginBackgroundUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={draftView.loginBackgroundUrl}
@@ -611,20 +698,85 @@ export function BrandStudioPanel({ tenantId }: { tenantId: string }) {
 
       {/* Live preview */}
       <section className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
-        <h3 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-zinc-50">Preview</h3>
-        <BrandMockFrames
-          draft={draftView}
-          tenantName={studio.tenantName}
-          adminScreen={adminScreen}
-          phoneScreen={phoneScreen}
-          onAdminScreen={setAdminScreen}
-          onPhoneScreen={setPhoneScreen}
-          watermark={
-            studio.entitled
-              ? undefined
-              : "Enable White-label branding on Plan & modules to publish"
-          }
-        />
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">Preview</h3>
+          <label className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+            <input
+              type="checkbox"
+              checked={compareLive}
+              onChange={(e) => setCompareLive(e.target.checked)}
+              className="rounded border-zinc-300"
+            />
+            Compare draft vs live
+          </label>
+        </div>
+        {compareLive ? (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-teal-700 dark:text-teal-300">
+                Draft
+              </p>
+              <BrandMockFrames
+                draft={draftView}
+                tenantName={studio.tenantName}
+                adminScreen={adminScreen}
+                phoneScreen={phoneScreen}
+                onAdminScreen={setAdminScreen}
+                onPhoneScreen={setPhoneScreen}
+                watermark={
+                  studio.entitled
+                    ? undefined
+                    : "Enable White-label branding on Plan & modules to publish"
+                }
+              />
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Live ({studio.live?.mode === "custom" ? "custom" : "VIT default"})
+              </p>
+              <BrandMockFrames
+                draft={{
+                  displayName: studio.live?.displayName || studio.liveFields?.displayName || null,
+                  primaryHex:
+                    studio.live?.primaryColor ||
+                    studio.liveFields?.primaryHex ||
+                    VIT_PRIMARY,
+                  accentHex:
+                    studio.live?.accentColor ||
+                    studio.liveFields?.accentHex ||
+                    VIT_ACCENT,
+                  primaryDarkHex: studio.liveFields?.primaryDarkHex || null,
+                  sidebarStyle:
+                    studio.liveFields?.sidebarStyle === "neutral" ? "neutral" : "colored",
+                  fontFamily: (studio.liveFields?.fontFamily as BrandFontFamily) || "inter",
+                  borderRadius: (studio.liveFields?.borderRadius as BrandBorderRadius) || "md",
+                  density: (studio.liveFields?.density as BrandDensity) || "comfortable",
+                  logoUrl: studio.live?.logoUrl,
+                  loginBackgroundUrl: studio.live?.loginBackgroundUrl,
+                }}
+                tenantName={studio.tenantName}
+                adminScreen={adminScreen}
+                phoneScreen={phoneScreen}
+                onAdminScreen={setAdminScreen}
+                onPhoneScreen={setPhoneScreen}
+              />
+            </div>
+          </div>
+        ) : (
+          <BrandMockFrames
+            draft={draftView}
+            tenantName={studio.tenantName}
+            adminScreen={adminScreen}
+            phoneScreen={phoneScreen}
+            onAdminScreen={setAdminScreen}
+            onPhoneScreen={setPhoneScreen}
+            watermark={
+              studio.entitled
+                ? undefined
+                : "Enable White-label branding on Plan & modules to publish"
+            }
+          />
+        )}
       </section>
 
       {/* Tools */}

@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { TenantScopeService } from '../../tenancy/tenant-scope.service';
 import { TenantContextService } from '../../tenancy/tenant-context.service';
 import { AuthUser } from '../../auth/auth-user.entity';
@@ -32,6 +32,28 @@ export type NotificationDto = {
   read: boolean;
   createdBy: string | null;
   createdAt: string;
+  /** Present on admin `view=sent` list */
+  audienceCount?: number;
+  readCount?: number;
+};
+
+export type NotificationReaderDto = {
+  userId: string;
+  displayName: string | null;
+  email: string | null;
+  role: 'TENANT_USER' | 'TENANT_ADMIN' | 'UNKNOWN';
+  readAt: string;
+};
+
+export type NotificationDeliveryStats = {
+  notificationId: string;
+  title: string;
+  status: string;
+  targetRole: string | null;
+  audienceCount: number;
+  readCount: number;
+  unreadCount: number;
+  reads: NotificationReaderDto[];
 };
 
 export type SendNotificationInput = {
@@ -113,11 +135,48 @@ export class TenantNotificationsService {
     actorUserId?: string | null;
     actorRole?: string | null;
     limit?: number;
+    /** `sent` = admin compose log with delivery/read counts; default = inbox */
+    view?: 'inbox' | 'sent' | null;
   }): Promise<NotificationDto[]> {
     const schema = this.tenantScope.getTenantSchema();
     const limit = Math.min(Math.max(opts?.limit ?? 50, 1), 200);
     const role = opts?.actorRole ?? null;
     const userId = opts?.actorUserId ?? null;
+    const view = opts?.view ?? 'inbox';
+
+    if (view === 'sent' && role === 'TENANT_ADMIN') {
+      const rows = await this.dataSource.query(
+        `SELECT n.id, n.category_id, n.title, n.message, n.target_role, n.target_user_id,
+                n.status, n.source, n.deep_link, n.meta, n.created_by, n.created_at,
+                false AS is_read,
+                (SELECT COUNT(*)::int FROM "${schema}"."notification_reads" r
+                  WHERE r.notification_id = n.id) AS read_count
+         FROM "${schema}"."notifications" n
+         ORDER BY n.created_at DESC
+         LIMIT $1`,
+        [limit],
+      );
+      const tenantSlug = this.tenantContext.getTenantId();
+      const driverCount = (await this.listDriverIds()).length;
+      const adminCount = tenantSlug
+        ? (await this.listTenantAdminIds(tenantSlug)).length
+        : 0;
+      return (rows as Record<string, unknown>[]).map((r) => {
+        const dto = this.mapNotification(r);
+        const tr = r.target_role != null ? String(r.target_role) : null;
+        const tu = r.target_user_id != null ? String(r.target_user_id) : null;
+        let audienceCount = 0;
+        if (tu) audienceCount = 1;
+        else if (tr === 'TENANT_USER') audienceCount = driverCount;
+        else if (tr === 'TENANT_ADMIN') audienceCount = adminCount;
+        else audienceCount = driverCount + adminCount;
+        return {
+          ...dto,
+          audienceCount,
+          readCount: Number(r.read_count ?? 0),
+        };
+      });
+    }
 
     if (role === 'TENANT_USER' && userId) {
       const rows = await this.dataSource.query(
@@ -165,6 +224,126 @@ export class TenantNotificationsService {
       [limit],
     );
     return rows.map((r: Record<string, unknown>) => this.mapNotification(r));
+  }
+
+  async getDeliveryStats(
+    notificationId: string,
+  ): Promise<NotificationDeliveryStats> {
+    const schema = this.tenantScope.getTenantSchema();
+    const rows = await this.dataSource.query(
+      `SELECT id, title, status, target_role, target_user_id
+       FROM "${schema}"."notifications"
+       WHERE id = $1
+       LIMIT 1`,
+      [notificationId],
+    );
+    if (!rows.length) throw new NotFoundException('Notification not found');
+    const n = rows[0] as Record<string, unknown>;
+    const targetRole = n.target_role != null ? String(n.target_role) : null;
+    const targetUserId =
+      n.target_user_id != null ? String(n.target_user_id) : null;
+    const audienceCount = await this.audienceCountFor(targetRole, targetUserId);
+
+    const readRows = await this.dataSource.query(
+      `SELECT r.user_id, r.read_at
+       FROM "${schema}"."notification_reads" r
+       WHERE r.notification_id = $1
+       ORDER BY r.read_at ASC`,
+      [notificationId],
+    );
+    const reads = await this.enrichReaders(
+      (readRows as { user_id: string; read_at: Date | string }[]).map((r) => ({
+        userId: String(r.user_id),
+        readAt:
+          r.read_at instanceof Date
+            ? r.read_at.toISOString()
+            : String(r.read_at),
+      })),
+    );
+    const readCount = reads.length;
+    return {
+      notificationId: String(n.id),
+      title: String(n.title),
+      status: String(n.status ?? 'sent'),
+      targetRole,
+      audienceCount,
+      readCount,
+      unreadCount: Math.max(0, audienceCount - readCount),
+      reads,
+    };
+  }
+
+  private async audienceCountFor(
+    targetRole: string | null,
+    targetUserId: string | null,
+  ): Promise<number> {
+    try {
+      const { externalIds } = await this.resolveRecipients(
+        targetRole,
+        targetUserId,
+      );
+      return externalIds.length;
+    } catch {
+      return 0;
+    }
+  }
+
+  private async enrichReaders(
+    rows: { userId: string; readAt: string }[],
+  ): Promise<NotificationReaderDto[]> {
+    if (!rows.length) return [];
+    const schema = this.tenantScope.getTenantSchema();
+    const ids = rows.map((r) => r.userId);
+    const drivers = await this.dataSource.query(
+      `SELECT id, first_name, last_name, email
+       FROM "${schema}"."users"
+       WHERE id = ANY($1::uuid[])`,
+      [ids],
+    );
+    const driverMap = new Map(
+      (drivers as Record<string, unknown>[]).map((d) => [
+        String(d.id),
+        {
+          displayName: `${String(d.first_name ?? '')} ${String(d.last_name ?? '')}`.trim() || null,
+          email: d.email != null ? String(d.email) : null,
+          role: 'TENANT_USER' as const,
+        },
+      ]),
+    );
+    const missing = ids.filter((id) => !driverMap.has(id));
+    const adminMap = new Map<
+      string,
+      { displayName: string | null; email: string | null; role: 'TENANT_ADMIN' }
+    >();
+    if (missing.length) {
+      const admins = await this.authUsers.find({
+        where: { id: In(missing) },
+        select: ['id', 'email'],
+      });
+      for (const a of admins) {
+        adminMap.set(a.id, {
+          displayName: a.email ?? null,
+          email: a.email ?? null,
+          role: 'TENANT_ADMIN',
+        });
+      }
+    }
+    return rows.map((r) => {
+      const info =
+        driverMap.get(r.userId) ??
+        adminMap.get(r.userId) ?? {
+          displayName: null,
+          email: null,
+          role: 'UNKNOWN' as const,
+        };
+      return {
+        userId: r.userId,
+        displayName: info.displayName,
+        email: info.email,
+        role: info.role,
+        readAt: r.readAt,
+      };
+    });
   }
 
   async unreadCount(actorUserId: string, actorRole: string): Promise<number> {
