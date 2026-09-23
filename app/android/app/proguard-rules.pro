@@ -10,3 +10,6 @@
 -dontwarn com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions$Builder
 -dontwarn com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 
+## OneSignal (release minify)
+-dontwarn com.onesignal.**
+-keep class com.onesignal.** { *; }

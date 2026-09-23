@@ -24,7 +24,7 @@ import 'services/onesignal_push.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await OneSignalPushBootstrap.init();
+  await OneSignalService.instance.initialize(appId: kOneSignalAppId);
   await Session.load();
   await SecuritySettings.load();
   if (Platform.isAndroid) {
@@ -49,7 +49,7 @@ class VITApp extends StatelessWidget {
             AppTheme.dark(primaryColor: brand.primaryDarkColor ?? brand.primaryColor),
             brand,
           ),
-          home: const InitialRoute(),
+          home: const OneSignalVerificationHost(child: InitialRoute()),
         );
       },
     );

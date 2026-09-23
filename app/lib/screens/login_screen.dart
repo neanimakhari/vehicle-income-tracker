@@ -123,10 +123,10 @@ class _LoginScreenState extends State<LoginScreen> {
       Session.mfaEnabled = result['user']?['mfaEnabled'] as bool?;
       Session.tenantId = result['user']?['tenantId'] as String? ?? tenantHint;
       Session.tenantName = result['tenantName'] as String? ?? result['user']?['tenantName'] as String?;
-      // OneSignal: bind push identity to JWT sub (no-op until ONESIGNAL_APP_ID + SDK wired).
+      // OneSignal: bind push identity to JWT sub for server external_id targeting.
       final uid = Session.userId;
       if (uid != null && uid.isNotEmpty) {
-        await OneSignalPushBootstrap.loginUser(uid);
+        await OneSignalService.instance.login(uid);
       }
       Session.rememberMe = true;
       Session.mustChangePassword = result['user']?['mustChangePassword'] as bool? ?? false;
