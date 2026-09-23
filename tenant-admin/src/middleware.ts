@@ -37,6 +37,7 @@ const RESERVED = new Set([
   "expiry-requests",
   "scholar-payments",
   "target-calendar",
+  "incidents",
 ]);
 
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/i;
