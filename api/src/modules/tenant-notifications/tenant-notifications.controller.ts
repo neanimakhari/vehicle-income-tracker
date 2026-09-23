@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  Param,
+  ParseUUIDPipe,
   Post,
   Req,
   UseGuards,
@@ -91,6 +93,22 @@ export class TenantNotificationsController {
     );
   }
 
+  @Get('unread-count')
+  @UseGuards(
+    JwtAuthGuard,
+    RolesGuard,
+    TenantContextGuard,
+    TenantAccessGuard,
+    ModuleEntitlementGuard,
+  )
+  @Roles('TENANT_ADMIN', 'TENANT_USER')
+  async unreadCount(@Req() req: Request) {
+    const user = req.user as { sub?: string; role?: string } | undefined;
+    if (!user?.sub || !user.role) return { count: 0 };
+    const count = await this.notifications.unreadCount(user.sub, user.role);
+    return { count };
+  }
+
   @Get()
   @UseGuards(
     JwtAuthGuard,
@@ -106,6 +124,39 @@ export class TenantNotificationsController {
       actorUserId: user?.sub ?? null,
       actorRole: user?.role ?? null,
     });
+  }
+
+  @Post('read-all')
+  @UseGuards(
+    JwtAuthGuard,
+    RolesGuard,
+    TenantContextGuard,
+    TenantAccessGuard,
+    ModuleEntitlementGuard,
+  )
+  @Roles('TENANT_ADMIN', 'TENANT_USER')
+  markAllRead(@Req() req: Request) {
+    const user = req.user as { sub?: string; role?: string } | undefined;
+    if (!user?.sub || !user.role) return { ok: true, count: 0 };
+    return this.notifications.markAllRead(user.sub, user.role);
+  }
+
+  @Post(':id/read')
+  @UseGuards(
+    JwtAuthGuard,
+    RolesGuard,
+    TenantContextGuard,
+    TenantAccessGuard,
+    ModuleEntitlementGuard,
+  )
+  @Roles('TENANT_ADMIN', 'TENANT_USER')
+  markRead(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request,
+  ) {
+    const user = req.user as { sub?: string } | undefined;
+    if (!user?.sub) return { ok: true };
+    return this.notifications.markRead(id, user.sub);
   }
 
   @Post('send')
@@ -126,6 +177,9 @@ export class TenantNotificationsController {
         categoryId: dto.categoryId ?? null,
         targetRole: dto.targetRole || null,
         targetUserId: dto.targetUserId ?? null,
+        source: 'manual',
+        deepLink: null,
+        push: true,
       },
       user?.sub ?? null,
     );

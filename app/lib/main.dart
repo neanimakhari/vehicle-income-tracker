@@ -21,10 +21,23 @@ import 'theme.dart';
 import 'widgets/app_update_prompt.dart';
 import 'services/brand_theme_controller.dart';
 import 'services/onesignal_push.dart';
+import 'services/notification_nav.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await OneSignalService.instance.initialize(appId: kOneSignalAppId);
+  OneSignalService.instance.setNotificationClickListener((event) {
+    final raw = event.notification.additionalData;
+    if (raw != null && raw.isNotEmpty) {
+      NotificationNav.fromOneSignalData(
+        Map<String, dynamic>.from(
+          raw.map((key, value) => MapEntry(key.toString(), value)),
+        ),
+      );
+    } else {
+      NotificationNav.openAlerts();
+    }
+  });
   await Session.load();
   // Cold start with saved session: re-bind OneSignal external_id (login screen is skipped).
   final restoredUserId = Session.userId;
@@ -48,6 +61,7 @@ class VITApp extends StatelessWidget {
       builder: (context, _) {
         final brand = BrandThemeController.instance;
         return MaterialApp(
+          navigatorKey: NotificationNav.navigatorKey,
           title: brand.displayName?.isNotEmpty == true ? brand.displayName! : 'VIT',
           theme: _themed(AppTheme.light(primaryColor: brand.primaryColor), brand),
           darkTheme: _themed(
@@ -113,15 +127,24 @@ class _InitialRouteState extends State<InitialRoute> {
     final host = uri.host.toLowerCase();
     final token = uri.queryParameters['token'];
     final tenant = uri.queryParameters['tenant'];
-    if (token == null || token.isEmpty) return;
-    Widget? screen;
-    if (host == 'reset-password') {
-      screen = ResetPasswordLinkScreen(token: token, tenantId: tenant);
-    } else if (host == 'verify-email') {
-      screen = VerifyEmailLinkScreen(token: token, tenantId: tenant);
+    if (host == 'reset-password' || host == 'verify-email') {
+      if (token == null || token.isEmpty) return;
+      Widget? screen;
+      if (host == 'reset-password') {
+        screen = ResetPasswordLinkScreen(token: token, tenantId: tenant);
+      } else if (host == 'verify-email') {
+        screen = VerifyEmailLinkScreen(token: token, tenantId: tenant);
+      }
+      if (screen != null && mounted) {
+        setState(() => _initialScreen = screen);
+      }
+      return;
     }
-    if (screen != null && mounted) {
-      setState(() => _initialScreen = screen);
+    // Fleet notification deep links (alerts / income-log / maintenance).
+    if (mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        NotificationNav.handleUri(uri);
+      });
     }
   }
 

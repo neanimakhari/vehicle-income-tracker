@@ -23,6 +23,7 @@ import {
 } from './tracking-analytics.formulas';
 import { TrackingGateway } from './tracking.gateway';
 import { TrackingEventsService } from './tracking-events.service';
+import { TenantNotificationsService } from '../tenant-notifications/tenant-notifications.service';
 
 export type GeofenceRow = {
   id: string;
@@ -54,6 +55,7 @@ export class GeofenceService {
     private readonly audit: AuditService,
     private readonly gateway: TrackingGateway,
     private readonly trackingEvents: TrackingEventsService,
+    private readonly notifications: TenantNotificationsService,
   ) {}
 
   private schema() {
@@ -1492,6 +1494,36 @@ export class GeofenceService {
           });
         } catch {
           /* ignore email failures */
+        }
+      }
+      // Push / in-app inbox → tenant admins only (product choice).
+      const wantInbox =
+        Array.isArray(channels) &&
+        (channels.includes('push') ||
+          channels.includes('in_app') ||
+          channels.length === 0);
+      if (wantInbox) {
+        try {
+          const slug = this.slug();
+          if (slug && (await this.commercial.hasModule(slug, 'notifications'))) {
+            await this.notifications.publish({
+              title: rule.name ? `Geofence: ${rule.name}` : 'Geofence alert',
+              message,
+              targetRole: 'TENANT_ADMIN',
+              source: 'tracking',
+              deepLink: 'vitapp://alerts',
+              meta: {
+                dedupeKey: `tracking:${rule.id}:${opts.vehicleId}:${opts.trigger}:${opts.geofenceId}`,
+                ruleId: rule.id,
+                vehicleId: opts.vehicleId,
+                geofenceId: opts.geofenceId,
+                trigger: opts.trigger,
+              },
+              push: Array.isArray(channels) && channels.includes('push'),
+            });
+          }
+        } catch {
+          /* ignore inbox failures */
         }
       }
     }

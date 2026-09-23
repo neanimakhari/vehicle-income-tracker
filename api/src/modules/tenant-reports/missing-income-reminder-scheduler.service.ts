@@ -8,6 +8,8 @@ import { TenantReportsService } from './tenant-reports.service';
 import { EmailService } from '../email/email.service';
 import { BrandService } from '../tenants/brand.service';
 import { letterheadFromPolicy } from '../tenants/brand.util';
+import { TenantNotificationsService } from '../tenant-notifications/tenant-notifications.service';
+import { CommercialService } from '../commercial/commercial.service';
 
 /** Sentinel user_id for admin digest rows in missing_income_reminder_logs. */
 const ADMIN_DIGEST_USER_ID = '00000000-0000-0000-0000-000000000001';
@@ -24,6 +26,8 @@ export class MissingIncomeReminderSchedulerService {
     private readonly tenantReportsService: TenantReportsService,
     private readonly emailService: EmailService,
     private readonly brandService: BrandService,
+    private readonly notifications: TenantNotificationsService,
+    private readonly commercial: CommercialService,
   ) {}
 
   /** Every 15 minutes: cutoff reminders + next-morning escalations per tenant TZ. */
@@ -114,6 +118,13 @@ export class MissingIncomeReminderSchedulerService {
         `,
       );
 
+    const canPush = await this.commercial.hasModule(tenant.slug, 'notifications');
+    const title =
+      reminderType === 'escalation'
+        ? 'Missing income — follow up'
+        : 'Missing income reminder';
+    const message = `${missing.missingCount} vehicle(s) still need income for ${reminderDate}.`;
+
     for (const driver of drivers) {
       const claimed = await this.claimLog(
         tenant.slug,
@@ -137,6 +148,30 @@ export class MissingIncomeReminderSchedulerService {
             err instanceof Error ? err.message : String(err)
           }`,
         );
+      }
+      if (canPush) {
+        try {
+          await this.notifications.publish({
+            title,
+            message,
+            targetRole: 'TENANT_USER',
+            targetUserId: driver.id,
+            source: 'missing_income',
+            deepLink: 'vitapp://income-log',
+            meta: {
+              dedupeKey: `missing_income:${reminderType}:${reminderDate}:${driver.id}`,
+              reminderDate,
+              reminderType,
+            },
+            push: true,
+          });
+        } catch (err) {
+          this.logger.warn(
+            `Driver push failed ${tenant.slug}/${driver.id}: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+        }
       }
     }
 
@@ -164,6 +199,29 @@ export class MissingIncomeReminderSchedulerService {
         } catch (err) {
           this.logger.warn(
             `Admin digest failed ${tenant.slug}: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+        }
+      }
+      if (canPush) {
+        try {
+          await this.notifications.publish({
+            title,
+            message: `Fleet digest: ${message}`,
+            targetRole: 'TENANT_ADMIN',
+            source: 'missing_income',
+            deepLink: 'vitapp://alerts',
+            meta: {
+              dedupeKey: `missing_income:${reminderType}:${reminderDate}:admins`,
+              reminderDate,
+              reminderType,
+            },
+            push: true,
+          });
+        } catch (err) {
+          this.logger.warn(
+            `Admin push failed ${tenant.slug}: ${
               err instanceof Error ? err.message : String(err)
             }`,
           );

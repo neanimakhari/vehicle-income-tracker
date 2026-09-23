@@ -48,6 +48,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   num _thisWeekIncome = 0;
   int _pendingMaintenanceCount = 0;
   int _documentsExpiringCount = 0;
+  int _unreadNotifications = 0;
 
   @override
   void initState() {
@@ -58,6 +59,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadRecentActivities();
     _loadDriverProfile();
     _loadMaintenanceCount();
+    _loadUnreadNotifications();
     _headerBgTimer = Timer.periodic(const Duration(seconds: 25), (_) {
       if (mounted) setState(() => _headerBgIndex = (_headerBgIndex + 1) % _headerBgAssets.length);
     });
@@ -197,6 +199,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     } catch (_) {
       if (mounted) setState(() => _pendingMaintenanceCount = 0);
+    }
+  }
+
+  Future<void> _loadUnreadNotifications() async {
+    try {
+      final count = await _api.fetchNotificationsUnreadCount();
+      if (mounted) setState(() => _unreadNotifications = count);
+    } catch (_) {
+      if (mounted) setState(() => _unreadNotifications = 0);
     }
   }
 
@@ -370,16 +381,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     actions: [
                       IconButton(
-                        icon: CircleAvatar(
-                          radius: 16,
-                          backgroundColor: Colors.white.withOpacity(0.2),
-                          child: const Icon(Icons.notifications_outlined, color: Colors.white, size: 20),
+                        icon: Badge(
+                          isLabelVisible: _unreadNotifications > 0,
+                          label: Text(
+                            _unreadNotifications > 9
+                                ? '9+'
+                                : '$_unreadNotifications',
+                            style: const TextStyle(fontSize: 10),
+                          ),
+                          child: CircleAvatar(
+                            radius: 16,
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            child: const Icon(Icons.notifications_outlined,
+                                color: Colors.white, size: 20),
+                          ),
                         ),
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const AlertsScreen()),
-                          );
+                            MaterialPageRoute(
+                                builder: (_) => const AlertsScreen()),
+                          ).then((_) => _loadUnreadNotifications());
                         },
                       ),
                       const SizedBox(width: 8),

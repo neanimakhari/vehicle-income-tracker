@@ -24,6 +24,7 @@ import {
 } from './geofence.controller';
 import { TrackingEventsService } from './tracking-events.service';
 import { TrackingOfflineScheduler } from './tracking-offline.scheduler';
+import { TenantNotificationsModule } from '../tenant-notifications/tenant-notifications.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { TrackingOfflineScheduler } from './tracking-offline.scheduler';
     CommercialModule,
     EmailModule,
     TenantsModule,
+    TenantNotificationsModule,
     TypeOrmModule.forFeature([GpsTrackingPoint, TrackerDevice]),
     ConfigModule,
     JwtModule.registerAsync({

@@ -38,6 +38,24 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="vitapp" android:host="verify-email"/>
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="vitapp" android:host="alerts"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="vitapp" android:host="income-log"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="vitapp" android:host="maintenance"/>
+            </intent-filter>
         </activity>
         <meta-data
             android:name="flutterEmbedding"

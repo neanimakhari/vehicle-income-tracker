@@ -56,7 +56,14 @@ class _MenuColors {
 }
 
 class AppSidebar extends StatelessWidget {
-  const AppSidebar({super.key, required this.onSelect, this.driverDisplayName, this.emailVerified, this.showExpiryBadge = false});
+  const AppSidebar({
+    super.key,
+    required this.onSelect,
+    this.driverDisplayName,
+    this.emailVerified,
+    this.showExpiryBadge = false,
+    this.unreadAlerts = 0,
+  });
 
   final void Function(int index) onSelect;
   /// Display name for the logged-in user (from driver profile or Session.email).
@@ -65,6 +72,8 @@ class AppSidebar extends StatelessWidget {
   final bool? emailVerified;
   /// True when driver has expiring docs and should see a notification badge until they submit and get approval.
   final bool showExpiryBadge;
+  /// Unread fleet notification messages (API inbox).
+  final int unreadAlerts;
 
   @override
   Widget build(BuildContext context) {
@@ -183,7 +192,7 @@ class AppSidebar extends StatelessWidget {
             _ListTile(
               icon: Icons.notifications_active_outlined,
               label: 'Alerts',
-              showBadge: showExpiryBadge,
+              showBadge: showExpiryBadge || unreadAlerts > 0,
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertsScreen()));

@@ -10,6 +10,7 @@ import { MissingIncomeReminderSchedulerService } from './missing-income-reminder
 import { TenantsModule } from '../tenants/tenants.module';
 import { CommercialModule } from '../commercial/commercial.module';
 import { TenantIncomesModule } from '../tenant-incomes/tenant-incomes.module';
+import { TenantNotificationsModule } from '../tenant-notifications/tenant-notifications.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { TenantIncomesModule } from '../tenant-incomes/tenant-incomes.module';
     forwardRef(() => TenantsModule),
     CommercialModule,
     forwardRef(() => TenantIncomesModule),
+    TenantNotificationsModule,
   ],
   controllers: [TenantReportsController],
   providers: [

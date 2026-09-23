@@ -477,11 +477,29 @@ export class TenantSchemasService {
         "target_role" varchar NULL,
         "target_user_id" uuid NULL,
         "status" varchar NOT NULL DEFAULT 'sent',
+        "source" varchar NOT NULL DEFAULT 'manual',
+        "deep_link" varchar NULL,
+        "meta" jsonb NOT NULL DEFAULT '{}',
         "created_by" uuid NULL,
         "created_at" timestamptz NOT NULL DEFAULT now(),
         "updated_at" timestamptz NOT NULL DEFAULT now(),
         CONSTRAINT "fk_notifications_category_id" FOREIGN KEY ("category_id")
           REFERENCES "${schemaName}"."notification_categories"("id") ON DELETE SET NULL
+      )`,
+    );
+    await this.dataSource.query(
+      `ALTER TABLE "${schemaName}"."notifications"
+         ADD COLUMN IF NOT EXISTS "source" varchar NOT NULL DEFAULT 'manual',
+         ADD COLUMN IF NOT EXISTS "deep_link" varchar NULL,
+         ADD COLUMN IF NOT EXISTS "meta" jsonb NOT NULL DEFAULT '{}'`,
+    );
+    await this.dataSource.query(
+      `CREATE TABLE IF NOT EXISTS "${schemaName}"."notification_reads" (
+        "notification_id" uuid NOT NULL
+          REFERENCES "${schemaName}"."notifications"("id") ON DELETE CASCADE,
+        "user_id" uuid NOT NULL,
+        "read_at" timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY ("notification_id", "user_id")
       )`,
     );
     await this.dataSource.query(

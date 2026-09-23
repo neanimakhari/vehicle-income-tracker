@@ -1,36 +1,57 @@
 # OneSignal push notifications (tenant-admin)
 
 **Branch:** `feature/onesignal-notifications`  
-**Status:** Live on production API; FCM service account configured in OneSignal; mobile **1.0.11+12**.  
-**Sender:** Tenant Admin → `POST /tenant/notifications/send` → Nest → OneSignal REST.
+**Status:** Live — inbox (mark-read + badge), deep links, auto-alerts (missing income / tracking admins / maintenance both). Mobile **1.0.12+13**.
+
+**Sender:** Tenant Admin → `POST /tenant/notifications/send` → Nest → OneSignal REST.  
+**Auto:** missing-income cron, geofence fires (tenant admins), maintenance daily cron (drivers + admins).
 
 ---
 
 ## Goal
 
-Let a tenant admin compose a notification in Admin Console and push it to drivers (and optionally other tenant admins) on the Flutter app via OneSignal.
+Let a tenant admin compose a notification in Admin Console and push it to drivers (and optionally other tenant admins) on the Flutter app via OneSignal. System events use the same centre.
 
 ---
 
 ## Architecture
 
 ```
-Tenant Admin UI (/notifications)
-        │  JWT + X-Tenant-Id
+Tenant Admin UI (/notifications)  OR  auto producers (cron / geofence)
+        │  JWT + X-Tenant-Id  (or internal publish)
         ▼
-Nest  POST /v1/tenant/notifications/send   [@RequiresModule('notifications')]
-        │  1. Persist row in tenant_*."notifications"
-        │  2. Resolve recipient user UUIDs by targetRole
+Nest  TenantNotificationsService.publish(...)
+        │  1. Persist row (+ source, deep_link, meta)
+        │  2. Resolve recipient user UUIDs
         │  3. OneSignalClient.createNotification(...)
         ▼
-OneSignal REST  POST https://api.onesignal.com/notifications
-        │  include_aliases.external_id = [user UUIDs]
+OneSignal REST  include_aliases.external_id = [user UUIDs]
         ▼
-Flutter app (OneSignal SDK + OneSignal.login(userId))
+Flutter: Alerts inbox + badge; tap push → vitapp:// deep link
 ```
 
-**Identity model:** `external_id` = auth/driver user UUID (same id already in JWT `sub`).  
-Optional fallback: `device_bindings.push_token` as OneSignal subscription / player IDs.
+**Identity model:** `external_id` = auth/driver user UUID (JWT `sub`).
+
+---
+
+## Inbox APIs
+
+| Method | Path | Notes |
+|--------|------|--------|
+| GET | `/tenant/notifications` | Includes `read`, `source`, `deepLink` |
+| GET | `/tenant/notifications/unread-count` | Badge |
+| POST | `/tenant/notifications/:id/read` | Mark one |
+| POST | `/tenant/notifications/read-all` | Clear noise |
+
+---
+
+## Auto-alert targets
+
+| Source | Recipients |
+|--------|------------|
+| Missing income | Each driver + admin digest |
+| Geofence / tracking | **Tenant admins only** |
+| Maintenance overdue/due_soon | **Drivers (recent vehicle) + admins** |
 
 ---
 
@@ -38,70 +59,20 @@ Optional fallback: `device_bindings.push_token` as OneSignal subscription / play
 
 | Env var | Where | Purpose | Status |
 |---------|--------|---------|--------|
-| `ONESIGNAL_APP_ID` | `deploy/.env` + Flutter `--dart-define` | App id | Have: `8c514c8b-305c-45b2-ba6f-4ef92fa77ed0` |
-| `ONESIGNAL_REST_API_KEY` | `deploy/.env` only (secret) | Server REST key | Have (stored outside git — not pasted here) |
+| `ONESIGNAL_APP_ID` | `deploy/.env` + Flutter | App id | Live |
+| `ONESIGNAL_REST_API_KEY` | `deploy/.env` only | Server REST key | Live |
 | `ONESIGNAL_ENABLED` | `deploy/.env` | `true` to send | `true` in prod |
-
-OneSignal dashboard: **Settings → Keys & IDs** for App ID + REST key.
-
----
-
-## Firebase Android (required for device push)
-
-OneSignal delivers Android via FCM. Do this in **Firebase Console**, not OneSignal first:
-
-1. [console.firebase.google.com](https://console.firebase.google.com) → create/open project  
-2. **Add app → Android**  
-3. **Android package name (must match VIT APK):** `co.za.vehinc.vit`  
-4. Register (nickname optional; SHA-1 optional for now)  
-5. OneSignal → **Settings → Push & In-App → Google Android (FCM)** → choose **Flutter** SDK → upload Firebase **service account JSON**
-
-Do **not** add `google-services.json` / Google Services Gradle plugin for OneSignal — the Flutter SDK registers FCM itself.
-
-### Flutter SDK (integrated on this branch)
-
-- Package: `onesignal_flutter` **5.5.2** (Stable from onesignal releases.json)
-- App ID hardcoded for init: `8c514c8b-305c-45b2-ba6f-4ef92fa77ed0`
-- Wrapper: `app/lib/services/onesignal_push.dart` (`OneSignalService`)
-- Init in `main()`; verification dialog via `OneSignalVerificationHost`; `login(userId)` after driver login
-- Platforms: **Android** native + shared Dart. iOS NSE deferred (Runner bundle still `com.example.app`)
-
----
-
-## Recipient rules
-
-| `targetRole` | Recipients |
-|--------------|------------|
-| `TENANT_USER` | Active drivers in tenant schema `users` |
-| `TENANT_ADMIN` | Active `platform.auth_users` with `role=TENANT_ADMIN` for this tenant |
-| `null` / empty | Both |
 
 ---
 
 ## Phases
 
-1. **Done on this branch** — API module, OneSignal client (no-op until enabled), env placeholders, plan doc, tenant-admin send feedback, Flutter prep stubs.
-2. **When credentials arrive** — set env, enable flag, rebuild api only; add `onesignal_flutter` + `OneSignal.login(userId)` on driver login; smoke-send from tenant-admin.
-3. **Next** — mark-read inbox, deep links from push, wire tracking/missing-income into the centre, iOS APNs.
-
-In-app: driver **Alerts** lists recent tenant notifications (push is separate).
+1. **Done** — API module, OneSignal client, Flutter SDK, manual send, Alerts list.
+2. **Done** — Mark-read inbox + badge; deep links; auto-alerts as above.
+3. **Later** — iOS APNs; richer admin “who read” analytics.
 
 ---
 
 ## Commercial gate
 
-Module key `notifications` (Pro). UI already shows `ModuleLocked` without entitlement.
-
----
-
-## Local / prod smoke (after credentials)
-
-```bash
-# API must have ONESIGNAL_* set and ONESIGNAL_ENABLED=true
-curl -sS -X POST "$API/v1/tenant/notifications/send" \
-  -H "Authorization: Bearer $TOKEN" -H "X-Tenant-Id: $SLUG" \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Test","message":"Hello from VIT","targetRole":"TENANT_USER"}'
-```
-
-Expect `status: sent` (or `sent_no_devices` if no OneSignal logins yet) and a `push` object in the JSON body.
+Module key `notifications` (Pro).

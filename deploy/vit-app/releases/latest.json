@@ -1,10 +1,10 @@
 {
   "platform": "android",
   "channel": "prod",
-  "versionName": "1.0.11",
-  "versionCode": 12,
+  "versionName": "1.0.12",
+  "versionCode": 13,
   "minSupportedVersionCode": 1,
-  "sha256": "af99e2274d5746710111735c4e3b20c2877add74551c58076ca1339750e8e781",
-  "releaseNotes": "Remove OneSignal setup dialog; show admin notifications in Alerts.",
-  "publishedAt": "2026-09-23T09:52:04.000Z"
+  "sha256": "ec5d8c0d8fe7f364a29e5352899d1484e6aa1456863c34ce5ed7b36ce6fbbc18",
+  "releaseNotes": "Inbox mark-read + badge; push deep links; auto-alerts (missing income, tracking admins, maintenance).",
+  "publishedAt": "2026-09-23T11:14:11.000Z"
 }

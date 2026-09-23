@@ -26,6 +26,10 @@ export type NotificationDto = {
   targetRole: string | null;
   targetUserId: string | null;
   status: string;
+  source: string;
+  deepLink: string | null;
+  meta: Record<string, unknown>;
+  read: boolean;
   createdBy: string | null;
   createdAt: string;
 };
@@ -36,6 +40,10 @@ export type SendNotificationInput = {
   categoryId?: string | null;
   targetRole?: string | null;
   targetUserId?: string | null;
+  source?: string;
+  deepLink?: string | null;
+  meta?: Record<string, unknown>;
+  push?: boolean;
 };
 
 export type SendNotificationResult = {
@@ -111,16 +119,36 @@ export class TenantNotificationsService {
     const role = opts?.actorRole ?? null;
     const userId = opts?.actorUserId ?? null;
 
-    // Drivers only see notifications aimed at them (or all drivers / everyone).
     if (role === 'TENANT_USER' && userId) {
       const rows = await this.dataSource.query(
-        `SELECT id, category_id, title, message, target_role, target_user_id,
-                status, created_by, created_at
-         FROM "${schema}"."notifications"
-         WHERE (target_user_id IS NULL OR target_user_id = $1)
-           AND (target_role IS NULL OR target_role = 'TENANT_USER')
-           AND status <> 'pending'
-         ORDER BY created_at DESC
+        `SELECT n.id, n.category_id, n.title, n.message, n.target_role, n.target_user_id,
+                n.status, n.source, n.deep_link, n.meta, n.created_by, n.created_at,
+                (r.read_at IS NOT NULL) AS is_read
+         FROM "${schema}"."notifications" n
+         LEFT JOIN "${schema}"."notification_reads" r
+           ON r.notification_id = n.id AND r.user_id = $1
+         WHERE (n.target_user_id IS NULL OR n.target_user_id = $1)
+           AND (n.target_role IS NULL OR n.target_role = 'TENANT_USER')
+           AND n.status <> 'pending'
+         ORDER BY n.created_at DESC
+         LIMIT $2`,
+        [userId, limit],
+      );
+      return rows.map((r: Record<string, unknown>) => this.mapNotification(r));
+    }
+
+    if (role === 'TENANT_ADMIN' && userId) {
+      const rows = await this.dataSource.query(
+        `SELECT n.id, n.category_id, n.title, n.message, n.target_role, n.target_user_id,
+                n.status, n.source, n.deep_link, n.meta, n.created_by, n.created_at,
+                (r.read_at IS NOT NULL) AS is_read
+         FROM "${schema}"."notifications" n
+         LEFT JOIN "${schema}"."notification_reads" r
+           ON r.notification_id = n.id AND r.user_id = $1
+         WHERE (n.target_user_id IS NULL OR n.target_user_id = $1)
+           AND (n.target_role IS NULL OR n.target_role = 'TENANT_ADMIN')
+           AND n.status <> 'pending'
+         ORDER BY n.created_at DESC
          LIMIT $2`,
         [userId, limit],
       );
@@ -129,7 +157,8 @@ export class TenantNotificationsService {
 
     const rows = await this.dataSource.query(
       `SELECT id, category_id, title, message, target_role, target_user_id,
-              status, created_by, created_at
+              status, source, deep_link, meta, created_by, created_at,
+              false AS is_read
        FROM "${schema}"."notifications"
        ORDER BY created_at DESC
        LIMIT $1`,
@@ -138,10 +167,74 @@ export class TenantNotificationsService {
     return rows.map((r: Record<string, unknown>) => this.mapNotification(r));
   }
 
-  async send(
+  async unreadCount(actorUserId: string, actorRole: string): Promise<number> {
+    const schema = this.tenantScope.getTenantSchema();
+    const roleFilter =
+      actorRole === 'TENANT_ADMIN'
+        ? `(target_role IS NULL OR target_role = 'TENANT_ADMIN')`
+        : `(target_role IS NULL OR target_role = 'TENANT_USER')`;
+    const rows = await this.dataSource.query(
+      `SELECT COUNT(*)::int AS c
+       FROM "${schema}"."notifications" n
+       WHERE (n.target_user_id IS NULL OR n.target_user_id = $1)
+         AND ${roleFilter}
+         AND n.status <> 'pending'
+         AND NOT EXISTS (
+           SELECT 1 FROM "${schema}"."notification_reads" r
+           WHERE r.notification_id = n.id AND r.user_id = $1
+         )`,
+      [actorUserId],
+    );
+    return Number(rows[0]?.c ?? 0);
+  }
+
+  async markRead(notificationId: string, actorUserId: string): Promise<{ ok: true }> {
+    const schema = this.tenantScope.getTenantSchema();
+    const exists = await this.dataSource.query(
+      `SELECT 1 FROM "${schema}"."notifications" WHERE id = $1 LIMIT 1`,
+      [notificationId],
+    );
+    if (!exists.length) throw new NotFoundException('Notification not found');
+    await this.dataSource.query(
+      `INSERT INTO "${schema}"."notification_reads" (notification_id, user_id)
+       VALUES ($1, $2)
+       ON CONFLICT (notification_id, user_id) DO NOTHING`,
+      [notificationId, actorUserId],
+    );
+    return { ok: true };
+  }
+
+  async markAllRead(actorUserId: string, actorRole: string): Promise<{ ok: true; count: number }> {
+    const schema = this.tenantScope.getTenantSchema();
+    const roleFilter =
+      actorRole === 'TENANT_ADMIN'
+        ? `(target_role IS NULL OR target_role = 'TENANT_ADMIN')`
+        : `(target_role IS NULL OR target_role = 'TENANT_USER')`;
+    const result = await this.dataSource.query(
+      `INSERT INTO "${schema}"."notification_reads" (notification_id, user_id)
+       SELECT n.id, $1
+       FROM "${schema}"."notifications" n
+       WHERE (n.target_user_id IS NULL OR n.target_user_id = $1)
+         AND ${roleFilter}
+         AND n.status <> 'pending'
+         AND NOT EXISTS (
+           SELECT 1 FROM "${schema}"."notification_reads" r
+           WHERE r.notification_id = n.id AND r.user_id = $1
+         )`,
+      [actorUserId],
+    );
+    const count = Array.isArray(result) ? result.length : Number(result?.rowCount ?? 0);
+    return { ok: true, count };
+  }
+
+  /**
+   * Unified publish path for admin compose + auto-alerts.
+   * Skips insert when meta.dedupeKey already exists in the last 24h.
+   */
+  async publish(
     input: SendNotificationInput,
-    actorUserId: string | null,
-  ): Promise<SendNotificationResult> {
+    actorUserId: string | null = null,
+  ): Promise<SendNotificationResult | null> {
     const title = input.title?.trim();
     const message = input.message?.trim();
     if (!title || !message) {
@@ -151,18 +244,39 @@ export class TenantNotificationsService {
     const targetRole = this.normalizeRole(input.targetRole);
     const categoryId = input.categoryId?.trim() || null;
     const targetUserId = input.targetUserId?.trim() || null;
+    const source = (input.source ?? 'manual').trim() || 'manual';
+    const deepLink = input.deepLink?.trim() || null;
+    const meta = input.meta ?? {};
+    const wantPush = input.push !== false;
 
     if (categoryId) {
       await this.assertCategoryExists(categoryId);
     }
 
     const schema = this.tenantScope.getTenantSchema();
+    const dedupeKey =
+      typeof meta.dedupeKey === 'string' ? meta.dedupeKey : null;
+    if (dedupeKey) {
+      const dup = await this.dataSource.query(
+        `SELECT id FROM "${schema}"."notifications"
+         WHERE meta->>'dedupeKey' = $1
+           AND created_at > now() - interval '24 hours'
+         LIMIT 1`,
+        [dedupeKey],
+      );
+      if (dup.length) {
+        this.logger.debug(`Skip duplicate notification dedupeKey=${dedupeKey}`);
+        return null;
+      }
+    }
+
     const inserted = await this.dataSource.query(
       `INSERT INTO "${schema}"."notifications"
-         (category_id, title, message, target_role, target_user_id, status, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (category_id, title, message, target_role, target_user_id, status,
+          source, deep_link, meta, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)
        RETURNING id, category_id, title, message, target_role, target_user_id,
-                 status, created_by, created_at`,
+                 status, source, deep_link, meta, created_by, created_at`,
       [
         categoryId,
         title,
@@ -170,55 +284,92 @@ export class TenantNotificationsService {
         targetRole,
         targetUserId,
         'pending',
+        source,
+        deepLink,
+        JSON.stringify(meta),
         actorUserId,
       ],
     );
     const row = inserted[0] as Record<string, unknown>;
     const notificationId = String(row.id);
+    const resolvedDeepLink =
+      deepLink ?? `vitapp://alerts?id=${encodeURIComponent(notificationId)}`;
 
-    const { externalIds, subscriptionIds } = await this.resolveRecipients(
-      targetRole,
-      targetUserId,
-    );
+    let push: SendNotificationResult['push'] = {
+      configured: this.oneSignal.isConfigured(),
+      enabled: this.oneSignal.isEnabled(),
+      skipped: true,
+      reason: 'push disabled for this publish',
+      recipientCount: 0,
+    };
 
-    const push = await this.oneSignal.send({
-      title,
-      message,
-      externalIds,
-      subscriptionIds,
-      data: {
-        notificationId,
-        tenantId: this.tenantContext.getTenantId() ?? '',
-        targetRole: targetRole ?? '',
-      },
-    });
-
-    const status = this.statusFromPush(push);
-    await this.dataSource.query(
-      `UPDATE "${schema}"."notifications"
-       SET status = $2, updated_at = now()
-       WHERE id = $1`,
-      [notificationId, status],
-    );
-
-    if (push.errors?.length) {
-      this.logger.warn(
-        `Notification ${notificationId} push issues: ${push.errors.join('; ')}`,
+    if (wantPush) {
+      const { externalIds, subscriptionIds } = await this.resolveRecipients(
+        targetRole,
+        targetUserId,
       );
+      const result = await this.oneSignal.send({
+        title,
+        message,
+        externalIds,
+        subscriptionIds,
+        data: {
+          notificationId,
+          tenantId: this.tenantContext.getTenantId() ?? '',
+          targetRole: targetRole ?? '',
+          source,
+          deepLink: resolvedDeepLink,
+        },
+      });
+      push = {
+        configured: result.configured,
+        enabled: result.enabled,
+        skipped: result.skipped,
+        reason: result.reason,
+        recipientCount: result.recipientCount,
+        onesignalId: result.onesignalId,
+        errors: result.errors,
+      };
+      if (result.errors?.length) {
+        this.logger.warn(
+          `Notification ${notificationId} push issues: ${result.errors.join('; ')}`,
+        );
+      }
     }
 
+    const status = wantPush ? this.statusFromPush(push) : 'recorded';
+    await this.dataSource.query(
+      `UPDATE "${schema}"."notifications"
+       SET status = $2,
+           deep_link = COALESCE(deep_link, $3),
+           updated_at = now()
+       WHERE id = $1`,
+      [notificationId, status, resolvedDeepLink],
+    );
+
     return {
-      notification: this.mapNotification({ ...row, status }),
-      push: {
-        configured: push.configured,
-        enabled: push.enabled,
-        skipped: push.skipped,
-        reason: push.reason,
-        recipientCount: push.recipientCount,
-        onesignalId: push.onesignalId,
-        errors: push.errors,
-      },
+      notification: this.mapNotification({
+        ...row,
+        status,
+        deep_link: row.deep_link ?? resolvedDeepLink,
+        is_read: false,
+      }),
+      push,
     };
+  }
+
+  async send(
+    input: SendNotificationInput,
+    actorUserId: string | null,
+  ): Promise<SendNotificationResult> {
+    const result = await this.publish(
+      { ...input, source: input.source ?? 'manual', push: true },
+      actorUserId,
+    );
+    if (!result) {
+      throw new BadRequestException('Duplicate notification suppressed');
+    }
+    return result;
   }
 
   private statusFromPush(push: {
@@ -231,10 +382,9 @@ export class TenantNotificationsService {
     errors?: string[];
   }): string {
     if (!push.configured || !push.enabled) {
-      return 'recorded'; // saved in DB; push not attempted (credentials pending)
+      return 'recorded';
     }
     if (push.skipped && push.recipientCount === 0) return 'sent_no_devices';
-    // OneSignal often returns this when external_ids resolve but no device opted in yet.
     if (this.isUnsubscribedOnly(push.errors)) return 'sent_no_devices';
     if (push.errors?.length && !push.onesignalId) return 'push_failed';
     if (push.errors?.length && push.onesignalId) return 'push_partial';
@@ -244,7 +394,9 @@ export class TenantNotificationsService {
   private isUnsubscribedOnly(errors?: string[]): boolean {
     if (!errors?.length) return false;
     return errors.every((e) =>
-      /not subscribed|no subscribed|no.*players.*subscribed/i.test(e),
+      /not subscribed|no subscribed|no.*players.*subscribed|have not opened the app/i.test(
+        e,
+      ),
     );
   }
 
@@ -347,6 +499,18 @@ export class TenantNotificationsService {
       r.created_at instanceof Date
         ? r.created_at.toISOString()
         : String(r.created_at ?? new Date().toISOString());
+    let meta: Record<string, unknown> = {};
+    if (r.meta != null) {
+      if (typeof r.meta === 'string') {
+        try {
+          meta = JSON.parse(r.meta) as Record<string, unknown>;
+        } catch {
+          meta = {};
+        }
+      } else if (typeof r.meta === 'object') {
+        meta = r.meta as Record<string, unknown>;
+      }
+    }
     return {
       id: String(r.id),
       title: String(r.title),
@@ -355,6 +519,10 @@ export class TenantNotificationsService {
       targetRole: r.target_role != null ? String(r.target_role) : null,
       targetUserId: r.target_user_id != null ? String(r.target_user_id) : null,
       status: String(r.status ?? 'sent'),
+      source: String(r.source ?? 'manual'),
+      deepLink: r.deep_link != null ? String(r.deep_link) : null,
+      meta,
+      read: r.is_read === true || r.is_read === 't' || r.is_read === 1,
       createdBy: r.created_by != null ? String(r.created_by) : null,
       createdAt,
     };
