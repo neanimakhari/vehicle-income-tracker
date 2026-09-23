@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../theme.dart';
 import '../utils/app_toast.dart';
 import '../widgets/sidebar.dart';
+import 'income_log_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key, this.onBack, this.openDrawer});
@@ -403,12 +404,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'Try another filter or log income from the dashboard.',
+                                  'Try another filter or log your first income.',
                                   style: TextStyle(
                                     color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                                     fontSize: 14,
                                   ),
                                   textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 20),
+                                FilledButton.icon(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const IncomeLogScreen(),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Log income'),
                                 ),
                               ],
                             ),

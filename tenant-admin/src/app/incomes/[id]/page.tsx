@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAuth } from "@/lib/auth";
 import { fetchJson } from "@/lib/api";
-import { IncomeViewClient } from "./IncomeViewClient";
+import { IncomeViewClient, type IncomeHistoryEvent } from "./IncomeViewClient";
 
 type Income = {
   id: string;
@@ -17,12 +17,16 @@ type Income = {
   expenseImage?: string | null;
   petrolSlip?: string | null;
   loggedOn: string;
+  approvalStatus?: string | null;
 };
 
 export default async function IncomeViewPage({ params }: { params: Promise<{ id: string }> }) {
   await requireAuth();
   const { id } = await params;
-  const income = await fetchJson<Income>(`/tenant/incomes/${id}`);
+  const [income, history] = await Promise.all([
+    fetchJson<Income>(`/tenant/incomes/${id}`),
+    fetchJson<IncomeHistoryEvent[]>(`/tenant/incomes/${id}/history`).catch(() => []),
+  ]);
   if (!income) {
     return (
       <div className="max-w-2xl mx-auto py-8">
@@ -47,15 +51,14 @@ export default async function IncomeViewPage({ params }: { params: Promise<{ id:
     expenseImage: income.expenseImage ?? undefined,
     petrolSlip: income.petrolSlip ?? undefined,
     loggedOn: income.loggedOn,
+    approvalStatus: income.approvalStatus ?? undefined,
   };
   return (
     <div className="max-w-2xl mx-auto py-8">
       <Link href="/incomes" className="inline-flex items-center gap-1 text-sm text-zinc-600 dark:text-zinc-400 hover:text-teal-600 dark:hover:text-teal-400 mb-6">
         ← Back to Incomes
       </Link>
-      <IncomeViewClient income={normalized} />
+      <IncomeViewClient income={normalized} history={Array.isArray(history) ? history : []} />
     </div>
   );
 }
-
-

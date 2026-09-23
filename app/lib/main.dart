@@ -20,11 +20,13 @@ import 'screens/change_password_screen.dart';
 import 'theme.dart';
 import 'widgets/app_update_prompt.dart';
 import 'services/brand_theme_controller.dart';
+import 'services/theme_mode_controller.dart';
 import 'services/onesignal_push.dart';
 import 'services/notification_nav.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await ThemeModeController.instance.load();
   await OneSignalService.instance.initialize(appId: kOneSignalAppId);
   OneSignalService.instance.setNotificationClickListener((event) {
     final raw = event.notification.additionalData;
@@ -57,7 +59,10 @@ class VITApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: BrandThemeController.instance,
+      listenable: Listenable.merge([
+        BrandThemeController.instance,
+        ThemeModeController.instance,
+      ]),
       builder: (context, _) {
         final brand = BrandThemeController.instance;
         return MaterialApp(
@@ -68,6 +73,7 @@ class VITApp extends StatelessWidget {
             AppTheme.dark(primaryColor: brand.primaryDarkColor ?? brand.primaryColor),
             brand,
           ),
+          themeMode: ThemeModeController.instance.mode,
           home: const InitialRoute(),
         );
       },

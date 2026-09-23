@@ -72,7 +72,7 @@ Flutter: Alerts inbox + badge; tap push → vitapp:// deep link
 1. **Done** — API module, OneSignal client, Flutter SDK, manual send, Alerts list.
 2. **Done** — Mark-read inbox + badge; deep links; auto-alerts as above.
 3. **Done** — Admin “who read” delivery/read stats on tenant-admin Notifications.
-4. **Later** — iOS APNs; geofence channel UI toggles.
+4. **Later** — iOS APNs only (geofence alerts stay admin-only; drivers must not see fence enter/exit).
 
 ---
 

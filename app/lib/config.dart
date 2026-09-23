@@ -11,10 +11,18 @@ class AppConfig {
   static String get apiBaseUrl =>
       _rawBaseUrl.endsWith('/v1') ? _rawBaseUrl : '$_rawBaseUrl/v1';
 
+  /// Origin without /v1 — for Socket.IO namespaces.
+  static String get apiOrigin {
+    final base = _rawBaseUrl.endsWith('/v1')
+        ? _rawBaseUrl.substring(0, _rawBaseUrl.length - 3)
+        : _rawBaseUrl;
+    return base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+  }
+
   /// App version shown in sidebar. Keep in sync with pubspec.yaml version.
   static const appVersion = String.fromEnvironment(
     'APP_VERSION',
-    defaultValue: '1.0.0',
+    defaultValue: '1.0.8',
   );
 }
 

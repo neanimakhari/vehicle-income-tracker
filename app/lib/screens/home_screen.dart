@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/brand_theme_controller.dart';
 import '../services/session.dart';
+import '../services/tenant_events_service.dart';
 import '../theme.dart';
 import '../widgets/platform_announcement_banner.dart';
 import '../widgets/sidebar.dart';
@@ -34,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     Session.onCleared = _handleSessionCleared;
     _driverDisplayName = Session.email;
+    _ensureBrandAndEvents();
     _loadDriverDisplayName();
     _loadExpiryStatus();
     _loadAnnouncement();
@@ -44,6 +47,15 @@ class _HomeScreenState extends State<HomeScreen> {
       HistoryScreen(onBack: _handleBackToHome, openDrawer: () => _scaffoldKey.currentState?.openDrawer()),
       ProfileScreen(onBack: _handleBackToHome, openDrawer: () => _scaffoldKey.currentState?.openDrawer()),
     ];
+  }
+
+  /// Login can push HomeScreen without HomeGate — hydrate brand + live refresh here too.
+  Future<void> _ensureBrandAndEvents() async {
+    if (Session.accessToken == null) return;
+    await BrandThemeController.instance.hydrateFromAuthenticatedPolicy(
+      () => ApiService().fetchTenantPolicy(),
+    );
+    TenantEventsService.instance.start();
   }
 
   @override
@@ -120,7 +132,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final barColor = isDarkMode ? AppTheme.darkSurface : Theme.of(context).colorScheme.primary;
+    final primary = Theme.of(context).colorScheme.primary;
+    final branded = BrandThemeController.instance.isCustom;
+    final barColor = isDarkMode
+        ? (branded ? Color.lerp(AppTheme.darkSurface, primary, 0.35)! : AppTheme.darkSurface)
+        : primary;
     final borderColor = isDarkMode ? AppTheme.darkBorder : Colors.transparent;
     final showBanner =
         !_announcementDismissed && _announcement != null;

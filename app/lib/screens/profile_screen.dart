@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import '../services/session.dart';
 import '../services/api_service.dart';
+import '../services/brand_theme_controller.dart';
 import '../services/offline_queue.dart';
 import '../services/security_settings.dart';
+import '../services/tenant_events_service.dart';
 import '../theme.dart';
 import '../utils/app_toast.dart';
 import '../widgets/sidebar.dart';
@@ -53,16 +55,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _lockTimeoutMinutes = SecuritySettings.lockTimeoutMinutes;
 
   Future<void> _logout(BuildContext context) async {
+    final pending = await OfflineQueue.pendingCount();
+    final message = pending > 0
+        ? 'Are you sure you want to logout? $pending unsynced income(s) will be discarded.'
+        : 'Are you sure you want to logout? You will need to login again to access the app.';
     final confirmed = await ConfirmationDialog.show(
       context: context,
       title: 'Logout',
-      message: 'Are you sure you want to logout? You will need to login again to access the app.',
+      message: message,
       confirmText: 'Logout',
       cancelText: 'Cancel',
       isDestructive: true,
     );
 
     if (confirmed == true) {
+      TenantEventsService.instance.stop();
       await Session.clearForLogout();
       await OfflineQueue.clearQueue();
       if (!context.mounted) return;
@@ -132,6 +139,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final api = ApiService();
       final policy = await api.fetchTenantPolicy();
       if (!mounted) return;
+      BrandThemeController.instance.applyFromPolicy(policy);
       setState(() => _tenantPolicy = policy);
       final name = policy['tenantName'] as String?;
       if (name != null && name.isNotEmpty) {

@@ -35,6 +35,20 @@ export type MissingVehicleRow = {
   registrationNumber: string;
 };
 
+export type IncomeEventDto = {
+  id: string;
+  incomeId: string;
+  action: string;
+  reason: string | null;
+  actorUserId: string | null;
+  actorRole: string | null;
+  actorName: string | null;
+  actorEmail: string | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  createdAt: string;
+};
+
 @Injectable()
 export class TenantIncomesService {
   constructor(
@@ -45,6 +59,118 @@ export class TenantIncomesService {
     private readonly webhooksService: WebhooksService,
     private readonly tenantsService: TenantsService,
   ) {}
+
+  private snapshotIncome(income: TenantIncome): Record<string, unknown> {
+    return {
+      vehicle: income.vehicle,
+      driverName: income.driverName,
+      driverId: income.driverId,
+      income: income.income != null ? Number(income.income) : null,
+      startingKm: income.startingKm,
+      endKm: income.endKm,
+      petrolPoured: income.petrolPoured != null ? Number(income.petrolPoured) : null,
+      petrolLitres: income.petrolLitres != null ? Number(income.petrolLitres) : null,
+      expenseDetail: income.expenseDetail,
+      expensePrice: income.expensePrice != null ? Number(income.expensePrice) : null,
+      approvalStatus: income.approvalStatus,
+      approvedAt: income.approvedAt?.toISOString?.() ?? income.approvedAt ?? null,
+      approvedBy: income.approvedBy,
+      incomeStream: income.incomeStream,
+      loggedOn: income.loggedOn?.toISOString?.() ?? income.loggedOn ?? null,
+    };
+  }
+
+  private async recordIncomeEvent(input: {
+    incomeId: string;
+    action: string;
+    actorUserId?: string | null;
+    actorRole?: string | null;
+    reason?: string | null;
+    before?: Record<string, unknown> | null;
+    after?: Record<string, unknown> | null;
+  }): Promise<void> {
+    const schema = this.tenantScope.getTenantSchema();
+    await this.dataSource.query(
+      `INSERT INTO "${schema}"."income_events"
+         (income_id, actor_user_id, actor_role, action, reason, before, after)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb)`,
+      [
+        input.incomeId,
+        input.actorUserId ?? null,
+        input.actorRole ?? null,
+        input.action,
+        input.reason ?? null,
+        input.before != null ? JSON.stringify(input.before) : null,
+        input.after != null ? JSON.stringify(input.after) : null,
+      ],
+    );
+  }
+
+  async getHistory(incomeId: string): Promise<IncomeEventDto[]> {
+    const schema = this.tenantScope.getTenantSchema();
+    const exists = await this.dataSource.query(
+      `SELECT 1 FROM "${schema}"."vehicle_incomes" WHERE id = $1 LIMIT 1`,
+      [incomeId],
+    );
+    if (!exists.length) throw new NotFoundException('Income not found');
+
+    const rows = await this.dataSource.query(
+      `SELECT e.id, e.income_id, e.actor_user_id, e.actor_role, e.action, e.reason,
+              e.before, e.after, e.created_at,
+              u.first_name AS driver_first, u.last_name AS driver_last, u.email AS driver_email,
+              a.email AS admin_email
+       FROM "${schema}"."income_events" e
+       LEFT JOIN "${schema}"."users" u ON u.id = e.actor_user_id
+       LEFT JOIN "platform"."auth_users" a ON a.id = e.actor_user_id
+       WHERE e.income_id = $1
+       ORDER BY e.created_at ASC`,
+      [incomeId],
+    );
+
+    return (rows as Record<string, unknown>[]).map((r) => {
+      const driverName =
+        r.driver_first != null
+          ? `${String(r.driver_first)} ${String(r.driver_last ?? '')}`.trim()
+          : null;
+      const actorEmail =
+        r.driver_email != null
+          ? String(r.driver_email)
+          : r.admin_email != null
+            ? String(r.admin_email)
+            : null;
+      let before: Record<string, unknown> | null = null;
+      let after: Record<string, unknown> | null = null;
+      if (r.before != null) {
+        before =
+          typeof r.before === 'string'
+            ? (JSON.parse(r.before) as Record<string, unknown>)
+            : (r.before as Record<string, unknown>);
+      }
+      if (r.after != null) {
+        after =
+          typeof r.after === 'string'
+            ? (JSON.parse(r.after) as Record<string, unknown>)
+            : (r.after as Record<string, unknown>);
+      }
+      const createdAt =
+        r.created_at instanceof Date
+          ? r.created_at.toISOString()
+          : String(r.created_at);
+      return {
+        id: String(r.id),
+        incomeId: String(r.income_id),
+        action: String(r.action),
+        reason: r.reason != null ? String(r.reason) : null,
+        actorUserId: r.actor_user_id != null ? String(r.actor_user_id) : null,
+        actorRole: r.actor_role != null ? String(r.actor_role) : null,
+        actorName: driverName || actorEmail,
+        actorEmail,
+        before,
+        after,
+        createdAt,
+      };
+    });
+  }
 
   /**
    * Active vehicles with no income row for the given local day (tenant timezone).
@@ -327,10 +453,17 @@ export class TenantIncomesService {
         scholarPaymentId: payload.scholarPaymentId ?? null,
       });
       const saved = await repo.save(entity);
+      await this.recordIncomeEvent({
+        incomeId: saved.id,
+        action: 'create',
+        actorUserId: actor?.sub ?? null,
+        actorRole: actor?.role ?? null,
+        after: this.snapshotIncome(saved),
+      });
       await this.auditService.log({
         action: 'tenant.income.create',
-        actorUserId: null,
-        actorRole: 'TENANT_ADMIN',
+        actorUserId: actor?.sub ?? null,
+        actorRole: actor?.role ?? 'TENANT_ADMIN',
         targetType: 'tenant_income',
         targetId: saved.id,
         metadata: {
@@ -375,6 +508,8 @@ export class TenantIncomesService {
         throw new NotFoundException('Income not found');
       }
 
+      const before = this.snapshotIncome(existing);
+
       // If driverId is provided, update driverName from user
       if (payload.driverId) {
         const user = await userRepo.withSchema(userRepository =>
@@ -405,6 +540,14 @@ export class TenantIncomesService {
         existing.scholarPaymentId = payload.scholarPaymentId ?? null;
 
       const saved = await repo.save(existing);
+      await this.recordIncomeEvent({
+        incomeId: saved.id,
+        action: 'update',
+        actorUserId: actor?.sub ?? null,
+        actorRole: actor?.role ?? 'TENANT_ADMIN',
+        before,
+        after: this.snapshotIncome(saved),
+      });
       await this.auditService.log({
         action: 'tenant.income.update',
         actorUserId: actor?.sub ?? null,
@@ -421,7 +564,7 @@ export class TenantIncomesService {
     });
   }
 
-  async remove(id: string) {
+  async remove(id: string, actor?: { sub?: string; role?: string }) {
     const tenantRepo = new TenantAwareRepository(
       this.dataSource,
       this.tenantScope,
@@ -432,11 +575,19 @@ export class TenantIncomesService {
       if (!existing) {
         throw new NotFoundException('Income not found');
       }
+      const before = this.snapshotIncome(existing);
+      await this.recordIncomeEvent({
+        incomeId: existing.id,
+        action: 'delete',
+        actorUserId: actor?.sub ?? null,
+        actorRole: actor?.role ?? 'TENANT_ADMIN',
+        before,
+      });
       await repo.remove(existing);
       await this.auditService.log({
         action: 'tenant.income.delete',
-        actorUserId: null,
-        actorRole: 'TENANT_ADMIN',
+        actorUserId: actor?.sub ?? null,
+        actorRole: actor?.role ?? 'TENANT_ADMIN',
         targetType: 'tenant_income',
         targetId: id,
         metadata: {
@@ -449,7 +600,11 @@ export class TenantIncomesService {
     });
   }
 
-  async approve(id: string, actor?: { sub?: string }): Promise<TenantIncome> {
+  async approve(
+    id: string,
+    actor?: { sub?: string },
+    reason?: string | null,
+  ): Promise<TenantIncome> {
     const tenantRepo = new TenantAwareRepository(
       this.dataSource,
       this.tenantScope,
@@ -461,23 +616,45 @@ export class TenantIncomesService {
       if (income.approvalStatus !== 'pending') {
         throw new BadRequestException('Only pending incomes can be approved.');
       }
+      const before = this.snapshotIncome(income);
       income.approvalStatus = 'approved';
       income.approvedAt = new Date();
       income.approvedBy = actor?.sub ?? null;
       const saved = await repo.save(income);
+      await this.recordIncomeEvent({
+        incomeId: saved.id,
+        action: 'approve',
+        actorUserId: actor?.sub ?? null,
+        actorRole: 'TENANT_ADMIN',
+        reason: reason?.trim() || null,
+        before,
+        after: this.snapshotIncome(saved),
+      });
       await this.auditService.log({
         action: 'tenant.income.approve',
         actorUserId: actor?.sub ?? null,
         actorRole: 'TENANT_ADMIN',
         targetType: 'tenant_income',
         targetId: id,
-        metadata: { tenant: this.tenantContext.getTenantId(), vehicle: saved.vehicle },
+        metadata: {
+          tenant: this.tenantContext.getTenantId(),
+          vehicle: saved.vehicle,
+          reason: reason?.trim() || null,
+        },
       });
       return saved;
     });
   }
 
-  async reject(id: string, actor?: { sub?: string }): Promise<TenantIncome> {
+  async reject(
+    id: string,
+    actor?: { sub?: string },
+    reason?: string | null,
+  ): Promise<TenantIncome> {
+    const trimmed = reason?.trim() || '';
+    if (!trimmed) {
+      throw new BadRequestException('A reject reason is required.');
+    }
     const tenantRepo = new TenantAwareRepository(
       this.dataSource,
       this.tenantScope,
@@ -489,17 +666,31 @@ export class TenantIncomesService {
       if (income.approvalStatus !== 'pending') {
         throw new BadRequestException('Only pending incomes can be rejected.');
       }
+      const before = this.snapshotIncome(income);
       income.approvalStatus = 'rejected';
       income.approvedAt = new Date();
       income.approvedBy = actor?.sub ?? null;
       const saved = await repo.save(income);
+      await this.recordIncomeEvent({
+        incomeId: saved.id,
+        action: 'reject',
+        actorUserId: actor?.sub ?? null,
+        actorRole: 'TENANT_ADMIN',
+        reason: trimmed,
+        before,
+        after: this.snapshotIncome(saved),
+      });
       await this.auditService.log({
         action: 'tenant.income.reject',
         actorUserId: actor?.sub ?? null,
         actorRole: 'TENANT_ADMIN',
         targetType: 'tenant_income',
         targetId: id,
-        metadata: { tenant: this.tenantContext.getTenantId(), vehicle: saved.vehicle },
+        metadata: {
+          tenant: this.tenantContext.getTenantId(),
+          vehicle: saved.vehicle,
+          reason: trimmed,
+        },
       });
       return saved;
     });

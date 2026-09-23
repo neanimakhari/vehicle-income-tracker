@@ -6,7 +6,7 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { TenantContextGuard } from '../../tenancy/guards/tenant-context.guard';
 import { TenantAccessGuard } from '../../tenancy/guards/tenant-access.guard';
-import { IsDateString, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsDateString, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiTags } from '@nestjs/swagger';
 
@@ -80,6 +80,18 @@ class CreateTenantIncomeDto {
   loggedOn: string;
 }
 
+class RejectIncomeDto {
+  @IsString()
+  @MinLength(1)
+  reason: string;
+}
+
+class ApproveIncomeDto {
+  @IsOptional()
+  @IsString()
+  reason?: string | null;
+}
+
 @Controller('tenant/incomes')
 @ApiTags('tenant-incomes')
 export class TenantIncomesController {
@@ -115,6 +127,13 @@ export class TenantIncomesController {
   @Roles('TENANT_ADMIN', 'TENANT_USER')
   findMissingVehicles(@Query('date') date?: string) {
     return this.tenantIncomesService.findMissingVehicles(date);
+  }
+
+  @Get(':id/history')
+  @UseGuards(JwtAuthGuard, RolesGuard, TenantContextGuard, TenantAccessGuard)
+  @Roles('TENANT_ADMIN', 'TENANT_USER')
+  history(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.tenantIncomesService.getHistory(id);
   }
 
   @Get(':id')
@@ -153,9 +172,10 @@ export class TenantIncomesController {
   @Roles('TENANT_ADMIN')
   approve(
     @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: ApproveIncomeDto,
     @Req() req: { user?: { sub?: string } },
   ): Promise<TenantIncome> {
-    return this.tenantIncomesService.approve(id, req.user);
+    return this.tenantIncomesService.approve(id, req.user, dto?.reason ?? null);
   }
 
   @Patch(':id/reject')
@@ -163,16 +183,20 @@ export class TenantIncomesController {
   @Roles('TENANT_ADMIN')
   reject(
     @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: RejectIncomeDto,
     @Req() req: { user?: { sub?: string } },
   ): Promise<TenantIncome> {
-    return this.tenantIncomesService.reject(id, req.user);
+    return this.tenantIncomesService.reject(id, req.user, dto.reason);
   }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard, TenantContextGuard, TenantAccessGuard)
   @Roles('TENANT_ADMIN')
-  remove(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.tenantIncomesService.remove(id);
+  remove(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Req() req: { user?: { sub?: string; role?: string } },
+  ) {
+    return this.tenantIncomesService.remove(id, req.user);
   }
 
   @Post('seed')
@@ -188,4 +212,3 @@ export class TenantIncomesController {
     });
   }
 }
-

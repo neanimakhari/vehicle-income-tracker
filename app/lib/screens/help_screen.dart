@@ -110,7 +110,7 @@ class HelpScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isDarkMode ? AppTheme.darkSurface : Colors.teal[50],
+                color: isDarkMode ? AppTheme.darkSurface : Theme.of(context).colorScheme.primary.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(AppTheme.radius),
                 border: Border.all(
                   color: isDarkMode

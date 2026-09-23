@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
+import '../services/brand_theme_controller.dart';
 import '../services/session.dart';
 import '../services/offline_queue.dart';
 import '../theme.dart';
@@ -15,6 +16,9 @@ import 'vehicle_insights_screen.dart';
 import 'maintenance_screen.dart';
 import 'driver_profile_screen.dart';
 import 'transport_screen.dart';
+import 'offline_queue_screen.dart';
+import '../services/onboarding_checklist.dart';
+import '../services/security_settings.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, this.openDrawer});
@@ -125,6 +129,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final policy = await _api.fetchTenantPolicy();
       if (!mounted || Session.userId != currentUserId) return;
+      BrandThemeController.instance.applyFromPolicy(policy);
       setState(() => _tenantPolicy = policy);
       final name = policy['tenantName'] as String?;
       if (name != null && name.isNotEmpty) {
@@ -414,7 +419,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           if (_pendingQueue > 0)
-                            Container(
+                            InkWell(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const OfflineQueueScreen(),
+                                  ),
+                                ).then((_) => _loadPendingQueue());
+                              },
+                              child: Container(
                               width: double.infinity,
                               margin: const EdgeInsets.only(bottom: 16),
                               padding: const EdgeInsets.all(12),
@@ -450,6 +464,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ],
                               ),
                             ),
+                            ),
+                          _buildOnboardingCard(isDarkMode),
+                          _buildDashboard(isDarkMode),
+                          const SizedBox(height: 24),
                           if (_tenantPolicy?['requireMfaUsers'] == true &&
                               Session.mfaEnabled != true)
                             Container(
@@ -489,8 +507,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           _buildQuickActions(context, isDarkMode),
                           const SizedBox(height: 24),
                           _buildSummaryWidgets(isDarkMode),
-                          const SizedBox(height: 24),
-                          _buildDashboard(isDarkMode),
                           const SizedBox(height: 24),
                           _buildRecentActivity(isDarkMode),
                           const SizedBox(height: 80),
@@ -817,6 +833,103 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildOnboardingCard(bool isDarkMode) {
+    if (OnboardingChecklist.skipped) return const SizedBox.shrink();
+    final profileDone = _driverProfile != null &&
+        ((_driverProfile?['firstName'] ?? '').toString().isNotEmpty);
+    final biometricsDone = SecuritySettings.biometricsEnabled;
+    final incomeDone =
+        OnboardingChecklist.firstIncomeLogged || _recentIncomes.isNotEmpty;
+    if (profileDone && biometricsDone && incomeDone) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDarkMode ? AppTheme.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(AppTheme.radius),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Getting started',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: isDarkMode ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () async {
+                  await OnboardingChecklist.skip();
+                  if (mounted) setState(() {});
+                },
+                child: const Text('Skip'),
+              ),
+            ],
+          ),
+          if (!profileDone)
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.person_outline),
+              title: const Text('Complete your profile'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const DriverProfileScreen()),
+                ).then((_) => _loadDriverProfile());
+              },
+            ),
+          if (!biometricsDone)
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.fingerprint),
+              title: const Text('Enable biometrics'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                );
+              },
+            ),
+          if (!incomeDone)
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.attach_money),
+              title: const Text('Log your first income'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const IncomeLogScreen()),
+                ).then((_) async {
+                  await OnboardingChecklist.markFirstIncome();
+                  if (mounted) {
+                    await _loadRecentActivities();
+                    setState(() {});
+                  }
+                });
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDashboard(bool isDarkMode) {
     final totalIncome = _summary?['totalIncome'] ?? 0;
     final totalExpenses = _summary?['totalExpenses'] ?? 0;
@@ -827,17 +940,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final actual = me?['actual'];
     final variance = me?['variance'];
     final percentHit = me?['percentHit'];
-    final varianceNum = variance is num
-        ? variance
-        : (num.tryParse('$variance') ?? 0);
-    final varianceLabel = variance == null
-        ? ''
-        : (varianceNum >= 0
-            ? ' · +R $variance'
-            : ' · short R ${(-varianceNum).toString()}');
+    final dailyTargetNum = target is num ? target : num.tryParse('$target');
+    final now = DateTime.now();
+    final weekDaysElapsed = now.weekday;
+    final weekTarget = dailyTargetNum != null ? dailyTargetNum * weekDaysElapsed : null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _buildTargetHero(
+          isDarkMode: isDarkMode,
+          target: target,
+          actual: actual,
+          variance: variance,
+          percentHit: percentHit,
+        ),
+        const SizedBox(height: 12),
+        _buildWeekStrip(
+          isDarkMode: isDarkMode,
+          weekActual: _thisWeekIncome,
+          weekTarget: weekTarget,
+        ),
+        const SizedBox(height: 20),
         Text(
           'Dashboard',
           style: TextStyle(
@@ -847,16 +971,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        if (target != null) ...[
-          _buildDashboardCard(
-            'Today vs target',
-            'R ${actual ?? 0} / R $target'
-                '${percentHit != null ? ' (${percentHit}%)' : ''}'
-                '$varianceLabel',
-            Icons.flag,
-            (variance is num && variance < 0) ? AppTheme.danger : AppTheme.success,
-            isDarkMode,
-          ),
+        if (_summary == null && _recentIncomes.isEmpty) ...[
+          _buildEmptyDashboard(isDarkMode),
           const SizedBox(height: 16),
         ],
         Row(
@@ -891,6 +1007,174 @@ class _DashboardScreenState extends State<DashboardScreen> {
           isDarkMode,
         ),
       ],
+    );
+  }
+
+  Widget _buildEmptyDashboard(bool isDarkMode) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDarkMode ? AppTheme.darkSurface : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(AppTheme.radius),
+      ),
+      child: Column(
+        children: [
+          Text(
+            'No activity yet',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: isDarkMode ? Colors.white : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Log your first income to see totals here.',
+            style: TextStyle(
+              color: isDarkMode ? Colors.white70 : Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const IncomeLogScreen()),
+              );
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('Log income'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTargetHero({
+    required bool isDarkMode,
+    required dynamic target,
+    required dynamic actual,
+    required dynamic variance,
+    required dynamic percentHit,
+  }) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final varianceNum = variance is num ? variance : (num.tryParse('$variance') ?? 0);
+    final pct = percentHit is num
+        ? percentHit.toDouble()
+        : double.tryParse('$percentHit') ?? 0.0;
+    final progress = (pct / 100).clamp(0.0, 1.5);
+    final hasTarget = target != null;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDarkMode ? AppTheme.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(AppTheme.radius),
+        border: Border.all(color: primary.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            hasTarget ? 'Today vs target' : 'Today',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isDarkMode ? Colors.white70 : Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            hasTarget ? 'R ${actual ?? 0} / R $target' : 'No target set for today',
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? Colors.white : Colors.black87,
+            ),
+          ),
+          if (hasTarget) ...[
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: progress > 1 ? 1 : progress,
+                minHeight: 10,
+                backgroundColor: primary.withOpacity(0.15),
+                color: varianceNum < 0 ? AppTheme.danger : AppTheme.success,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              varianceNum >= 0
+                  ? '+R $varianceNum surplus · ${pct.toStringAsFixed(0)}%'
+                  : 'Short R ${(-varianceNum)} · ${pct.toStringAsFixed(0)}%',
+              style: TextStyle(
+                color: varianceNum < 0 ? AppTheme.danger : AppTheme.success,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const IncomeLogScreen()),
+                );
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Log income'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeekStrip({
+    required bool isDarkMode,
+    required num weekActual,
+    required num? weekTarget,
+  }) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final label = weekTarget != null ? 'R $weekActual / R $weekTarget' : 'R $weekActual';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: primary.withOpacity(isDarkMode ? 0.18 : 0.08),
+        borderRadius: BorderRadius.circular(AppTheme.radius),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.date_range, color: primary, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'This week',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDarkMode ? Colors.white70 : Colors.black54,
+                  ),
+                ),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: isDarkMode ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

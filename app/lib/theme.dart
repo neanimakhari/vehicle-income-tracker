@@ -69,19 +69,28 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
+          backgroundColor: seed,
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(pillRadius)),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           elevation: 0,
         ),
       ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: seed,
+        foregroundColor: Colors.white,
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(color: seed),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
+          foregroundColor: seed,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(pillRadius)),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
+          foregroundColor: seed,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
         ),
       ),
@@ -171,19 +180,28 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
+          backgroundColor: seed,
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(pillRadius)),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           elevation: 0,
         ),
       ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: seed,
+        foregroundColor: Colors.white,
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(color: seed),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
+          foregroundColor: seed,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(pillRadius)),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
+          foregroundColor: seed,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
         ),
       ),
