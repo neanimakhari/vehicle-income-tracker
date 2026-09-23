@@ -133,6 +133,51 @@ export class CommercialService {
     };
   }
 
+  /** Lightweight plan badges for the tenants table. */
+  async listTenantEntitlementSummaries(): Promise<
+    Array<{
+      tenantId: string;
+      planId: string | null;
+      planCode: string | null;
+      planName: string | null;
+      moduleCount: number;
+      legacyUnrestricted: boolean;
+    }>
+  > {
+    const tenants = await this.tenantsService.findAll();
+    const plans = await this.listPlans(true);
+    const planById = new Map(plans.map((p) => [p.id, p]));
+    const rows = await this.entitlementsRepo.find();
+    const rowBySlug = new Map(rows.map((r) => [r.tenantId, r]));
+    const allModuleCount = (await this.modulesRepo.count({ where: { isActive: true } }));
+
+    return Promise.all(
+      tenants.map(async (t) => {
+        const row = rowBySlug.get(t.slug);
+        if (!row) {
+          return {
+            tenantId: t.slug,
+            planId: null,
+            planCode: null,
+            planName: null,
+            moduleCount: allModuleCount,
+            legacyUnrestricted: true,
+          };
+        }
+        const plan = row.planId ? planById.get(row.planId) : null;
+        const entitlements = await this.resolveEntitlements(t.slug);
+        return {
+          tenantId: t.slug,
+          planId: row.planId,
+          planCode: plan?.code ?? null,
+          planName: plan?.name ?? null,
+          moduleCount: entitlements.length,
+          legacyUnrestricted: false,
+        };
+      }),
+    );
+  }
+
   /**
    * No entitlement row => all active modules (legacy tenants).
    * With plan => plan modules, then apply overrides true/false.

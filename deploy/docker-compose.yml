@@ -25,6 +25,8 @@ services:
       # Private APK store (auth-gated downloads; not served by nginx)
       - /var/www/vit-app-private:/var/www/vit-app-private:ro
       - /var/www/vit-app-private-staging:/var/www/vit-app-private-staging:ro
+      # Optional: enable Docker container stats on /platform/ops/host
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     secrets:
       - postgres_password
       - jwt_secret
@@ -68,7 +70,7 @@ services:
       args:
         API_URL: http://api:3000
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
-        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-1.2.5}
+        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-1.2.8}
     container_name: vit_system_admin
     restart: unless-stopped
     environment:
@@ -86,7 +88,7 @@ services:
       args:
         API_URL: http://api:3000
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
-        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-1.2.5}
+        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-1.2.8}
     container_name: vit_tenant_admin
     restart: unless-stopped
     environment:

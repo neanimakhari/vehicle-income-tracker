@@ -104,24 +104,41 @@ export function PlansClient({
 
       <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
         <div className="card p-3 space-y-1">
-          {plans.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setSelectedId(p.id)}
-              className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
-                p.id === selectedId
-                  ? "bg-teal-600 text-white"
-                  : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
-              }`}
-            >
-              <div className="font-medium">{p.name}</div>
-              <div className="text-xs opacity-80">
-                {p.code} · {p.tenantCount ?? 0} tenants
-                {!p.isActive ? " · inactive" : ""}
-              </div>
-            </button>
-          ))}
+          {plans.length === 0 ? (
+            <div className="space-y-3 px-2 py-4 text-sm">
+              <p className="font-medium text-zinc-800 dark:text-zinc-100">No plans yet</p>
+              <p className="text-zinc-500 dark:text-zinc-400">
+                Create a starter plan (e.g. Basic / Pro) then assign modules. New tenants can pick a plan
+                at create time.
+              </p>
+              <button
+                type="button"
+                className="btn-primary w-full"
+                onClick={() => setShowCreate(true)}
+              >
+                Create first plan
+              </button>
+            </div>
+          ) : (
+            plans.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setSelectedId(p.id)}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
+                  p.id === selectedId
+                    ? "bg-teal-600 text-white"
+                    : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                }`}
+              >
+                <div className="font-medium">{p.name}</div>
+                <div className="text-xs opacity-80">
+                  {p.code} · {p.tenantCount ?? 0} tenants
+                  {!p.isActive ? " · inactive" : ""}
+                </div>
+              </button>
+            ))
+          )}
         </div>
 
         {selected ? (
@@ -179,7 +196,16 @@ export function PlansClient({
             </div>
           </div>
         ) : (
-          <p className="text-sm text-zinc-500">No plans yet.</p>
+          <div className="card space-y-3 p-6 text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="font-medium text-zinc-800 dark:text-zinc-100">Get started with plans</p>
+            <p>
+              Plans define which modules a tenant can use. Create at least one active plan, set it as
+              the platform default under Defaults, then create or assign tenants.
+            </p>
+            <button type="button" className="btn-primary" onClick={() => setShowCreate(true)}>
+              Create first plan
+            </button>
+          </div>
         )}
       </div>
 

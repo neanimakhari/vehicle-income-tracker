@@ -28,10 +28,14 @@ import { Type } from 'class-transformer';
 import { PlatformSettingsService } from '../modules/platform-settings/platform-settings.service';
 import { CommercialService } from '../modules/commercial/commercial.service';
 import { TenantAdminService } from '../tenant-admin/tenant-admin.service';
+import { PlatformOpsService } from './platform-ops.service';
+import { OpsAlertStore } from './ops-alert-store';
 
 const FAILED_LOGIN_SPIKE_THRESHOLD = 5;
 const FAILED_LOGIN_WINDOW_MS = 24 * 60 * 60 * 1000;
 const TENANT_LIMIT_THRESHOLD = 0.9;
+const HOST_MEM_ALERT_PCT = 85;
+const HOST_DISK_ALERT_PCT = 85;
 
 export type PlatformDefaultPolicyHints = {
   recommendMfa: boolean;
@@ -47,7 +51,14 @@ export type PlatformDefaultsDto = {
 };
 
 export type AlertItem = {
-  type: 'new_tenant' | 'tenant_updated' | 'failed_login_spike' | 'tenant_near_limit';
+  type:
+    | 'new_tenant'
+    | 'tenant_updated'
+    | 'failed_login_spike'
+    | 'tenant_near_limit'
+    | 'ops_5xx'
+    | 'host_memory'
+    | 'host_disk';
   at: string;
   message: string;
   metadata?: Record<string, unknown>;
@@ -84,6 +95,10 @@ class CreateFromTemplateDto {
   @IsString() @IsOptional() adminLastName?: string;
 }
 
+class MailTestDto {
+  @IsEmail() to: string;
+}
+
 @Controller('platform')
 @ApiTags('platform-system')
 export class PlatformSystemController {
@@ -93,6 +108,7 @@ export class PlatformSystemController {
     private readonly settings: PlatformSettingsService,
     private readonly commercial: CommercialService,
     private readonly tenantAdmins: TenantAdminService,
+    private readonly ops: PlatformOpsService,
   ) {}
 
   @Get('defaults')
@@ -267,6 +283,27 @@ export class PlatformSystemController {
     };
   }
 
+  @Get('ops/host')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PLATFORM_ADMIN', 'SYS')
+  getHostMetrics() {
+    return this.ops.getHostMetrics();
+  }
+
+  @Get('ops/mail')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PLATFORM_ADMIN', 'SYS')
+  getMailStatus() {
+    return this.ops.getMailStatus();
+  }
+
+  @Post('ops/mail-test')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PLATFORM_ADMIN')
+  sendMailTest(@Body() dto: MailTestDto) {
+    return this.ops.sendMailTest(dto.to);
+  }
+
   @Get('alerts')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('PLATFORM_ADMIN', 'SYS')
@@ -331,6 +368,37 @@ export class PlatformSystemController {
       }
     } catch {
       // ignore usage errors
+    }
+
+    for (const ops of OpsAlertStore.list(25)) {
+      alerts.push({
+        type: 'ops_5xx',
+        at: ops.at,
+        message: ops.message,
+        metadata: ops.metadata,
+      });
+    }
+
+    try {
+      const host = await this.ops.getHostMetrics();
+      if (host.memory.hostUsedPercent >= HOST_MEM_ALERT_PCT) {
+        alerts.push({
+          type: 'host_memory',
+          at: host.collectedAt,
+          message: `Host memory at ${host.memory.hostUsedPercent}% (${host.memory.hostFreeMb} MB free of ${host.memory.hostTotalMb} MB)`,
+          metadata: { ...host.memory },
+        });
+      }
+      if (host.disk.root && host.disk.root.usedPercent >= HOST_DISK_ALERT_PCT) {
+        alerts.push({
+          type: 'host_disk',
+          at: host.collectedAt,
+          message: `Root disk at ${host.disk.root.usedPercent}% (${host.disk.root.freeMb} MB free of ${host.disk.root.totalMb} MB)`,
+          metadata: { ...host.disk.root },
+        });
+      }
+    } catch {
+      // ignore host probe errors in alerts
     }
 
     alerts.sort((a, b) => b.at.localeCompare(a.at));

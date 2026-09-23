@@ -1,8 +1,10 @@
 import { brandListKits } from "@/app/tenants/brand-actions";
 import { BrandKitsClient } from "./BrandKitsClient";
 import { fetchJson } from "@/lib/api";
+import { requirePlatformAdmin } from "@/lib/auth";
 
 export default async function BrandKitsPage() {
+  await requirePlatformAdmin();
   const [kitsRes, tenants] = await Promise.all([
     brandListKits(),
     fetchJson<Array<{ id: string; name: string; slug: string }>>("/tenants").catch(

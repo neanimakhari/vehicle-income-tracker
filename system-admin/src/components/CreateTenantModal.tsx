@@ -12,9 +12,17 @@ type CreateTenantModalProps = {
   createTenant: (
     formData: FormData,
   ) => Promise<{ success: boolean; error?: string; slug?: string }>;
+  plans?: Array<{ code: string; name: string; isActive?: boolean }>;
+  defaultPlanCode?: string | null;
 };
 
-export function CreateTenantModal({ isOpen, onClose, createTenant }: CreateTenantModalProps) {
+export function CreateTenantModal({
+  isOpen,
+  onClose,
+  createTenant,
+  plans = [],
+  defaultPlanCode = null,
+}: CreateTenantModalProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [slugPreview, setSlugPreview] = useState("");
@@ -168,6 +176,32 @@ export function CreateTenantModal({ isOpen, onClose, createTenant }: CreateTenan
                     Links appear here once you enter a slug.
                   </p>
                 )}
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Plan
+                </label>
+                <select
+                  name="planCode"
+                  defaultValue={defaultPlanCode ?? ""}
+                  className="input w-full px-3 py-2 text-sm"
+                >
+                  <option value="">
+                    {defaultPlanCode
+                      ? `Platform default (${defaultPlanCode})`
+                      : "Platform default (none)"}
+                  </option>
+                  {plans
+                    .filter((p) => p.isActive !== false)
+                    .map((p) => (
+                      <option key={p.code} value={p.code}>
+                        {p.name} ({p.code})
+                      </option>
+                    ))}
+                </select>
+                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  Overrides the platform default plan for this tenant only.
+                </p>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">

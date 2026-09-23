@@ -1,5 +1,5 @@
 import { revalidatePath } from "next/cache";
-import { requireAuth } from "@/lib/auth";
+import { requirePlatformAdmin } from "@/lib/auth";
 import { fetchJson, getApiUrl, getAuthHeaders } from "@/lib/api";
 import { PlansClient } from "./PlansClient";
 
@@ -17,7 +17,7 @@ type Plan = {
 };
 
 export default async function PlansPage() {
-  await requireAuth();
+  await requirePlatformAdmin();
   const [plans, modules] = await Promise.all([
     fetchJson<Plan[]>("/platform/commercial/plans?all=1"),
     fetchJson<Module[]>("/platform/commercial/modules"),

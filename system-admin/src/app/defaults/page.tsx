@@ -1,5 +1,5 @@
 import { revalidatePath } from "next/cache";
-import { requireAuth } from "@/lib/auth";
+import { requirePlatformAdmin } from "@/lib/auth";
 import { fetchJson, getApiUrl, getAuthHeaders } from "@/lib/api";
 import { DefaultsClient } from "./DefaultsClient";
 
@@ -17,7 +17,7 @@ type Defaults = {
 type Plan = { code: string; name: string; isActive?: boolean };
 
 export default async function DefaultsPage() {
-  await requireAuth();
+  await requirePlatformAdmin();
   const [data, plans] = await Promise.all([
     fetchJson<Defaults>("/platform/defaults"),
     fetchJson<Plan[]>("/platform/commercial/plans?all=1"),

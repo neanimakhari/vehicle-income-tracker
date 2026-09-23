@@ -8,12 +8,14 @@ import { PlatformBootstrapService } from './platform-bootstrap.service';
 import { PlatformSystemController } from './platform-system.controller';
 import { SysAccountsController } from './sys-accounts.controller';
 import { SysAccountsService } from './sys-accounts.service';
+import { PlatformOpsService } from './platform-ops.service';
 import { ConfigModule } from '@nestjs/config';
 import { AuditModule } from '../modules/audit/audit.module';
 import { TenantsModule } from '../modules/tenants/tenants.module';
 import { PlatformSettingsModule } from '../modules/platform-settings/platform-settings.module';
 import { CommercialModule } from '../modules/commercial/commercial.module';
 import { TenantAdminModule } from '../tenant-admin/tenant-admin.module';
+import { EmailModule } from '../modules/email/email.module';
 
 @Module({
   imports: [
@@ -24,6 +26,7 @@ import { TenantAdminModule } from '../tenant-admin/tenant-admin.module';
     PlatformSettingsModule,
     CommercialModule,
     TenantAdminModule,
+    EmailModule,
   ],
   controllers: [
     PlatformAdminController,
@@ -31,6 +34,11 @@ import { TenantAdminModule } from '../tenant-admin/tenant-admin.module';
     PlatformSystemController,
     SysAccountsController,
   ],
-  providers: [PlatformAdminService, PlatformBootstrapService, SysAccountsService],
+  providers: [
+    PlatformAdminService,
+    PlatformBootstrapService,
+    SysAccountsService,
+    PlatformOpsService,
+  ],
 })
 export class PlatformAdminModule {}
