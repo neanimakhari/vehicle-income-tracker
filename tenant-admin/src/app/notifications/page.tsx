@@ -8,6 +8,8 @@ import {
   RecentNotificationsTable,
   type SentNotificationRow,
 } from "./RecentNotificationsTable";
+import { NotificationsInbox } from "./NotificationsInbox";
+import Link from "next/link";
 
 async function fetchCategories() {
   const categories = await fetchJson<Array<{ id: string; name: string; description: string | null }>>(
@@ -23,8 +25,14 @@ async function fetchNotifications() {
   return items ?? [];
 }
 
-export default async function NotificationsPage() {
+export default async function NotificationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
   await requireAuth();
+  const sp = await searchParams;
+  const tab = sp.tab === "inbox" ? "inbox" : "compose";
   const policy = await fetchJson<{
     entitlements?: string[];
     featureFlags?: string[];
@@ -132,36 +140,64 @@ export default async function NotificationsPage() {
       <div>
         <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Notifications</h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Compose messages for drivers (and optionally tenant admins). Push uses OneSignal when
-          configured; the Read column shows who opened the message in the app.
+          Inbox receives live alerts (including panics). Compose sends to drivers; the Read column
+          shows who opened the message in the app.
         </p>
-      </div>
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="card p-4">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-3">Create Category</h2>
-          <form action={createCategory} className="space-y-3">
-            <input name="name" placeholder="Category name" className="input w-full px-3 py-2 text-sm" required />
-            <input name="description" placeholder="Description (optional)" className="input w-full px-3 py-2 text-sm" />
-            <button className="btn btn-primary" type="submit">Create</button>
-          </form>
-          <ul className="mt-4 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
-            {categories.map((c) => (
-              <li key={c.id} className="rounded border border-zinc-200 px-3 py-2 dark:border-zinc-700">
-                <div className="font-medium">{c.name}</div>
-                <div className="text-xs text-zinc-500">{c.description ?? "—"}</div>
-              </li>
-            ))}
-          </ul>
+        <div className="mt-3 flex gap-2 text-sm">
+          <Link
+            href="/notifications?tab=inbox"
+            className={`rounded-md px-3 py-1.5 ${
+              tab === "inbox"
+                ? "bg-teal-600 text-white"
+                : "border border-zinc-200 text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"
+            }`}
+          >
+            Inbox
+          </Link>
+          <Link
+            href="/notifications"
+            className={`rounded-md px-3 py-1.5 ${
+              tab === "compose"
+                ? "bg-teal-600 text-white"
+                : "border border-zinc-200 text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"
+            }`}
+          >
+            Compose &amp; sent
+          </Link>
         </div>
-        <div className="card p-4">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-3">Send Notification</h2>
-          <SendNotificationForm categories={categories} sendNotification={sendNotification} />
-        </div>
       </div>
-      <div className="card p-4">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-3">Recent Notifications</h2>
-        <RecentNotificationsTable notifications={notifications} loadReads={loadReads} />
-      </div>
+      {tab === "inbox" ? (
+        <NotificationsInbox />
+      ) : (
+        <>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="card p-4">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-3">Create Category</h2>
+              <form action={createCategory} className="space-y-3">
+                <input name="name" placeholder="Category name" className="input w-full px-3 py-2 text-sm" required />
+                <input name="description" placeholder="Description (optional)" className="input w-full px-3 py-2 text-sm" />
+                <button className="btn btn-primary" type="submit">Create</button>
+              </form>
+              <ul className="mt-4 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
+                {categories.map((c) => (
+                  <li key={c.id} className="rounded border border-zinc-200 px-3 py-2 dark:border-zinc-700">
+                    <div className="font-medium">{c.name}</div>
+                    <div className="text-xs text-zinc-500">{c.description ?? "—"}</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="card p-4">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-3">Send Notification</h2>
+              <SendNotificationForm categories={categories} sendNotification={sendNotification} />
+            </div>
+          </div>
+          <div className="card p-4">
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-3">Recent Notifications</h2>
+            <RecentNotificationsTable notifications={notifications} loadReads={loadReads} />
+          </div>
+        </>
+      )}
     </div>
   );
 }

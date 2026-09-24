@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- OneSignal Android 12+ notification accent (ARGB, no #). Teal-600. -->
+    <string name="onesignal_notification_accent_color">FF0D9488</string>
+</resources>

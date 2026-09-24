@@ -18,6 +18,28 @@ type BrandUpdatedPayload = {
   action: string;
 };
 
+export type NotificationCreatedPayload = {
+  id: string;
+  title: string;
+  message: string;
+  source: string;
+  deepLink: string | null;
+  targetRole: string | null;
+  meta?: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type IncidentCreatedPayload = {
+  id: string;
+  driverId: string;
+  vehicle: string | null;
+  note: string | null;
+  status: string;
+  createdAt: string;
+  title?: string;
+  message?: string;
+};
+
 @WebSocketGateway({
   namespace: '/tenant-events',
   cors: { origin: true, credentials: true },
@@ -71,10 +93,27 @@ export class TenantEventsGateway
     await client.join(`tenant:${tenantId}`);
   }
 
+  private emitToTenant(
+    tenantKey: string,
+    event: string,
+    payload: unknown,
+  ) {
+    this.server?.to(`tenant:${tenantKey}`).emit(event, payload);
+  }
+
   emitBrandUpdated(payload: BrandUpdatedPayload) {
-    const room = `tenant:${payload.slug}`;
-    this.server?.to(room).emit('brand.updated', payload);
-    // Also emit by uuid room if clients joined with uuid
-    this.server?.to(`tenant:${payload.tenantId}`).emit('brand.updated', payload);
+    this.emitToTenant(payload.slug, 'brand.updated', payload);
+    this.emitToTenant(payload.tenantId, 'brand.updated', payload);
+  }
+
+  emitNotificationCreated(
+    tenantKey: string,
+    payload: NotificationCreatedPayload,
+  ) {
+    this.emitToTenant(tenantKey, 'notification.created', payload);
+  }
+
+  emitIncidentCreated(tenantKey: string, payload: IncidentCreatedPayload) {
+    this.emitToTenant(tenantKey, 'incident.created', payload);
   }
 }

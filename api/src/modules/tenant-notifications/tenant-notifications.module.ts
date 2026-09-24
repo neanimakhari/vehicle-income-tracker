@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { TenancyModule } from '../../tenancy/tenancy.module';
 import { CommercialModule } from '../commercial/commercial.module';
+import { TenantEventsModule } from '../tenant-events/tenant-events.module';
 import { AuthUser } from '../../auth/auth-user.entity';
 import { DeviceBinding } from '../../auth/device-binding.entity';
 import { OneSignalClient } from './onesignal.client';
@@ -14,6 +15,7 @@ import { TenantNotificationsService } from './tenant-notifications.service';
     ConfigModule,
     TenancyModule,
     CommercialModule,
+    TenantEventsModule,
     TypeOrmModule.forFeature([AuthUser, DeviceBinding]),
   ],
   controllers: [TenantNotificationsController],

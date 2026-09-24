@@ -3,6 +3,7 @@ import { requireAuth } from "@/lib/auth";
 import { fetchJson, getApiUrl, getAuthHeaders } from "@/lib/api";
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
+import { IncidentsLiveRefresh } from "./incidents-live-refresh";
 
 type Incident = {
   id: string;
@@ -66,6 +67,7 @@ export default async function IncidentsPage({
 
   return (
     <div className="space-y-6">
+      <IncidentsLiveRefresh />
       <div>
         <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
           <AlertTriangle className="h-6 w-6 text-rose-600 dark:text-rose-400" />

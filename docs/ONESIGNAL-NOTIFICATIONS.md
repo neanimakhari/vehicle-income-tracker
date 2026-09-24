@@ -76,6 +76,18 @@ Flutter: Alerts inbox + badge; tap push → vitapp:// deep link
 
 ---
 
+## Android notification icon
+
+OneSignal uses a **status-bar small icon** from the APK, not the launcher icon.
+
+- Required drawables: `ic_stat_onesignal_default.png` in `app/android/app/src/main/res/drawable-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/` (white silhouette on transparent).
+- Optional large icon: `ic_onesignal_large_icon_default.png` in `drawable-xxxhdpi/`.
+- Optional accent: `onesignal_notification_accent_color` in `values/strings.xml` (ARGB hex, no `#`).
+
+Missing small icon → OneSignal’s default **bell**. Rebuild/ship the APK after changing icons.
+
+---
+
 ## Commercial gate
 
 Module key `notifications` (Pro).

@@ -5,7 +5,9 @@ import {
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { TenantScopeService } from '../../tenancy/tenant-scope.service';
+import { TenantContextService } from '../../tenancy/tenant-context.service';
 import { TenantNotificationsService } from '../tenant-notifications/tenant-notifications.service';
+import { TenantEventsService } from '../tenant-events/tenant-events.service';
 
 export type IncidentStatus = 'open' | 'ack' | 'closed';
 
@@ -14,7 +16,9 @@ export class TenantIncidentsService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly tenantScope: TenantScopeService,
+    private readonly tenantContext: TenantContextService,
     private readonly notifications: TenantNotificationsService,
+    private readonly tenantEvents: TenantEventsService,
   ) {}
 
   private async ensureTable(schema: string): Promise<void> {
@@ -97,6 +101,24 @@ export class TenantIncidentsService {
       );
     } catch {
       // Incident row is already saved; push failure must not roll back.
+    }
+
+    const tenantKey = this.tenantContext.getTenantId();
+    if (tenantKey) {
+      const createdAt =
+        incident.createdAt instanceof Date
+          ? incident.createdAt.toISOString()
+          : String(incident.createdAt ?? new Date().toISOString());
+      this.tenantEvents.notifyIncidentCreated(tenantKey, {
+        id: incident.id,
+        driverId: incident.driverId,
+        vehicle: incident.vehicle,
+        note: incident.note,
+        status: incident.status,
+        createdAt,
+        title,
+        message,
+      });
     }
 
     return incident;

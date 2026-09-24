@@ -1,5 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { TenantEventsGateway } from './tenant-events.gateway';
+import {
+  IncidentCreatedPayload,
+  NotificationCreatedPayload,
+  TenantEventsGateway,
+} from './tenant-events.gateway';
 import { WebhooksService } from '../webhooks/webhooks.service';
 
 @Injectable()
@@ -37,5 +41,24 @@ export class TenantEventsService {
       .catch((err) =>
         this.logger.warn(`webhook brand.updated failed: ${String(err)}`),
       );
+  }
+
+  notifyNotificationCreated(
+    tenantKey: string,
+    payload: NotificationCreatedPayload,
+  ) {
+    try {
+      this.gateway.emitNotificationCreated(tenantKey, payload);
+    } catch (err) {
+      this.logger.warn(`socket notification.created failed: ${String(err)}`);
+    }
+  }
+
+  notifyIncidentCreated(tenantKey: string, payload: IncidentCreatedPayload) {
+    try {
+      this.gateway.emitIncidentCreated(tenantKey, payload);
+    } catch (err) {
+      this.logger.warn(`socket incident.created failed: ${String(err)}`);
+    }
   }
 }

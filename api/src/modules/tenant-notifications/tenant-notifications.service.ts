@@ -11,6 +11,7 @@ import { TenantContextService } from '../../tenancy/tenant-context.service';
 import { AuthUser } from '../../auth/auth-user.entity';
 import { DeviceBinding } from '../../auth/device-binding.entity';
 import { OneSignalClient } from './onesignal.client';
+import { TenantEventsService } from '../tenant-events/tenant-events.service';
 
 export type NotificationCategoryDto = {
   id: string;
@@ -90,6 +91,7 @@ export class TenantNotificationsService {
     private readonly tenantScope: TenantScopeService,
     private readonly tenantContext: TenantContextService,
     private readonly oneSignal: OneSignalClient,
+    private readonly tenantEvents: TenantEventsService,
     @InjectRepository(AuthUser)
     private readonly authUsers: Repository<AuthUser>,
     @InjectRepository(DeviceBinding)
@@ -525,6 +527,23 @@ export class TenantNotificationsService {
        WHERE id = $1`,
       [notificationId, status, resolvedDeepLink],
     );
+
+    const tenantKey = this.tenantContext.getTenantId();
+    if (tenantKey) {
+      this.tenantEvents.notifyNotificationCreated(tenantKey, {
+        id: notificationId,
+        title,
+        message,
+        source,
+        deepLink: resolvedDeepLink,
+        targetRole,
+        meta,
+        createdAt:
+          row.created_at instanceof Date
+            ? row.created_at.toISOString()
+            : String(row.created_at ?? new Date().toISOString()),
+      });
+    }
 
     return {
       notification: this.mapNotification({

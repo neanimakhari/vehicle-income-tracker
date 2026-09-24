@@ -16,6 +16,10 @@ import { ToastFromUrl } from "@/components/toast-from-url";
 import { SysImpersonationBanner } from "@/components/sys-impersonation-banner";
 import { PlatformAnnouncementBanner } from "@/components/PlatformAnnouncementBanner";
 import {
+  NotificationBellLink,
+  NotificationLiveProvider,
+} from "@/components/notification-live";
+import {
   LogOut,
   Bell,
 } from "lucide-react";
@@ -180,7 +184,7 @@ export default async function RootLayout({
         <ThemeProvider>
           <BrandStyleApplier brand={brand} />
           {isAuthenticated ? (
-            <>
+            <NotificationLiveProvider>
               <PlatformAnnouncementBanner announcement={platformAnnouncement} />
               <SysImpersonationBanner />
               <AuthChecker />
@@ -256,6 +260,7 @@ export default async function RootLayout({
                         </div>
                       </div>
                       <div className="flex items-center gap-2 lg:gap-4">
+                        <NotificationBellLink />
                         {pendingMfaUsers !== null && pendingMfaUsers > 0 ? (
                           <div className="hidden sm:flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 lg:px-4 py-1.5 lg:py-2 text-xs font-semibold text-amber-900 shadow-sm dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100">
                             <Bell className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
@@ -288,7 +293,7 @@ export default async function RootLayout({
                   <main id="main-content" className="px-4 sm:px-6 lg:px-8 py-6 lg:py-10 overflow-x-hidden" tabIndex={-1}>{children}</main>
                 </div>
               </div>
-            </>
+            </NotificationLiveProvider>
           ) : (
             <main id="main-content" className="min-h-screen px-6 py-10" tabIndex={-1}>{children}</main>
           )}
