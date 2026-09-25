@@ -44,44 +44,44 @@ class PrivacyPolicyScreen extends StatelessWidget {
             const SizedBox(height: 24),
             _buildSection(
               context,
-              '1. Introduction',
-              'Welcome to VIT (Vehicle Income Tracker). We are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our platform.',
+              '1. Who we are',
+              'VIT (Vehicle Income Tracker) is operated by Vehinc. Contact privacy and support at support@vehinc.co.za. The full policy is also on https://vit-admin.vehinc.co.za/privacy.',
               isDarkMode,
             ),
             _buildSection(
               context,
-              '2. Information We Collect',
-              'We collect personal information including your name, email, phone number, driver license details, banking information, and usage data such as income records, vehicle information, and device details.',
+              '2. POPIA',
+              'We process personal information under South Africa’s POPIA to provide fleet services under B2B contracts, secure accounts, run optional GPS and alerts, and meet legal duties. Your fleet operator (tenant) controls much of the data loaded into their workspace.',
               isDarkMode,
             ),
             _buildSection(
               context,
-              '3. How We Use Your Information',
-              'We use your information to provide and maintain our services, process transactions, send notifications, improve our services, comply with legal obligations, and detect and prevent fraud.',
+              '3. What we collect',
+              'Account details (name, email, phone), driver documents and expiry dates, income and expense records, optional banking fields for tenant payouts, device/login data, push identifiers, and GPS telemetry when tracking is enabled.',
               isDarkMode,
             ),
             _buildSection(
               context,
-              '4. Data Security',
-              'We implement industry-standard security measures including encryption, multi-factor authentication, biometric authentication, regular security audits, and access controls to protect your data.',
+              '4. Processors',
+              'OneSignal (push), SMTP/Mailgun (email), OpenStreetMap tiles when maps load on related web tools, and on-device Google ML Kit OCR when you scan slips. We do not use third-party advertising analytics SDKs in this app.',
               isDarkMode,
             ),
             _buildSection(
               context,
-              '5. Your Rights (GDPR)',
-              'You have the right to access, rectify, erase, port, object to, and restrict processing of your personal data. Contact support to exercise these rights.',
+              '5. Your rights',
+              'You may request access, correction, or deletion of personal information. Email support@vehinc.co.za or use the deletion form at https://vit-admin.vehinc.co.za/privacy/deletion-request. We aim to respond within 30 days.',
               isDarkMode,
             ),
             _buildSection(
               context,
-              '6. Data Retention',
-              'We retain your personal information for as long as necessary to provide our services and comply with legal obligations. Financial records are retained according to applicable regulations.',
+              '6. Children',
+              'VIT is for adult drivers and fleet administrators, not children under 18.',
               isDarkMode,
             ),
             _buildSection(
               context,
-              '7. Contact Us',
-              'If you have questions about this Privacy Policy or wish to exercise your rights, please contact us through the Help & Support page or your tenant administrator.',
+              '7. Contact',
+              'Vehinc — support@vehinc.co.za',
               isDarkMode,
             ),
           ],
@@ -99,8 +99,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
           Text(
             title,
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
               color: isDarkMode ? Colors.white : Colors.black87,
             ),
           ),
@@ -109,8 +109,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
             content,
             style: TextStyle(
               fontSize: 14,
-              color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
-              height: 1.5,
+              height: 1.45,
+              color: isDarkMode ? Colors.white70 : Colors.black87,
             ),
           ),
         ],
@@ -118,4 +118,3 @@ class PrivacyPolicyScreen extends StatelessWidget {
     );
   }
 }
-

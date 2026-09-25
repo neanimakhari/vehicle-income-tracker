@@ -1,21 +1,30 @@
-import { requireAuth } from "@/lib/auth";
+import { getAuthToken } from "@/lib/auth";
 import Link from "next/link";
-import { ArrowLeft, Shield, Lock, Eye, FileText } from "lucide-react";
+import { Shield, Lock, Eye, Server, Scale, Mail } from "lucide-react";
+
+const SUPPORT = "support@vehinc.co.za";
+const ADMIN_PUBLIC = "https://vit-admin.vehinc.co.za";
 
 export default async function PrivacyPolicyPage() {
-  await requireAuth();
-  
+  const token = await getAuthToken();
+  const backHref = token ? "/" : "/login";
+  const backLabel = token ? "Back to Dashboard" : "Back to Login";
+  const updated = new Date().toLocaleDateString("en-ZA", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto px-4 py-8">
       <Link
-        href="/"
+        href={backHref}
         className="inline-flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 mb-6"
       >
-        <ArrowLeft className="w-4 h-4" />
-        Back to Dashboard
+        ← {backLabel}
       </Link>
 
-      <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-sm p-8">
+      <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-sm p-6 sm:p-8">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-3 rounded-lg bg-teal-100 dark:bg-teal-900/30">
             <Shield className="w-6 h-6 text-teal-600 dark:text-teal-400" />
@@ -25,147 +34,227 @@ export default async function PrivacyPolicyPage() {
               Privacy Policy
             </h1>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-              Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+              Last updated: {updated}
             </p>
           </div>
         </div>
 
-        <div className="prose prose-zinc dark:prose-invert max-w-none">
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4 flex items-center gap-2">
+        <div className="prose prose-zinc dark:prose-invert max-w-none space-y-8 text-zinc-700 dark:text-zinc-300">
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3 flex items-center gap-2">
               <Lock className="w-5 h-5 text-teal-600 dark:text-teal-400" />
-              1. Introduction
+              1. Who we are
             </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-              Welcome to VIT (Vehicle Income Tracker). We are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our platform.
+            <p className="leading-relaxed">
+              VIT (Vehicle Income Tracker) is operated by <strong>Vehinc</strong>. This notice
+              explains how we process personal information when you use the VIT web consoles,
+              mobile app, and related APIs. For privacy requests contact{" "}
+              <a className="text-teal-700 dark:text-teal-300 underline" href={`mailto:${SUPPORT}`}>
+                {SUPPORT}
+              </a>
+              .
             </p>
           </section>
 
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4 flex items-center gap-2">
-              <Eye className="w-5 h-5 text-teal-600 dark:text-teal-400" />
-              2. Information We Collect
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3 flex items-center gap-2">
+              <Scale className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+              2. POPIA and lawful processing
             </h2>
-            <div className="space-y-4 text-zinc-700 dark:text-zinc-300">
+            <p className="leading-relaxed mb-3">
+              We process personal information in line with South Africa&apos;s Protection of
+              Personal Information Act (POPIA) and, where applicable, other data-protection laws.
+              Processing is typically necessary to:
+            </p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li>Provide fleet income, expense, maintenance, and admin services under a B2B contract</li>
+              <li>Secure accounts (login, MFA, sessions)</li>
+              <li>Operate GPS tracking and operational alerts where a tenant enables those modules</li>
+              <li>Meet legal or regulatory obligations</li>
+            </ul>
+            <p className="leading-relaxed mt-3">
+              Fleet operators (tenants) act as responsible parties for much of the driver and
+              vehicle data they load into their tenant workspace; Vehinc hosts and processes that
+              data to deliver the service.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3 flex items-center gap-2">
+              <Eye className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+              3. Information we collect
+            </h2>
+            <div className="space-y-3">
               <div>
-                <h3 className="font-semibold mb-2">Personal Information</h3>
-                <ul className="list-disc list-inside space-y-1 ml-4">
-                  <li>Name, email address, and phone number</li>
-                  <li>Driver license information and PRDP details</li>
-                  <li>Banking information for payment processing</li>
-                  <li>Profile pictures and documents</li>
-                </ul>
+                <h3 className="font-semibold mb-1">Account and profile</h3>
+                <p>
+                  Name, email, phone, role, authentication data, and optional profile picture.
+                </p>
               </div>
               <div>
-                <h3 className="font-semibold mb-2">Usage Data</h3>
-                <ul className="list-disc list-inside space-y-1 ml-4">
-                  <li>Income and expense records</li>
-                  <li>Vehicle and trip information</li>
-                  <li>Device information and IP addresses</li>
-                  <li>Login history and authentication data</li>
-                </ul>
+                <h3 className="font-semibold mb-1">Driver compliance documents</h3>
+                <p>
+                  Licence / PRDP / medical expiry details and uploaded documents as configured by
+                  the tenant.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-1">Operational records</h3>
+                <p>
+                  Income and expense entries, vehicle details, maintenance tasks, and related
+                  receipts or notes.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-1">Location and device (when enabled)</h3>
+                <p>
+                  GPS / tracker telemetry for vehicles, approximate device information, IP address
+                  on login, and push-notification device identifiers.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-1">Banking details (if captured by the tenant)</h3>
+                <p>
+                  Optional bank fields on driver profiles for the tenant&apos;s payroll or payout
+                  processes — not used by Vehinc for card payments (we do not take public card
+                  payments in-app).
+                </p>
               </div>
             </div>
           </section>
 
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              3. How We Use Your Information
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+              4. How we use information
             </h2>
-            <ul className="list-disc list-inside space-y-2 text-zinc-700 dark:text-zinc-300 ml-4">
-              <li>To provide and maintain our services</li>
-              <li>To process transactions and manage accounts</li>
-              <li>To send important notifications and updates</li>
-              <li>To improve our services and user experience</li>
-              <li>To comply with legal obligations</li>
-              <li>To detect and prevent fraud or security issues</li>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li>Operate and secure the VIT platform</li>
+              <li>Send operational emails and push alerts (reports, reminders, tracking, panic)</li>
+              <li>Provide support when you contact us</li>
+              <li>Improve reliability and prevent abuse</li>
+              <li>Comply with law or lawful requests</li>
             </ul>
           </section>
 
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              4. Data Security
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3 flex items-center gap-2">
+              <Server className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+              5. Operators and processors
             </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-4">
-              We implement industry-standard security measures to protect your data:
+            <p className="leading-relaxed mb-3">
+              We use specialised providers to run the product. They only receive what is needed for
+              their role:
             </p>
-            <ul className="list-disc list-inside space-y-2 text-zinc-700 dark:text-zinc-300 ml-4">
-              <li>Encryption of data in transit and at rest</li>
-              <li>Multi-factor authentication (MFA) support</li>
-              <li>Biometric authentication options</li>
-              <li>Regular security audits and updates</li>
-              <li>Access controls and role-based permissions</li>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li>
+                <strong>OneSignal</strong> — mobile push notifications (device / user identifiers)
+              </li>
+              <li>
+                <strong>SMTP / Mailgun</strong> — transactional and operational email delivery
+              </li>
+              <li>
+                <strong>OpenStreetMap tile servers</strong> — map tiles on Live Tracking (your
+                browser/IP may contact OSM when maps load)
+              </li>
+              <li>
+                <strong>Google ML Kit</strong> — on-device OCR in the mobile app when scanning slips
+                (processing stays on the device where possible)
+              </li>
+              <li>
+                <strong>UserWay</strong> — optional accessibility widget when enabled for a
+                deployment
+              </li>
+              <li>
+                <strong>Hosting / infrastructure</strong> — servers and databases that store tenant
+                data
+              </li>
             </ul>
-          </section>
-
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              5. Data Retention
-            </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-              We retain your personal information for as long as necessary to provide our services and comply with legal obligations. Financial records are retained according to applicable accounting and tax regulations. You may request deletion of your data subject to legal requirements.
+            <p className="leading-relaxed mt-3">
+              We do <strong>not</strong> use third-party product-analytics or advertising pixels on
+              the admin consoles.
             </p>
           </section>
 
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              6. Your Rights (GDPR Compliance)
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+              6. Cookies
             </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-4">
-              Under GDPR and other data protection laws, you have the right to:
-            </p>
-            <ul className="list-disc list-inside space-y-2 text-zinc-700 dark:text-zinc-300 ml-4">
-              <li><strong>Access:</strong> Request a copy of your personal data</li>
-              <li><strong>Rectification:</strong> Correct inaccurate or incomplete data</li>
-              <li><strong>Erasure:</strong> Request deletion of your data ("right to be forgotten")</li>
-              <li><strong>Portability:</strong> Receive your data in a structured, machine-readable format</li>
-              <li><strong>Objection:</strong> Object to processing of your data</li>
-              <li><strong>Restriction:</strong> Request restriction of processing</li>
-            </ul>
-          </section>
-
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              7. Cookies and Tracking
-            </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-              We use cookies and similar technologies to maintain your session, remember your preferences, and improve our services. You can control cookie preferences through your browser settings.
+            <p className="leading-relaxed">
+              We use essential cookies (or equivalent) to keep you signed in and apply security
+              settings. We do not use non-essential marketing cookies on the admin consoles.
             </p>
           </section>
 
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              8. Third-Party Services
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+              7. Security and retention
             </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-              We may use third-party services for analytics, email delivery, and cloud storage. These services have their own privacy policies, and we encourage you to review them.
+            <p className="leading-relaxed">
+              We use encryption in transit, access controls, optional MFA, and tenant isolation.
+              We retain information for as long as the tenant account needs the service and as
+              required for legal, tax, or dispute purposes. Tenants control much of the day-to-day
+              data lifecycle inside their workspace.
             </p>
           </section>
 
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              9. Children's Privacy
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+              8. Your rights
             </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-              Our services are not intended for individuals under the age of 18. We do not knowingly collect personal information from children.
+            <p className="leading-relaxed mb-3">
+              Subject to POPIA and other applicable law, you may request access, correction,
+              deletion, or restriction of personal information we hold, or object to certain
+              processing. You may also lodge a complaint with the Information Regulator (South
+              Africa).
+            </p>
+            <p className="leading-relaxed">
+              To request deletion of your personal information, use our{" "}
+              <Link
+                href="/privacy/deletion-request"
+                className="text-teal-700 dark:text-teal-300 underline"
+              >
+                data deletion request form
+              </Link>{" "}
+              or email {SUPPORT}. We aim to respond within 30 days.
             </p>
           </section>
 
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              10. Changes to This Policy
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+              9. Children
             </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-              We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date.
+            <p className="leading-relaxed">
+              VIT is a business fleet product for adult drivers and administrators. It is not
+              directed at children under 18, and we do not knowingly collect children&apos;s data
+              for marketing.
             </p>
           </section>
 
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              11. Contact Us
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+              10. Changes
             </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-              If you have questions about this Privacy Policy or wish to exercise your rights, please contact us through the Help & Support page or your tenant administrator.
+            <p className="leading-relaxed">
+              We may update this notice and will revise the &quot;Last updated&quot; date above.
+              Material changes may also be communicated in-product or by email.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3 flex items-center gap-2">
+              <Mail className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+              11. Contact
+            </h2>
+            <p className="leading-relaxed">
+              Vehinc — VIT support:{" "}
+              <a className="text-teal-700 dark:text-teal-300 underline" href={`mailto:${SUPPORT}`}>
+                {SUPPORT}
+              </a>
+              . Help:{" "}
+              <Link href="/help" className="text-teal-700 dark:text-teal-300 underline">
+                {ADMIN_PUBLIC}/help
+              </Link>
+              .
             </p>
           </section>
         </div>
@@ -173,4 +262,3 @@ export default async function PrivacyPolicyPage() {
     </div>
   );
 }
-

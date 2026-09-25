@@ -1,21 +1,29 @@
-import { requireAuth } from "@/lib/auth";
+import { getAuthToken } from "@/lib/auth";
 import Link from "next/link";
-import { ArrowLeft, FileText, Scale, AlertTriangle, CheckCircle } from "lucide-react";
+import { FileText, Scale, AlertTriangle, CheckCircle } from "lucide-react";
+
+const SUPPORT = "support@vehinc.co.za";
 
 export default async function TermsOfServicePage() {
-  await requireAuth();
-  
+  const token = await getAuthToken();
+  const backHref = token ? "/" : "/login";
+  const backLabel = token ? "Back to Dashboard" : "Back to Login";
+  const updated = new Date().toLocaleDateString("en-ZA", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto px-4 py-8">
       <Link
-        href="/"
+        href={backHref}
         className="inline-flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 mb-6"
       >
-        <ArrowLeft className="w-4 h-4" />
-        Back to Dashboard
+        ← {backLabel}
       </Link>
 
-      <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-sm p-8">
+      <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-sm p-6 sm:p-8">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-3 rounded-lg bg-teal-100 dark:bg-teal-900/30">
             <FileText className="w-6 h-6 text-teal-600 dark:text-teal-400" />
@@ -25,164 +33,135 @@ export default async function TermsOfServicePage() {
               Terms of Service
             </h1>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-              Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+              Last updated: {updated}
             </p>
           </div>
         </div>
 
-        <div className="prose prose-zinc dark:prose-invert max-w-none">
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4 flex items-center gap-2">
+        <div className="prose prose-zinc dark:prose-invert max-w-none space-y-8 text-zinc-700 dark:text-zinc-300">
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3 flex items-center gap-2">
               <Scale className="w-5 h-5 text-teal-600 dark:text-teal-400" />
-              1. Acceptance of Terms
+              1. Acceptance
             </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-              By accessing and using VIT (Vehicle Income Tracker), you accept and agree to be bound by these Terms of Service. If you do not agree to these terms, you must not use our services.
+            <p className="leading-relaxed">
+              By accessing VIT (Vehicle Income Tracker), operated by Vehinc, you agree to these
+              Terms. If you do not agree, do not use the service.
             </p>
           </section>
 
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              2. Description of Service
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+              2. The service
             </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-4">
-              VIT is a vehicle income tracking platform that allows:
+            <p className="leading-relaxed mb-2">
+              VIT is a multi-tenant B2B platform for fleet income, expenses, drivers, maintenance,
+              reports, and optional GPS tracking / alerts. Features depend on the tenant&apos;s
+              plan and configuration.
             </p>
-            <ul className="list-disc list-inside space-y-2 text-zinc-700 dark:text-zinc-300 ml-4">
-              <li>Recording and tracking vehicle income and expenses</li>
-              <li>Managing driver profiles and documents</li>
-              <li>Generating reports and analytics</li>
-              <li>Maintenance scheduling and tracking</li>
-              <li>Multi-tenant administration</li>
-            </ul>
           </section>
 
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4 flex items-center gap-2">
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3 flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-teal-600 dark:text-teal-400" />
-              3. User Accounts and Responsibilities
+              3. Accounts
             </h2>
-            <div className="space-y-4 text-zinc-700 dark:text-zinc-300">
-              <div>
-                <h3 className="font-semibold mb-2">Account Creation</h3>
-                <p>You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.</p>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">User Responsibilities</h3>
-                <ul className="list-disc list-inside space-y-1 ml-4">
-                  <li>Provide accurate and complete information</li>
-                  <li>Keep your password secure and confidential</li>
-                  <li>Notify us immediately of any unauthorized access</li>
-                  <li>Comply with all applicable laws and regulations</li>
-                  <li>Use the service only for lawful purposes</li>
-                </ul>
-              </div>
-            </div>
-          </section>
-
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              4. Acceptable Use
-            </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-4">
-              You agree not to:
-            </p>
-            <ul className="list-disc list-inside space-y-2 text-zinc-700 dark:text-zinc-300 ml-4">
-              <li>Use the service for any illegal or unauthorized purpose</li>
-              <li>Attempt to gain unauthorized access to the system</li>
-              <li>Interfere with or disrupt the service or servers</li>
-              <li>Upload malicious code, viruses, or harmful content</li>
-              <li>Impersonate any person or entity</li>
-              <li>Violate any applicable laws or regulations</li>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li>Keep credentials confidential and notify us of suspected misuse</li>
+              <li>Provide accurate information</li>
+              <li>Use the service lawfully and only for authorised fleet operations</li>
+              <li>Tenant admins are responsible for users they invite and data they load</li>
             </ul>
           </section>
 
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              5. Data and Content
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+              4. Acceptable use
             </h2>
-            <div className="space-y-4 text-zinc-700 dark:text-zinc-300">
-              <div>
-                <h3 className="font-semibold mb-2">Your Data</h3>
-                <p>You retain ownership of all data you upload to the platform. You grant us a license to use, store, and process your data to provide the service.</p>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Data Accuracy</h3>
-                <p>You are responsible for the accuracy and completeness of all data you enter. We are not liable for errors in data you provide.</p>
-              </div>
-            </div>
+            <p className="leading-relaxed mb-2">You must not:</p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li>Break the law or infringe others&apos; rights</li>
+              <li>Attempt unauthorised access, disrupt the service, or upload malware</li>
+              <li>Impersonate others or misuse panic / alert features</li>
+            </ul>
           </section>
 
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              6. Payment and Billing
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+              5. Data
             </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-              If applicable, payment terms will be specified in your service agreement. You are responsible for all fees associated with your account. We reserve the right to change our pricing with reasonable notice.
+            <p className="leading-relaxed">
+              You (or your organisation) retain ownership of data you submit. You grant Vehinc a
+              licence to host and process that data to provide VIT. See our{" "}
+              <Link href="/privacy" className="text-teal-700 dark:text-teal-300 underline">
+                Privacy Policy
+              </Link>{" "}
+              for POPIA details. You are responsible for the accuracy of data you enter.
             </p>
           </section>
 
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4 flex items-center gap-2">
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+              6. Fees and plans
+            </h2>
+            <p className="leading-relaxed">
+              Commercial terms (plans, modules, invoicing) are agreed between Vehinc and the
+              customer organisation. VIT does not process public in-app card payments; there is no
+              consumer refund checkout in the product.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3 flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-teal-600 dark:text-teal-400" />
-              7. Service Availability
+              7. Availability and liability
             </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-              We strive to provide reliable service but do not guarantee uninterrupted or error-free operation. We may perform maintenance that temporarily affects service availability. We are not liable for any losses resulting from service interruptions.
+            <p className="leading-relaxed">
+              We aim for reliable service but do not guarantee uninterrupted operation. To the
+              extent permitted by South African law, Vehinc is not liable for indirect or
+              consequential loss, including lost profits or data, arising from use of the service.
             </p>
           </section>
 
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              8. Intellectual Property
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+              8. Intellectual property
             </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-              The VIT platform, including its design, features, and functionality, is owned by us and protected by intellectual property laws. You may not copy, modify, or create derivative works without our written permission.
+            <p className="leading-relaxed">
+              The VIT software, branding, and documentation remain Vehinc property. You may not
+              copy or reverse-engineer the platform except as allowed by law.
             </p>
           </section>
 
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              9. Limitation of Liability
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+              9. Suspension and termination
             </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-              To the maximum extent permitted by law, we shall not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of profits or revenues, whether incurred directly or indirectly, or any loss of data, use, goodwill, or other intangible losses.
+            <p className="leading-relaxed">
+              We may suspend or terminate access for breach of these Terms, non-payment under a
+              commercial agreement, or risk to the platform or other customers.
             </p>
           </section>
 
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              10. Termination
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+              10. Governing law
             </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-4">
-              We may terminate or suspend your account immediately, without prior notice, for conduct that we believe violates these Terms of Service or is harmful to other users, us, or third parties. Upon termination, your right to use the service will cease immediately.
+            <p className="leading-relaxed">
+              These Terms are governed by the laws of the Republic of South Africa.
             </p>
           </section>
 
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              11. Changes to Terms
+          <section>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-3">
+              11. Contact
             </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-              We reserve the right to modify these Terms of Service at any time. We will notify users of significant changes. Your continued use of the service after changes constitutes acceptance of the new terms.
-            </p>
-          </section>
-
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              12. Governing Law
-            </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-              These Terms of Service shall be governed by and construed in accordance with the laws of the jurisdiction in which the service provider operates, without regard to its conflict of law provisions.
-            </p>
-          </section>
-
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              13. Contact Information
-            </h2>
-            <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-              For questions about these Terms of Service, please contact us through the Help & Support page or your tenant administrator.
+            <p className="leading-relaxed">
+              Questions:{" "}
+              <a className="text-teal-700 dark:text-teal-300 underline" href={`mailto:${SUPPORT}`}>
+                {SUPPORT}
+              </a>
+              .
             </p>
           </section>
         </div>
@@ -190,4 +169,3 @@ export default async function TermsOfServicePage() {
     </div>
   );
 }
-

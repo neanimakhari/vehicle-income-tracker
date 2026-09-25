@@ -1,9 +1,11 @@
-import { requireAuth } from "@/lib/auth";
+import { getAuthToken } from "@/lib/auth";
 import Link from "next/link";
-import { ArrowLeft, HelpCircle, MessageCircle, Book, Mail, Search, ChevronRight } from "lucide-react";
+import { HelpCircle, MessageCircle, Book, Mail, Search, ChevronRight } from "lucide-react";
 
 export default async function HelpPage() {
-  await requireAuth();
+  const token = await getAuthToken();
+  const backHref = token ? "/" : "/login";
+  const backLabel = token ? "Back to Dashboard" : "Back to Login";
   
   const faqs = [
     {
@@ -56,13 +58,12 @@ export default async function HelpPage() {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto px-4 py-8">
       <Link
-        href="/"
+        href={backHref}
         className="inline-flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 mb-6"
       >
-        <ArrowLeft className="w-4 h-4" />
-        Back to Dashboard
+        ← {backLabel}
       </Link>
 
       <div className="mb-8">
@@ -161,9 +162,22 @@ export default async function HelpPage() {
             Need additional help? Our support team is here to assist you.
           </p>
           <div className="space-y-2">
-            <p><strong>Email:</strong> support@vit.com</p>
+            <p><strong>Email:</strong>{" "}
+              <a className="text-teal-700 underline dark:text-teal-300" href="mailto:support@vehinc.co.za">
+                support@vehinc.co.za
+              </a>
+            </p>
             <p><strong>Response Time:</strong> Within 24 hours during business days</p>
-            <p><strong>Hours:</strong> Monday - Friday, 9:00 AM - 5:00 PM</p>
+            <p><strong>Hours:</strong> Monday - Friday, 9:00 AM - 5:00 PM (SAST)</p>
+            <p className="text-sm">
+              <Link href="/privacy" className="text-teal-700 underline dark:text-teal-300">Privacy</Link>
+              {" · "}
+              <Link href="/terms" className="text-teal-700 underline dark:text-teal-300">Terms</Link>
+              {" · "}
+              <Link href="/privacy/deletion-request" className="text-teal-700 underline dark:text-teal-300">
+                Data deletion request
+              </Link>
+            </p>
           </div>
           <div className="mt-6 p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-200 dark:border-teal-800">
             <p className="text-sm text-teal-900 dark:text-teal-100">

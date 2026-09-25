@@ -71,6 +71,15 @@
       }
       button:disabled { opacity: 0.55; cursor: not-allowed; }
       button.secondary { background: #3f3f46; margin-top: 0.6rem; }
+      .legal-links {
+        margin: 1.25rem 0 0;
+        text-align: center;
+        font-size: 0.8rem;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .legal-links a { color: #5eead4; text-decoration: none; }
+      .legal-links a:hover { text-decoration: underline; }
       .err {
         display: none;
         margin-top: 0.85rem;
@@ -140,6 +149,14 @@
         <button type="button" class="secondary" id="outBtn">Sign out</button>
         <div class="err" id="err2"></div>
       </div>
+
+      <p class="legal-links">
+        <a href="https://vit-admin.vehinc.co.za/privacy">Privacy</a>
+        ·
+        <a href="https://vit-admin.vehinc.co.za/terms">Terms</a>
+        ·
+        <a href="mailto:support@vehinc.co.za">support@vehinc.co.za</a>
+      </p>
     </main>
     <script>
       const API = "https://vit-api.vehinc.co.za/v1";

@@ -17,6 +17,8 @@ type MailOptions = {
   html?: string;
   from?: string;
   attachments?: MailAttachment[];
+  /** Extra SMTP/Mailgun headers (e.g. List-Unsubscribe). */
+  headers?: Record<string, string>;
 };
 
 @Injectable()
@@ -83,6 +85,11 @@ export class EmailService {
       text: mailOptions.text ?? '',
       html: mailOptions.html ?? '',
     };
+    if (mailOptions.headers) {
+      for (const [k, v] of Object.entries(mailOptions.headers)) {
+        payload[`h:${k}`] = v;
+      }
+    }
     if (mailOptions.attachments?.length) {
       payload.attachment = mailOptions.attachments.map((a) => ({
         filename: a.filename,
@@ -109,6 +116,7 @@ export class EmailService {
       text: mailOptions.text,
       html: mailOptions.html,
       from,
+      headers: mailOptions.headers,
       attachments: mailOptions.attachments?.map((a) => ({
         filename: a.filename,
         content: a.content,
@@ -116,6 +124,67 @@ export class EmailService {
       })),
     });
     return { sent: true };
+  }
+
+  private static readonly SUPPORT_EMAIL = 'support@vehinc.co.za';
+  private static readonly PRIVACY_URL = 'https://vit-admin.vehinc.co.za/privacy';
+  private static readonly TERMS_URL = 'https://vit-admin.vehinc.co.za/terms';
+
+  /** Shared legal footer for operational / digest mail (not auth OTP / password reset). */
+  private legalFooterHtml(opts?: { includeUnsubscribe?: boolean }): string {
+    const unsub = opts?.includeUnsubscribe
+      ? `<p style="margin:8px 0 0;"><a href="mailto:${EmailService.SUPPORT_EMAIL}?subject=Unsubscribe%20VIT%20emails" style="color:#0d9488;">Unsubscribe or manage email preferences</a></p>`
+      : '';
+    return `
+      <p style="margin:0;">
+        <a href="${EmailService.PRIVACY_URL}" style="color:#0d9488;">Privacy</a>
+        &nbsp;·&nbsp;
+        <a href="${EmailService.TERMS_URL}" style="color:#0d9488;">Terms</a>
+        &nbsp;·&nbsp;
+        <a href="mailto:${EmailService.SUPPORT_EMAIL}" style="color:#0d9488;">${EmailService.SUPPORT_EMAIL}</a>
+      </p>
+      ${unsub}
+      <p style="margin:8px 0 0;">Vehinc · VIT</p>`;
+  }
+
+  private unsubscribeHeaders(): Record<string, string> {
+    return {
+      'List-Unsubscribe': `<mailto:${EmailService.SUPPORT_EMAIL}?subject=Unsubscribe%20VIT%20emails>`,
+    };
+  }
+
+  async sendDeletionRequestNotice(input: {
+    requesterName: string;
+    requesterEmail: string;
+    company?: string | null;
+    details?: string | null;
+  }): Promise<{ sent: boolean }> {
+    const company = input.company?.trim() || '—';
+    const details = input.details?.trim() || '—';
+    const html = `
+      <p>A data deletion request was submitted via VIT.</p>
+      <ul>
+        <li><strong>Name:</strong> ${this.escapeHtml(input.requesterName)}</li>
+        <li><strong>Email:</strong> ${this.escapeHtml(input.requesterEmail)}</li>
+        <li><strong>Company / tenant:</strong> ${this.escapeHtml(company)}</li>
+        <li><strong>Details:</strong> ${this.escapeHtml(details)}</li>
+      </ul>
+      <p>Please respond within 30 days (POPIA).</p>`;
+    return this.send({
+      to: EmailService.SUPPORT_EMAIL,
+      subject: `VIT data deletion request — ${input.requesterEmail}`,
+      text: `Deletion request from ${input.requesterName} <${input.requesterEmail}> company=${company}\n\n${details}`,
+      html,
+      headers: { 'Reply-To': input.requesterEmail },
+    });
+  }
+
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   private async send(mailOptions: MailOptions): Promise<{ sent: boolean }> {
@@ -593,6 +662,7 @@ This invite expires in 48 hours. Do not share the link.`;
               <p>This is an automated monthly report from ${headerName}</p>
               <p>A detailed PDF with charts is attached.</p>
               <p>Generated on ${new Date().toLocaleDateString('en-ZA')}</p>
+              ${this.legalFooterHtml({ includeUnsubscribe: true })}
             </div>
           </div>
         </div>
@@ -607,6 +677,7 @@ This invite expires in 48 hours. Do not share the link.`;
         to: recipient,
         subject: `Monthly Financial Report - ${headerName} - ${formatDate(reportData.period.startDate)}`,
         html,
+        headers: this.unsubscribeHeaders(),
         attachments: pdfAttachment
           ? [
               {
@@ -1119,6 +1190,7 @@ This invite expires in 48 hours. Do not share the link.`;
             </div>
             <div class="footer">
               Automated message from VIT · ${escape(payload.tenantName)}
+              ${this.legalFooterHtml({ includeUnsubscribe: true })}
             </div>
           </div>
         </div>
@@ -1138,7 +1210,13 @@ This invite expires in 48 hours. Do not share the link.`;
     const recipients = Array.isArray(payload.to) ? payload.to : [payload.to];
     let lastResult = { sent: false };
     for (const recipient of recipients) {
-      lastResult = await this.send({ to: recipient, subject, html, text });
+      lastResult = await this.send({
+        to: recipient,
+        subject,
+        html,
+        text,
+        headers: this.unsubscribeHeaders(),
+      });
     }
     return lastResult;
   }
@@ -1173,6 +1251,7 @@ This invite expires in 48 hours. Do not share the link.`;
           (${escape(payload.expiryDate)}).</p>
         <p>Please update documents in VIT to avoid fines or downtime.</p>
         <p style="color:#71717a;font-size:12px;">Automated message from VIT · ${escape(payload.tenantName)}</p>
+        <div style="margin-top:16px;font-size:12px;color:#71717a;">${this.legalFooterHtml({ includeUnsubscribe: true })}</div>
       </body></html>`;
     const text = [
       subject,
@@ -1184,7 +1263,13 @@ This invite expires in 48 hours. Do not share the link.`;
     const recipients = Array.isArray(payload.to) ? payload.to : [payload.to];
     let lastResult = { sent: false };
     for (const recipient of recipients) {
-      lastResult = await this.send({ to: recipient, subject, html, text });
+      lastResult = await this.send({
+        to: recipient,
+        subject,
+        html,
+        text,
+        headers: this.unsubscribeHeaders(),
+      });
     }
     return lastResult;
   }

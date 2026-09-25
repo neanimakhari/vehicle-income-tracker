@@ -208,6 +208,25 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
 
           <div className="mt-6 pt-6 border-t border-zinc-700 flex flex-wrap items-center justify-center gap-4 text-xs text-zinc-400">
             <Link href="/forgot-password" className="hover:text-teal-400">Forgot password</Link>
+            <a
+              href="https://vit-admin.vehinc.co.za/privacy"
+              className="hover:text-teal-400"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Privacy
+            </a>
+            <a
+              href="https://vit-admin.vehinc.co.za/terms"
+              className="hover:text-teal-400"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Terms
+            </a>
+            <a href="mailto:support@vehinc.co.za" className="hover:text-teal-400">
+              support@vehinc.co.za
+            </a>
           </div>
         </div>
 
